@@ -1,0 +1,59 @@
+[package]
+name = "vc-client"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "VoiceChat Desktop Client"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+# Internal
+vc-common.workspace = true
+vc-crypto.workspace = true
+
+# Tauri
+tauri = { version = "2", features = ["protocol-asset"] }
+tauri-plugin-shell = "2"
+
+# Async
+tokio.workspace = true
+futures.workspace = true
+
+# WebRTC
+webrtc.workspace = true
+
+# Audio
+cpal = "0.15"
+opus = "0.3"
+# nnnoiseless = "0.5"
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+
+# HTTP
+reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
+
+# Secure Storage
+keyring = "2"
+
+# Utils
+uuid.workspace = true
+chrono.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+
+# Logging
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+[lints]
+workspace = true
+
+[lib]
+name = "vc_client"
+crate-type = ["staticlib", "cdylib", "rlib"]

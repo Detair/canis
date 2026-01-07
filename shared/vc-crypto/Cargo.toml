@@ -1,0 +1,23 @@
+[package]
+name = "vc-crypto"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "E2EE cryptography for VoiceChat using vodozemac (Olm/Megolm)"
+
+[dependencies]
+vodozemac.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+# For key storage
+zeroize = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+rand = "0.8"
+
+[lints]
+workspace = true

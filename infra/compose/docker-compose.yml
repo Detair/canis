@@ -1,0 +1,115 @@
+# VoiceChat Production Docker Compose
+# Usage: docker compose up -d
+
+services:
+  # ==========================================================================
+  # VoiceChat Server
+  # ==========================================================================
+  server:
+    build:
+      context: ../..
+      dockerfile: infra/docker/server.Dockerfile
+    image: voicechat/server:latest
+    container_name: voicechat-server
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - BIND_ADDRESS=0.0.0.0:8080
+      - DATABASE_URL=postgres://voicechat:${POSTGRES_PASSWORD}@postgres:5432/voicechat
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=${JWT_SECRET}
+      - S3_ENDPOINT=${S3_ENDPOINT:-}
+      - S3_BUCKET=${S3_BUCKET:-voicechat}
+      - OIDC_ISSUER_URL=${OIDC_ISSUER_URL:-}
+      - OIDC_CLIENT_ID=${OIDC_CLIENT_ID:-}
+      - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET:-}
+      - STUN_SERVER=${STUN_SERVER:-stun:stun.l.google.com:19302}
+      - TURN_SERVER=${TURN_SERVER:-}
+      - TURN_USERNAME=${TURN_USERNAME:-}
+      - TURN_CREDENTIAL=${TURN_CREDENTIAL:-}
+    networks:
+      - voicechat
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.voicechat.rule=Host(`${DOMAIN}`)"
+      - "traefik.http.routers.voicechat.entrypoints=websecure"
+      - "traefik.http.routers.voicechat.tls.certresolver=letsencrypt"
+      - "traefik.http.services.voicechat.loadbalancer.server.port=8080"
+
+  # ==========================================================================
+  # PostgreSQL Database
+  # ==========================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: voicechat-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=voicechat
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=voicechat
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - voicechat
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U voicechat"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==========================================================================
+  # Redis
+  # ==========================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: voicechat-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - voicechat
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==========================================================================
+  # Traefik Reverse Proxy
+  # ==========================================================================
+  traefik:
+    image: traefik:v3.0
+    container_name: voicechat-traefik
+    restart: unless-stopped
+    command:
+      - "--api.dashboard=false"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
+      - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - letsencrypt:/letsencrypt
+    networks:
+      - voicechat
+
+networks:
+  voicechat:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  letsencrypt:

@@ -1,0 +1,111 @@
+[workspace]
+resolver = "2"
+members = [
+    "server",
+    "client/src-tauri",
+    "shared/vc-common",
+    "shared/vc-crypto",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/yourorg/voicechat"
+rust-version = "1.75"
+authors = ["VoiceChat Contributors"]
+description = "Self-hosted voice and text chat platform"
+keywords = ["voip", "chat", "webrtc", "e2ee"]
+categories = ["multimedia", "network-programming"]
+
+[workspace.dependencies]
+# Async Runtime
+tokio = { version = "1", features = ["full"] }
+futures = "0.3"
+
+# Web Framework
+axum = "0.7"
+tower = "0.4"
+tower-http = { version = "0.5", features = ["cors", "trace", "compression-gzip"] }
+
+# WebSocket
+tokio-tungstenite = "0.21"
+
+# WebRTC
+webrtc = "0.11"
+
+# Database
+sqlx = { version = "0.7", features = ["postgres", "runtime-tokio", "uuid", "chrono", "json"] }
+
+# Redis
+fred = "8"
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Auth
+jsonwebtoken = "9"
+argon2 = "0.5"
+totp-rs = "5"
+openidconnect = "3"
+
+# Crypto
+rustls = "0.22"
+x25519-dalek = "2"
+ed25519-dalek = "2"
+aes-gcm = "0.10"
+hkdf = "0.12"
+sha2 = "0.10"
+vodozemac = "0.5"
+
+# Utils
+uuid = { version = "1", features = ["v7", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+thiserror = "1"
+anyhow = "1"
+bytes = "1"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["json", "env-filter"] }
+
+# S3
+aws-sdk-s3 = "1"
+aws-config = "1"
+
+# API Docs
+utoipa = { version = "4", features = ["axum_extras"] }
+utoipa-swagger-ui = { version = "6", features = ["axum"] }
+
+# Markdown
+pulldown-cmark = "0.10"
+
+# Validation
+validator = { version = "0.16", features = ["derive"] }
+
+# Internal Crates
+vc-common = { path = "shared/vc-common" }
+vc-crypto = { path = "shared/vc-crypto" }
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
+
+[workspace.lints.clippy]
+all = "warn"
+pedantic = "warn"
+nursery = "warn"
+
+[profile.release]
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[profile.dev]
+opt-level = 0
+debug = true
+
+[profile.dev.package."*"]
+opt-level = 3
