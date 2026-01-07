@@ -109,3 +109,22 @@ pub struct FileAttachment {
     pub s3_key: String,
     pub created_at: DateTime<Utc>,
 }
+
+/// Session model for refresh token tracking.
+#[derive(Debug, Clone, FromRow)]
+pub struct Session {
+    /// Session ID.
+    pub id: Uuid,
+    /// User this session belongs to.
+    pub user_id: Uuid,
+    /// SHA256 hash of the refresh token.
+    pub token_hash: String,
+    /// When the session/token expires.
+    pub expires_at: DateTime<Utc>,
+    /// IP address of the client (stored as string for simplicity).
+    pub ip_address: Option<String>,
+    /// User agent of the client.
+    pub user_agent: Option<String>,
+    /// When the session was created.
+    pub created_at: DateTime<Utc>,
+}
