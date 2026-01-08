@@ -8,6 +8,7 @@ import { createStore } from "solid-js/store";
 import * as tauri from "@/lib/tauri";
 import type { Message, ServerEvent, UserStatus } from "@/lib/types";
 import { addMessage, updateMessage, removeMessage } from "./messages";
+import { getVoiceAdapter } from "@/lib/webrtc";
 
 // Detect if running in Tauri
 const isTauri = typeof window !== "undefined" && "__TAURI__" in window;
@@ -166,39 +167,107 @@ function handleServerEvent(event: ServerEvent): void {
       if ("message" in event) {
         addMessage(event.message as Message);
       }
-      break;
-    case "MessageUpdate":
-      if ("message_id" in event && "content" in event) {
-        console.log("Message edited:", event.message_id, event.content);
+    )
+  );
+
+  unlisteners.push(
+    await listen<{ channel_id: string; message_id: string }>("ws:message_delete", (event) => {
+      removeMessage(event.payload.channel_id, event.payload.message_id);
+    })
+  );
+
+  // Typing events
+  unlisteners.push(
+    await listen<{ channel_id: string; user_id: string }>("ws:typing_start", (event) => {
+      const { channel_id, user_id } = event.payload;
+      addTypingUser(channel_id, user_id);
+    })
+  );
+
+  unlisteners.push(
+    await listen<{ channel_id: string; user_id: string }>("ws:typing_stop", (event) => {
+      const { channel_id, user_id } = event.payload;
+      removeTypingUser(channel_id, user_id);
+    })
+  );
+
+  // Presence events (will be handled by presence store)
+  unlisteners.push(
+    await listen<{ user_id: string; status: UserStatus }>("ws:presence_update", (event) => {
+      // This will be handled by the presence store
+      console.log("Presence update:", event.payload.user_id, event.payload.status);
+    })
+  );
+
+  // Voice events
+  unlisteners.push(
+    await listen<{ channel_id: string; sdp: string }>("ws:voice_offer", async (event) => {
+      console.log("Voice offer received for channel:", event.payload.channel_id);
+      const adapter = getVoiceAdapter();
+      if (adapter) {
+        const result = await adapter.handleOffer(event.payload.channel_id, event.payload.sdp);
+        if (!result.ok) {
+          console.error("Failed to handle voice offer:", result.error);
+        }
       }
-      break;
-    case "MessageDelete":
-      if ("channel_id" in event && "message_id" in event) {
-        removeMessage(event.channel_id as string, event.message_id as string);
+    })
+  );
+
+  unlisteners.push(
+    await listen<{ channel_id: string; candidate: string }>("ws:voice_ice_candidate", async (event) => {
+      console.log("Voice ICE candidate received");
+      const adapter = getVoiceAdapter();
+      if (adapter) {
+        const result = await adapter.handleIceCandidate(event.payload.channel_id, event.payload.candidate);
+        if (!result.ok) {
+          console.error("Failed to handle ICE candidate:", result.error);
+        }
       }
-      break;
-    case "TypingStart":
-      if ("channel_id" in event && "user" in event) {
-        addTypingUser(event.channel_id as string, (event.user as { id: string }).id);
-      }
-      break;
-    case "TypingStop":
-      if ("channel_id" in event && "user_id" in event) {
-        removeTypingUser(event.channel_id as string, event.user_id as string);
-      }
-      break;
-    case "PresenceUpdate":
-      if ("user_id" in event && "status" in event) {
-        console.log("Presence update:", event.user_id, event.status);
-      }
-      break;
-    case "Error":
-      if ("message" in event) {
-        console.error("WebSocket error:", event);
-        setWsState({ error: event.message as string });
-      }
-      break;
-  }
+    })
+  );
+
+  unlisteners.push(
+    await listen<{ channel_id: string; user_id: string }>("ws:voice_user_joined", (event) => {
+      console.log("User joined voice:", event.payload.user_id);
+      // Will be handled by voice store
+    })
+  );
+
+  unlisteners.push(
+    await listen<{ channel_id: string; user_id: string }>("ws:voice_user_left", (event) => {
+      console.log("User left voice:", event.payload.user_id);
+      // Will be handled by voice store
+    })
+  );
+
+  unlisteners.push(
+    await listen<{ channel_id: string; user_id: string }>("ws:voice_user_muted", (event) => {
+      console.log("User muted:", event.payload.user_id);
+      // Will be handled by voice store
+    })
+  );
+
+  unlisteners.push(
+    await listen<{ channel_id: string; user_id: string }>("ws:voice_user_unmuted", (event) => {
+      console.log("User unmuted:", event.payload.user_id);
+      // Will be handled by voice store
+    })
+  );
+
+  unlisteners.push(
+    await listen<{ code: string; message: string }>("ws:voice_error", (event) => {
+      console.error("Voice error:", event.payload);
+      // Will be handled by voice store
+    })
+  );
+
+  // Error events
+  unlisteners.push(
+    await listen<{ code: string; message: string }>("ws:error", (event) => {
+      console.error("WebSocket error:", event.payload);
+      setWsState({ error: event.payload.message });
+    })
+  );
 }
 
 /**

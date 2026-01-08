@@ -5,7 +5,8 @@
  */
 
 import { createStore, produce } from "solid-js/store";
-import * as tauri from "@/lib/tauri";
+import { listen, UnlistenFn } from "@tauri-apps/api/event";
+import { createVoiceAdapter, type VoiceError } from "@/lib/webrtc";
 import type { VoiceParticipant } from "@/lib/types";
 
 // Detect if running in Tauri
@@ -28,8 +29,8 @@ interface VoiceStoreState {
   speaking: boolean;
   // Participants in the channel
   participants: Record<string, VoiceParticipant>;
-  // Error message
-  error: string | null;
+  // Error
+  error: VoiceError | null;
 }
 
 // Create the store
@@ -113,7 +114,12 @@ export async function initVoice(): Promise<void> {
   unlisteners.push(
     await listen<{ code: string; message: string }>("ws:voice_error", (event) => {
       console.error("Voice error:", event.payload);
-      setVoiceState({ error: event.payload.message });
+      const error: VoiceError = {
+        type: "server_rejected",
+        code: event.payload.code,
+        message: event.payload.message,
+      };
+      setVoiceState({ error });
     })
   );
 }
@@ -139,13 +145,32 @@ export async function joinVoice(channelId: string): Promise<void> {
 
   setVoiceState({ state: "connecting", channelId, error: null });
 
-  try {
-    await tauri.joinVoice(channelId);
-    setVoiceState({ state: "connected" });
-  } catch (err) {
-    const error = err instanceof Error ? err.message : String(err);
-    setVoiceState({ state: "disconnected", channelId: null, error });
-    throw err;
+  const adapter = await createVoiceAdapter();
+
+  // Set up adapter event handlers
+  adapter.setEventHandlers({
+    onStateChange: (state) => {
+      const stateMap = {
+        disconnected: "disconnected" as const,
+        requesting_media: "connecting" as const,
+        connecting: "connecting" as const,
+        connected: "connected" as const,
+        reconnecting: "connecting" as const,
+      };
+      setVoiceState({ state: stateMap[state] });
+    },
+    onError: (error) => {
+      setVoiceState({ error });
+    },
+    onLocalMuteChange: (muted) => {
+      setVoiceState({ muted });
+    },
+  });
+
+  const result = await adapter.join(channelId);
+  if (!result.ok) {
+    setVoiceState({ state: "disconnected", channelId: null, error: result.error });
+    throw new Error(result.error.message || "Failed to join voice channel");
   }
 }
 
@@ -155,10 +180,11 @@ export async function joinVoice(channelId: string): Promise<void> {
 export async function leaveVoice(): Promise<void> {
   if (voiceState.state === "disconnected") return;
 
-  try {
-    await tauri.leaveVoice();
-  } catch (err) {
-    console.error("Failed to leave voice:", err);
+  const adapter = await createVoiceAdapter();
+  const result = await adapter.leave();
+
+  if (!result.ok) {
+    console.error("Failed to leave voice:", result.error);
   }
 
   setVoiceState({
@@ -174,11 +200,12 @@ export async function leaveVoice(): Promise<void> {
  */
 export async function toggleMute(): Promise<void> {
   const newMuted = !voiceState.muted;
-  try {
-    await tauri.setMute(newMuted);
-    setVoiceState({ muted: newMuted });
-  } catch (err) {
-    console.error("Failed to toggle mute:", err);
+  const adapter = await createVoiceAdapter();
+  const result = await adapter.setMute(newMuted);
+
+  if (!result.ok) {
+    console.error("Failed to toggle mute:", result.error);
+    setVoiceState({ error: result.error });
   }
 }
 
@@ -187,15 +214,18 @@ export async function toggleMute(): Promise<void> {
  */
 export async function toggleDeafen(): Promise<void> {
   const newDeafened = !voiceState.deafened;
-  try {
-    await tauri.setDeafen(newDeafened);
+  const adapter = await createVoiceAdapter();
+  const result = await adapter.setDeafen(newDeafened);
+
+  if (!result.ok) {
+    console.error("Failed to toggle deafen:", result.error);
+    setVoiceState({ error: result.error });
+  } else {
     setVoiceState({
       deafened: newDeafened,
       // Deafening also mutes
       muted: newDeafened ? true : voiceState.muted,
     });
-  } catch (err) {
-    console.error("Failed to toggle deafen:", err);
   }
 }
 
@@ -203,11 +233,12 @@ export async function toggleDeafen(): Promise<void> {
  * Set mute state directly.
  */
 export async function setMute(muted: boolean): Promise<void> {
-  try {
-    await tauri.setMute(muted);
-    setVoiceState({ muted });
-  } catch (err) {
-    console.error("Failed to set mute:", err);
+  const adapter = await createVoiceAdapter();
+  const result = await adapter.setMute(muted);
+
+  if (!result.ok) {
+    console.error("Failed to set mute:", result.error);
+    setVoiceState({ error: result.error });
   }
 }
 
@@ -215,11 +246,14 @@ export async function setMute(muted: boolean): Promise<void> {
  * Set deafen state directly.
  */
 export async function setDeafen(deafened: boolean): Promise<void> {
-  try {
-    await tauri.setDeafen(deafened);
+  const adapter = await createVoiceAdapter();
+  const result = await adapter.setDeafen(deafened);
+
+  if (!result.ok) {
+    console.error("Failed to set deafen:", result.error);
+    setVoiceState({ error: result.error });
+  } else {
     setVoiceState({ deafened, muted: deafened ? true : voiceState.muted });
-  } catch (err) {
-    console.error("Failed to set deafen:", err);
   }
 }
 
