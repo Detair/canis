@@ -9,6 +9,7 @@ import { listen, UnlistenFn } from "@tauri-apps/api/event";
 import * as tauri from "@/lib/tauri";
 import type { Message, ServerEvent, UserStatus } from "@/lib/types";
 import { addMessage, updateMessage, removeMessage } from "./messages";
+import { getVoiceAdapter } from "@/lib/webrtc";
 
 // Connection state
 type ConnectionState = "disconnected" | "connecting" | "connected" | "reconnecting";
@@ -123,6 +124,68 @@ export async function initWebSocket(): Promise<void> {
     await listen<{ user_id: string; status: UserStatus }>("ws:presence_update", (event) => {
       // This will be handled by the presence store
       console.log("Presence update:", event.payload.user_id, event.payload.status);
+    })
+  );
+
+  // Voice events
+  unlisteners.push(
+    await listen<{ channel_id: string; sdp: string }>("ws:voice_offer", async (event) => {
+      console.log("Voice offer received for channel:", event.payload.channel_id);
+      const adapter = getVoiceAdapter();
+      if (adapter) {
+        const result = await adapter.handleOffer(event.payload.channel_id, event.payload.sdp);
+        if (!result.ok) {
+          console.error("Failed to handle voice offer:", result.error);
+        }
+      }
+    })
+  );
+
+  unlisteners.push(
+    await listen<{ channel_id: string; candidate: string }>("ws:voice_ice_candidate", async (event) => {
+      console.log("Voice ICE candidate received");
+      const adapter = getVoiceAdapter();
+      if (adapter) {
+        const result = await adapter.handleIceCandidate(event.payload.channel_id, event.payload.candidate);
+        if (!result.ok) {
+          console.error("Failed to handle ICE candidate:", result.error);
+        }
+      }
+    })
+  );
+
+  unlisteners.push(
+    await listen<{ channel_id: string; user_id: string }>("ws:voice_user_joined", (event) => {
+      console.log("User joined voice:", event.payload.user_id);
+      // Will be handled by voice store
+    })
+  );
+
+  unlisteners.push(
+    await listen<{ channel_id: string; user_id: string }>("ws:voice_user_left", (event) => {
+      console.log("User left voice:", event.payload.user_id);
+      // Will be handled by voice store
+    })
+  );
+
+  unlisteners.push(
+    await listen<{ channel_id: string; user_id: string }>("ws:voice_user_muted", (event) => {
+      console.log("User muted:", event.payload.user_id);
+      // Will be handled by voice store
+    })
+  );
+
+  unlisteners.push(
+    await listen<{ channel_id: string; user_id: string }>("ws:voice_user_unmuted", (event) => {
+      console.log("User unmuted:", event.payload.user_id);
+      // Will be handled by voice store
+    })
+  );
+
+  unlisteners.push(
+    await listen<{ code: string; message: string }>("ws:voice_error", (event) => {
+      console.error("Voice error:", event.payload);
+      // Will be handled by voice store
     })
   );
 

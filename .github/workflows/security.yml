@@ -1,0 +1,112 @@
+name: Security Audit
+
+on:
+  # Run weekly on Sundays at midnight UTC
+  schedule:
+    - cron: '0 0 * * 0'
+  # Allow manual triggering
+  workflow_dispatch:
+  # Run on pushes to main (for critical security updates)
+  push:
+    branches: [main]
+    paths:
+      - 'Cargo.lock'
+      - 'client/package-lock.json'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # ===========================================================================
+  # Rust Security Audit
+  # ===========================================================================
+  rust-audit:
+    name: Rust Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+
+      - name: Run security audit
+        run: cargo audit
+
+      - name: Check for yanked crates
+        run: cargo audit --deny yanked
+
+  # ===========================================================================
+  # Dependency Vulnerability Scan
+  # ===========================================================================
+  dependencies:
+    name: Dependency Check (cargo-deny)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install cargo-deny
+        run: cargo install cargo-deny --locked
+
+      - name: Check advisories
+        run: cargo deny check advisories
+
+      - name: Check licenses
+        run: cargo deny check licenses
+
+      - name: Check bans
+        run: cargo deny check bans
+
+  # ===========================================================================
+  # Frontend Security Audit
+  # ===========================================================================
+  npm-audit:
+    name: npm Security Audit
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: client
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Run npm audit
+        run: npm audit --audit-level=moderate
+
+  # ===========================================================================
+  # SAST (Static Application Security Testing)
+  # ===========================================================================
+  codeql:
+    name: CodeQL Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+    strategy:
+      matrix:
+        language: ['javascript', 'typescript']
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
