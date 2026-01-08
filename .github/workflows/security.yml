@@ -83,6 +83,23 @@ jobs:
         run: npm audit --audit-level=moderate
 
   # ===========================================================================
+  # Secrets Scanning
+  # ===========================================================================
+  secrets-scan:
+    name: Secrets Scanning (Gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for better detection
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}  # Optional: for Gitleaks Pro
+
+  # ===========================================================================
   # SAST (Static Application Security Testing)
   # ===========================================================================
   codeql:

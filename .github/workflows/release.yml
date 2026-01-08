@@ -16,14 +16,15 @@ env:
 
 jobs:
   # ===========================================================================
-  # Create GitHub Release
+  # Prepare Release Metadata
   # ===========================================================================
-  create-release:
-    name: Create Release
+  prepare-release:
+    name: Prepare Release
     runs-on: ubuntu-latest
     outputs:
-      upload_url: ${{ steps.create_release.outputs.upload_url }}
       version: ${{ steps.get_version.outputs.version }}
+      changelog: ${{ steps.changelog.outputs.changelog }}
+      is_prerelease: ${{ steps.check_prerelease.outputs.is_prerelease }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -43,6 +44,17 @@ jobs:
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "Version: ${VERSION}"
 
+      - name: Check if prerelease
+        id: check_prerelease
+        env:
+          VERSION: ${{ steps.get_version.outputs.version }}
+        run: |
+          if [[ "$VERSION" == *"alpha"* ]] || [[ "$VERSION" == *"beta"* ]] || [[ "$VERSION" == *"rc"* ]]; then
+            echo "is_prerelease=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_prerelease=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Generate changelog
         id: changelog
         run: |
@@ -58,34 +70,12 @@ jobs:
             echo "EOF" >> $GITHUB_OUTPUT
           fi
 
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ steps.get_version.outputs.version }}
-          release_name: Release ${{ steps.get_version.outputs.version }}
-          body: |
-            ## Changes
-            ${{ steps.changelog.outputs.changelog }}
-
-            ## Installation
-            Download the appropriate binary for your platform below.
-
-            ### Verify checksums
-            ```bash
-            sha256sum -c checksums.txt
-            ```
-          draft: true
-          prerelease: ${{ contains(steps.get_version.outputs.version, 'alpha') || contains(steps.get_version.outputs.version, 'beta') || contains(steps.get_version.outputs.version, 'rc') }}
-
   # ===========================================================================
   # Build Tauri Client (Multi-platform)
   # ===========================================================================
   build-tauri:
     name: Build Tauri (${{ matrix.platform }})
-    needs: create-release
+    needs: prepare-release
     strategy:
       fail-fast: false
       matrix:
@@ -204,7 +194,7 @@ jobs:
   # ===========================================================================
   build-docker:
     name: Build and Push Docker Image
-    needs: create-release
+    needs: prepare-release
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -240,3 +230,74 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  # ===========================================================================
+  # Publish GitHub Release
+  # ===========================================================================
+  publish-release:
+    name: Publish GitHub Release
+    needs: [prepare-release, build-tauri, build-docker]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare release assets
+        run: |
+          mkdir -p release-assets
+
+          # Find and copy all built packages
+          find artifacts -type f \( -name "*.deb" -o -name "*.AppImage" -o -name "*.msi" -o -name "*.exe" -o -name "*.dmg" \) -exec cp {} release-assets/ \;
+
+          # Find and consolidate checksums
+          find artifacts -type f -name "checksums.txt" -exec cat {} \; > release-assets/checksums.txt || true
+
+          # List what we're uploading
+          ls -lah release-assets/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.prepare-release.outputs.version }}
+          CHANGELOG: ${{ needs.prepare-release.outputs.changelog }}
+          IS_PRERELEASE: ${{ needs.prepare-release.outputs.is_prerelease }}
+        with:
+          tag_name: ${{ needs.prepare-release.outputs.version }}
+          name: Release ${{ needs.prepare-release.outputs.version }}
+          body: |
+            ## Changes
+            ${{ needs.prepare-release.outputs.changelog }}
+
+            ## Installation
+
+            ### Linux
+            - **Debian/Ubuntu**: Download the `.deb` file and install with `sudo dpkg -i canis_*.deb`
+            - **Other distros**: Download the `.AppImage` file, make it executable, and run it
+
+            ### Windows
+            - **Installer**: Download the `.exe` file for automatic installation
+            - **MSI**: Download the `.msi` file for Windows Installer
+
+            ### macOS
+            - Download the `.dmg` file for your architecture (Intel or Apple Silicon)
+            - Open the DMG and drag the app to Applications
+
+            ### Verify checksums
+            ```bash
+            sha256sum -c checksums.txt
+            ```
+
+            ## Server Deployment
+            Docker images are available at: `ghcr.io/${{ github.repository }}/server:${{ needs.prepare-release.outputs.version }}`
+          draft: true
+          prerelease: ${{ needs.prepare-release.outputs.is_prerelease == 'true' }}
+          files: |
+            release-assets/*
+          fail_on_unmatched_files: false
