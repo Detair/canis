@@ -145,10 +145,10 @@ export async function initWebSocket(): Promise<void> {
       const ws = tauri.getBrowserWebSocket();
       if (ws) {
         console.log("[WebSocket] Attaching message handler to WebSocket");
-        const messageHandler = (event: MessageEvent) => {
+        const messageHandler = async (event: MessageEvent) => {
           try {
             const data = JSON.parse(event.data) as ServerEvent;
-            handleServerEvent(data);
+            await handleServerEvent(data);
           } catch (err) {
             console.error("Failed to parse WebSocket message:", err);
           }
@@ -178,8 +178,9 @@ export async function initWebSocket(): Promise<void> {
 
 /**
  * Handle server events in browser mode.
+ * IMPORTANT: Voice events are handled asynchronously to ensure proper ICE candidate processing.
  */
-function handleServerEvent(event: ServerEvent): void {
+async function handleServerEvent(event: ServerEvent): Promise<void> {
   console.log("[WebSocket] Received event:", event.type);
 
   switch (event.type) {
@@ -209,31 +210,32 @@ function handleServerEvent(event: ServerEvent): void {
 
     case "voice_offer":
       console.log("[WebSocket] Handling voice_offer for channel:", event.channel_id);
-      handleVoiceOffer(event.channel_id, event.sdp);
+      await handleVoiceOffer(event.channel_id, event.sdp);
       break;
 
     case "voice_ice_candidate":
-      handleVoiceIceCandidate(event.channel_id, event.candidate);
+      // ICE candidates must be processed immediately for NAT traversal
+      await handleVoiceIceCandidate(event.channel_id, event.candidate);
       break;
 
     case "voice_user_joined":
-      handleVoiceUserJoined(event.channel_id, event.user_id, event.username, event.display_name);
+      await handleVoiceUserJoined(event.channel_id, event.user_id, event.username, event.display_name);
       break;
 
     case "voice_user_left":
-      handleVoiceUserLeft(event.channel_id, event.user_id);
+      await handleVoiceUserLeft(event.channel_id, event.user_id);
       break;
 
     case "voice_user_muted":
-      handleVoiceUserMuted(event.channel_id, event.user_id);
+      await handleVoiceUserMuted(event.channel_id, event.user_id);
       break;
 
     case "voice_user_unmuted":
-      handleVoiceUserUnmuted(event.channel_id, event.user_id);
+      await handleVoiceUserUnmuted(event.channel_id, event.user_id);
       break;
 
     case "voice_room_state":
-      handleVoiceRoomState(event.channel_id, event.participants);
+      await handleVoiceRoomState(event.channel_id, event.participants);
       break;
 
     case "voice_error":
@@ -439,8 +441,15 @@ export function isConnected(): boolean {
 
 async function handleVoiceOffer(channelId: string, sdp: string): Promise<void> {
   try {
-    const { createVoiceAdapter } = await import("@/lib/webrtc");
-    const adapter = await createVoiceAdapter();
+    // Use getVoiceAdapter() for faster access (offer should arrive after join)
+    const { getVoiceAdapter } = await import("@/lib/webrtc");
+    const adapter = getVoiceAdapter();
+
+    if (!adapter) {
+      console.error("[WebSocket] No voice adapter available for offer");
+      return;
+    }
+
     const result = await adapter.handleOffer(channelId, sdp);
 
     if (result.ok) {
@@ -450,6 +459,7 @@ async function handleVoiceOffer(channelId: string, sdp: string): Promise<void> {
         channel_id: channelId,
         sdp: result.value,
       });
+      console.log("[WebSocket] Voice answer sent successfully");
     } else {
       console.error("Failed to handle voice offer:", result.error);
     }
@@ -459,10 +469,22 @@ async function handleVoiceOffer(channelId: string, sdp: string): Promise<void> {
 }
 
 async function handleVoiceIceCandidate(channelId: string, candidate: string): Promise<void> {
+  const startTime = performance.now();
+
   try {
-    const { createVoiceAdapter } = await import("@/lib/webrtc");
-    const adapter = await createVoiceAdapter();
+    // Use getVoiceAdapter() to avoid dynamic import overhead (critical for ICE timing)
+    const { getVoiceAdapter } = await import("@/lib/webrtc");
+    const adapter = getVoiceAdapter();
+
+    if (!adapter) {
+      console.warn("[WebSocket] No voice adapter available for ICE candidate");
+      return;
+    }
+
     const result = await adapter.handleIceCandidate(channelId, candidate);
+
+    const elapsed = performance.now() - startTime;
+    console.log(`[WebSocket] ICE candidate processed in ${elapsed.toFixed(2)}ms`);
 
     if (!result.ok) {
       console.error("Failed to handle ICE candidate:", result.error);

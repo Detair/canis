@@ -265,9 +265,10 @@ export class BrowserVoiceAdapter implements VoiceAdapter {
     channelId: string,
     candidate: string
   ): Promise<VoiceResult<void>> {
-    console.log(`[BrowserVoiceAdapter] Handling ICE candidate`);
+    const startTime = performance.now();
 
     if (!this.peerConnection) {
+      console.warn("[BrowserVoiceAdapter] No peer connection for ICE candidate");
       return {
         ok: false,
         error: { type: "not_connected" },
@@ -275,6 +276,7 @@ export class BrowserVoiceAdapter implements VoiceAdapter {
     }
 
     if (this.channelId !== channelId) {
+      console.warn(`[BrowserVoiceAdapter] ICE candidate for wrong channel: ${channelId}`);
       return {
         ok: false,
         error: {
@@ -286,13 +288,20 @@ export class BrowserVoiceAdapter implements VoiceAdapter {
     }
 
     try {
+      // Parse and add ICE candidate immediately (critical for NAT traversal)
       const candidateInit = JSON.parse(candidate);
       await this.peerConnection.addIceCandidate(
         new RTCIceCandidate(candidateInit)
       );
-      console.log("[BrowserVoiceAdapter] ICE candidate added");
+
+      const elapsed = performance.now() - startTime;
+      console.log(`[BrowserVoiceAdapter] ICE candidate added successfully (${elapsed.toFixed(2)}ms)`);
+
       return { ok: true, value: undefined };
     } catch (err) {
+      const elapsed = performance.now() - startTime;
+      console.error(`[BrowserVoiceAdapter] Failed to add ICE candidate after ${elapsed.toFixed(2)}ms:`, err);
+
       return {
         ok: false,
         error: {

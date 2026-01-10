@@ -112,12 +112,19 @@ export class TauriVoiceAdapter implements VoiceAdapter {
     channelId: string,
     candidate: string
   ): Promise<VoiceResult<void>> {
-    console.log(`[TauriVoiceAdapter] Handling ICE candidate`);
+    const startTime = performance.now();
 
     try {
       await invoke("handle_voice_ice_candidate", { channelId, candidate });
+
+      const elapsed = performance.now() - startTime;
+      console.log(`[TauriVoiceAdapter] ICE candidate processed (${elapsed.toFixed(2)}ms)`);
+
       return { ok: true, value: undefined };
     } catch (err) {
+      const elapsed = performance.now() - startTime;
+      console.error(`[TauriVoiceAdapter] ICE candidate failed after ${elapsed.toFixed(2)}ms:`, err);
+
       return { ok: false, error: this.mapTauriError(err) };
     }
   }
