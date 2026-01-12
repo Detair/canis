@@ -1,5 +1,5 @@
-import { Component, Show } from "solid-js";
-import { SolidMarkdown } from "solid-markdown";
+import { Component, Show, createMemo, For } from "solid-js";
+import { marked } from "marked";
 import { File, Download } from "lucide-solid";
 import type { Message, Attachment } from "@/lib/types";
 import { formatTimestamp } from "@/lib/utils";
@@ -13,6 +13,25 @@ interface MessageItemProps {
   compact?: boolean;
 }
 
+// Configure marked for GitHub Flavored Markdown
+marked.setOptions({
+  breaks: true,
+  gfm: true,
+});
+
+interface CodeBlockData {
+  type: 'code';
+  language: string;
+  code: string;
+}
+
+interface TextBlock {
+  type: 'text';
+  html: string;
+}
+
+type ContentBlock = CodeBlockData | TextBlock;
+
 const MessageItem: Component<MessageItemProps> = (props) => {
   const author = () => props.message.author;
   const isEdited = () => !!props.message.edited_at;
@@ -24,6 +43,54 @@ const MessageItem: Component<MessageItemProps> = (props) => {
   };
 
   const isImage = (mimeType: string) => mimeType.startsWith("image/");
+
+  // Parse markdown and extract code blocks for separate rendering
+  const contentBlocks = createMemo(() => {
+    const content = props.message.content;
+    const blocks: ContentBlock[] = [];
+
+    // Split content by code blocks
+    const codeBlockRegex = /```(\w+)?\n([\s\S]*?)```/g;
+    let lastIndex = 0;
+    let match;
+
+    while ((match = codeBlockRegex.exec(content)) !== null) {
+      // Add text before code block
+      if (match.index > lastIndex) {
+        const text = content.substring(lastIndex, match.index);
+        if (text.trim()) {
+          const html = marked.parse(text, { async: false }) as string;
+          blocks.push({ type: 'text', html });
+        }
+      }
+
+      // Add code block
+      blocks.push({
+        type: 'code',
+        language: match[1] || 'plaintext',
+        code: match[2].trim(),
+      });
+
+      lastIndex = match.index + match[0].length;
+    }
+
+    // Add remaining text
+    if (lastIndex < content.length) {
+      const text = content.substring(lastIndex);
+      if (text.trim()) {
+        const html = marked.parse(text, { async: false }) as string;
+        blocks.push({ type: 'text', html });
+      }
+    }
+
+    // If no code blocks found, just parse the whole content
+    if (blocks.length === 0) {
+      const html = marked.parse(content, { async: false }) as string;
+      blocks.push({ type: 'text', html });
+    }
+
+    return blocks;
+  });
 
   return (
     <div
@@ -66,26 +133,18 @@ const MessageItem: Component<MessageItemProps> = (props) => {
         </Show>
 
         <div class="text-text-primary break-words leading-relaxed prose prose-invert max-w-none">
-          <SolidMarkdown
-            children={props.message.content}
-            components={{
-              code: (codeProps: any) => {
-                // Inline code (no language class)
-                if (!codeProps.class) {
-                  return (
-                    <code class="px-1.5 py-0.5 bg-surface-layer2 rounded text-sm">
-                      {codeProps.children}
-                    </code>
-                  );
-                }
-                // Block code with language
-                const language = codeProps.class?.replace("language-", "");
-                return (
-                  <CodeBlock language={language}>{codeProps.children}</CodeBlock>
-                );
-              },
-            }}
-          />
+          <For each={contentBlocks()}>
+            {(block) => (
+              <Show
+                when={block.type === 'code'}
+                fallback={<div innerHTML={(block as TextBlock).html} />}
+              >
+                <CodeBlock language={(block as CodeBlockData).language}>
+                  {(block as CodeBlockData).code}
+                </CodeBlock>
+              </Show>
+            )}
+          </For>
           <Show when={isEdited()}>
             <span class="text-xs text-text-secondary/70 ml-1.5 align-super" title={`Edited ${formatTimestamp(props.message.edited_at!)}`}>
               (edited)

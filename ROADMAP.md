@@ -130,10 +130,11 @@ This roadmap outlines the development path from the current prototype to a produ
   - [ ] **UI:** Render images/files nicely in the message list.
 - [x] **[Text] Markdown & Emojis**
   - **Note:** `solid-markdown` enabled and verified.
-  - Add an Emoji Picker component.
+  - Add an Emoji Picker component using `picmo` + `@floating-ui/dom`.
 - [ ] **[Text] Code Blocks & Syntax Highlighting** `New`
   - Style code blocks with monospace font (Unispace/Fira Code).
-  - Implement syntax highlighting (lazy-loaded).
+  - Implement syntax highlighting using `highlight.js` (auto-detection enabled).
+  - Support Solarized Dark/Light themes dynamically.
 - [ ] **[UX] Theme System Expansion** `New`
   - Implement CSS variable swapping for themes.
   - Add "Solarized Light" and "Solarized Dark" presets.
@@ -147,8 +148,14 @@ This roadmap outlines the development path from the current prototype to a produ
   - Create `guilds` table (`id`, `name`, `owner_id`, `icon`).
   - **Migration:** Move `channels` and `roles` to belong to `guild_id`.
   - **Migration:** Refactor `channel_members` into `guild_members`.
-- [ ] **[Chat] Direct Messages (DMs)** `New`
-  - Create `dm_channels` or reuse `channels` with `type='dm'`.
+- [ ] **[Social] Friends & Status System** `New`
+  - **DB:** Create `friendships` table (pending/accepted/blocked).
+  - **API:** Implement Friend Request system (add/accept/block).
+  - **Status:** Custom status messages ("Vacation 🌴") and "Invisible" mode.
+  - **Real-time:** Fan-out presence updates to friends only.
+- [ ] **[Chat] Direct Messages & Group DMs** `New`
+  - Create `dm_channels` or reuse `channels` with `type='dm'` / `type='group'`.
+  - **Group DMs:** Ad-hoc groups (max 10) created from Friends List.
   - Implement "Home" view for DM list.
   - **Security:** Enforce E2E encryption (Signal/Olm) for DMs.
 - [ ] **[UI] Server Rail & Navigation**
@@ -167,6 +174,10 @@ This roadmap outlines the development path from the current prototype to a produ
 ## Phase 4: Advanced Features
 *Goal: Add competitive differentiators and mobile support.*
 
+- [ ] **[Social] Rich Presence (Game Activity)** `New`
+  - Detect running games via Process Scan (Tauri) or RPC.
+  - Display "Playing X" status in Friends List and User Popups.
+  - Enable "Ask to Join" logic.
 - [ ] **[UX] Cross-Server Favorites** `New`
   - Allow pinning channels from different guilds into a single "Favorites" list.
 - [ ] **[Auth] SSO / OIDC Integration**
@@ -200,3 +211,38 @@ This roadmap outlines the development path from the current prototype to a produ
 - [ ] **[SaaS] Limits & Monetization Logic**
   - Enforce limits (storage, members) per Guild.
   - Prepare "Boost" logic for lifting limits.
+
+---
+
+# Developer Appendix: Implementation Prompts
+
+These prompts are designed to be used by implementation agents to execute specific roadmap items.
+
+## [UI/UX] Global Shell & Modern Design
+**Goal:** Implement the "Focused Hybrid" layout.
+- **Stack:** Solid.js + UnoCSS.
+- **Layout:** 3-Pane structure (`ServerRail` -> `ContextSidebar` -> `MainChat`).
+- **Voice Island:** Floating overlay at `bottom-center` with connection stats and large controls.
+- **Semantic Colors:** Use `bg-surface-base` (#1E1E2E), `bg-surface-layer1` (#252535), `bg-surface-layer2` (#2A2A3C).
+- **Interactions:** Use `<Show>` and `<For>` for Solid logic. Render modals via `<Portal>`.
+
+## [Phase 2] Code Blocks & Emoji Picker
+**Task A: Code Blocks (Highlight.js)**
+- **Specs:** Auto-language detection, monospace font stack (Unispace/Fira Code).
+- **Themes:** Dynamic swap between `solarized-dark.css` and `solarized-light.css`.
+- **Integration:** Custom renderer passed to `SolidMarkdown` components prop.
+
+**Task B: Emoji Picker (Picmo)**
+- **Specs:** Framework-agnostic `Picmo` library.
+- **Positioning:** Use `@floating-ui/dom` to anchor above the message input.
+- **Lazy Loading:** Use `lazy()` to load the picker on first interaction.
+
+## [Phase 3] Friends, Status & Social Graph
+**Task A: Social Backend**
+- **DB:** `friendships` table (user_id_1, user_id_2, status: pending/accepted/blocked).
+- **Presence:** `status_message` and `last_seen_at` columns on `users` table.
+- **Fan-out:** Redis broadcast of `presence_update` only to a user's friends' channels.
+
+**Task B: Social Frontend**
+- **View:** `Friends.tsx` dashboard with "Online", "All", "Pending" tabs.
+- **Actions:** Friend Request by username, blocking, and private status editing.

@@ -59,7 +59,19 @@ export default defineConfig({
     // Animations
     "animate-slide-up": "animate-[slideUp_0.2s_ease-out]",
   },
-  safelist: ["animate-slide-up"],
+  safelist: [
+    "animate-slide-up",
+    "bg-surface-base",
+    "bg-surface-layer1",
+    "bg-surface-layer2",
+    "bg-surface-highlight",
+    "text-text-primary",
+    "text-text-secondary",
+    "text-accent-primary",
+    "text-accent-danger",
+    "border-white/5",
+    "border-white/10",
+  ],
   rules: [
     [/^animate-\[slideUp/, () => ({
       "@keyframes slideUp": `{

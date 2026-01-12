@@ -5,6 +5,7 @@ import { Route } from "@solidjs/router";
 import Login from "./views/Login";
 import Register from "./views/Register";
 import Main from "./views/Main";
+import ThemeDemo from "./pages/ThemeDemo";
 
 // Components
 import AuthGuard from "./components/auth/AuthGuard";
@@ -36,10 +37,12 @@ const ProtectedMain: Component = () => (
 const LoginPage = () => <Layout><Login /></Layout>;
 const RegisterPage = () => <Layout><Register /></Layout>;
 const MainPage = () => <Layout><ProtectedMain /></Layout>;
+const ThemeDemoPage = () => <Layout><ThemeDemo /></Layout>;
 
 // Export routes as JSX Route elements
 export const AppRoutes = (): JSX.Element => (
   <>
+    <Route path="/demo" component={ThemeDemoPage} />
     <Route path="/login" component={LoginPage} />
     <Route path="/register" component={RegisterPage} />
     <Route path="/*" component={MainPage} />
