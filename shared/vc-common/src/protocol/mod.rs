@@ -17,37 +17,37 @@ pub enum ClientEvent {
     /// Subscribe to channel events
     Subscribe {
         /// Channel to subscribe to.
-        channel_id: Uuid
+        channel_id: Uuid,
     },
 
     /// Unsubscribe from channel events
     Unsubscribe {
         /// Channel to unsubscribe from.
-        channel_id: Uuid
+        channel_id: Uuid,
     },
 
     /// Send typing indicator
     Typing {
         /// Channel user is typing in.
-        channel_id: Uuid
+        channel_id: Uuid,
     },
 
     /// Stop typing indicator
     StopTyping {
         /// Channel user stopped typing in.
-        channel_id: Uuid
+        channel_id: Uuid,
     },
 
     /// Voice: Join channel
     VoiceJoin {
         /// Voice channel to join.
-        channel_id: Uuid
+        channel_id: Uuid,
     },
 
     /// Voice: Leave channel
     VoiceLeave {
         /// Voice channel to leave.
-        channel_id: Uuid
+        channel_id: Uuid,
     },
 
     /// Voice: SDP Offer
@@ -55,7 +55,7 @@ pub enum ClientEvent {
         /// Voice channel.
         channel_id: Uuid,
         /// SDP offer.
-        sdp: String
+        sdp: String,
     },
 
     /// Voice: SDP Answer
@@ -63,7 +63,7 @@ pub enum ClientEvent {
         /// Voice channel.
         channel_id: Uuid,
         /// SDP answer.
-        sdp: String
+        sdp: String,
     },
 
     /// Voice: ICE Candidate
@@ -71,19 +71,19 @@ pub enum ClientEvent {
         /// Voice channel.
         channel_id: Uuid,
         /// ICE candidate.
-        candidate: String
+        candidate: String,
     },
 
     /// Voice: Mute self
     VoiceMute {
         /// Voice channel.
-        channel_id: Uuid
+        channel_id: Uuid,
     },
 
     /// Voice: Unmute self
     VoiceUnmute {
         /// Voice channel.
-        channel_id: Uuid
+        channel_id: Uuid,
     },
 }
 
@@ -97,13 +97,13 @@ pub enum ServerEvent {
     /// Connection ready with user info
     Ready {
         /// Authenticated user profile.
-        user: UserProfile
+        user: UserProfile,
     },
 
     /// New message
     MessageCreate {
         /// New message.
-        message: Message
+        message: Message,
     },
 
     /// Message updated
@@ -129,7 +129,7 @@ pub enum ServerEvent {
         /// Channel user is typing in.
         channel_id: Uuid,
         /// User who is typing.
-        user: UserProfile
+        user: UserProfile,
     },
 
     /// User stopped typing
@@ -137,7 +137,7 @@ pub enum ServerEvent {
         /// Channel user stopped typing in.
         channel_id: Uuid,
         /// User who stopped typing.
-        user_id: Uuid
+        user_id: Uuid,
     },
 
     /// User presence changed
@@ -145,7 +145,7 @@ pub enum ServerEvent {
         /// User whose presence changed.
         user_id: Uuid,
         /// New status.
-        status: UserStatus
+        status: UserStatus,
     },
 
     /// Voice: User joined channel
@@ -161,7 +161,7 @@ pub enum ServerEvent {
         /// Voice channel.
         channel_id: Uuid,
         /// User who left.
-        user_id: Uuid
+        user_id: Uuid,
     },
 
     /// Voice: SDP Offer from another user
@@ -209,7 +209,7 @@ pub enum ServerEvent {
         /// Error code.
         code: String,
         /// Error message.
-        message: String
+        message: String,
     },
 }
 

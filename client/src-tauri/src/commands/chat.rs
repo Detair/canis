@@ -178,9 +178,7 @@ pub async fn send_message(
 
     let response = state
         .http
-        .post(format!(
-            "{server_url}/api/messages/channel/{channel_id}"
-        ))
+        .post(format!("{server_url}/api/messages/channel/{channel_id}"))
         .header("Authorization", format!("Bearer {token}"))
         .json(&serde_json::json!({
             "content": content,

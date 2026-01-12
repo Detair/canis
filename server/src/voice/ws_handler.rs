@@ -25,18 +25,15 @@ pub async fn handle_voice_event(
         ClientEvent::VoiceJoin { channel_id } => {
             handle_join(sfu, pool, user_id, channel_id, tx).await
         }
-        ClientEvent::VoiceLeave { channel_id } => {
-            handle_leave(sfu, user_id, channel_id).await
-        }
+        ClientEvent::VoiceLeave { channel_id } => handle_leave(sfu, user_id, channel_id).await,
         ClientEvent::VoiceAnswer { channel_id, sdp } => {
             handle_answer(sfu, user_id, channel_id, &sdp).await
         }
-        ClientEvent::VoiceIceCandidate { channel_id, candidate } => {
-            handle_ice_candidate(sfu, user_id, channel_id, &candidate).await
-        }
-        ClientEvent::VoiceMute { channel_id } => {
-            handle_mute(sfu, user_id, channel_id, true).await
-        }
+        ClientEvent::VoiceIceCandidate {
+            channel_id,
+            candidate,
+        } => handle_ice_candidate(sfu, user_id, channel_id, &candidate).await,
+        ClientEvent::VoiceMute { channel_id } => handle_mute(sfu, user_id, channel_id, true).await,
         ClientEvent::VoiceUnmute { channel_id } => {
             handle_mute(sfu, user_id, channel_id, false).await
         }
@@ -51,7 +48,7 @@ async fn handle_join(
     user_id: Uuid,
     channel_id: Uuid,
     tx: &mpsc::Sender<ServerEvent>,
-)  -> Result<(), VoiceError> {
+) -> Result<(), VoiceError> {
     info!(user_id = %user_id, channel_id = %channel_id, "User joining voice channel");
 
     // Rate limit check (max 1 join per second per user)
@@ -64,16 +61,20 @@ async fn handle_join(
         .await
         .map_err(|e| VoiceError::Signaling(format!("Failed to fetch user info: {e}")))?;
 
-    let username: String = user.try_get("username")
+    let username: String = user
+        .try_get("username")
         .map_err(|e| VoiceError::Signaling(format!("Failed to get username: {e}")))?;
-    let display_name: String = user.try_get("display_name")
+    let display_name: String = user
+        .try_get("display_name")
         .map_err(|e| VoiceError::Signaling(format!("Failed to get display_name: {e}")))?;
 
     // Get or create the room
     let room = sfu.get_or_create_room(channel_id).await;
 
     // Create peer connection for this user
-    let peer = sfu.create_peer(user_id, username, display_name, channel_id, tx.clone()).await?;
+    let peer = sfu
+        .create_peer(user_id, username, display_name, channel_id, tx.clone())
+        .await?;
 
     // Add recvonly transceiver for receiving audio from client
     peer.add_recv_transceiver().await?;
@@ -281,5 +282,3 @@ async fn handle_mute(
 #[cfg(test)]
 #[path = "ws_handler_test.rs"]
 mod ws_handler_test;
-
-

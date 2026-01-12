@@ -67,19 +67,17 @@ impl IntoResponse for VoiceError {
     fn into_response(self) -> Response {
         let (status, code, message) = match &self {
             Self::RoomNotFound(_) => (StatusCode::NOT_FOUND, "ROOM_NOT_FOUND", self.to_string()),
-            Self::ParticipantNotFound(_) => {
-                (StatusCode::NOT_FOUND, "PARTICIPANT_NOT_FOUND", self.to_string())
-            }
+            Self::ParticipantNotFound(_) => (
+                StatusCode::NOT_FOUND,
+                "PARTICIPANT_NOT_FOUND",
+                self.to_string(),
+            ),
             Self::WebRtc(_) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "WEBRTC_ERROR",
                 "WebRTC operation failed".to_string(),
             ),
-            Self::Signaling(_) => (
-                StatusCode::BAD_REQUEST,
-                "SIGNALING_ERROR",
-                self.to_string(),
-            ),
+            Self::Signaling(_) => (StatusCode::BAD_REQUEST, "SIGNALING_ERROR", self.to_string()),
             Self::IceConnectionFailed => (
                 StatusCode::SERVICE_UNAVAILABLE,
                 "ICE_FAILED",
@@ -92,7 +90,11 @@ impl IntoResponse for VoiceError {
             }
             Self::AlreadyJoined => (StatusCode::CONFLICT, "ALREADY_JOINED", self.to_string()),
             Self::NotInChannel => (StatusCode::BAD_REQUEST, "NOT_IN_CHANNEL", self.to_string()),
-            Self::RateLimited => (StatusCode::TOO_MANY_REQUESTS, "RATE_LIMITED", self.to_string()),
+            Self::RateLimited => (
+                StatusCode::TOO_MANY_REQUESTS,
+                "RATE_LIMITED",
+                self.to_string(),
+            ),
             Self::Internal(_) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "INTERNAL_ERROR",

@@ -17,7 +17,6 @@ use webrtc::{
         ice_server::RTCIceServer,
     },
     interceptor::registry::Registry,
-    track::track_local::{track_local_static_rtp::TrackLocalStaticRTP, TrackLocal},
     peer_connection::{
         configuration::RTCConfiguration, peer_connection_state::RTCPeerConnectionState,
         sdp::session_description::RTCSessionDescription, RTCPeerConnection,
@@ -26,6 +25,7 @@ use webrtc::{
         rtp_codec::{RTCRtpCodecCapability, RTCRtpCodecParameters, RTPCodecType},
         rtp_sender::RTCRtpSender,
     },
+    track::track_local::{track_local_static_rtp::TrackLocalStaticRTP, TrackLocal},
     track::track_remote::TrackRemote,
 };
 

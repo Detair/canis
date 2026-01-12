@@ -12,9 +12,8 @@ use vc_server::{api, chat, config, db, voice};
 async fn main() -> Result<()> {
     // Initialize rustls crypto provider (required for WebRTC)
     // This must happen before any TLS/WebRTC operations
-    let _ = rustls::crypto::CryptoProvider::install_default(
-        rustls::crypto::ring::default_provider()
-    );
+    let _ =
+        rustls::crypto::CryptoProvider::install_default(rustls::crypto::ring::default_provider());
 
     // Initialize tracing
     tracing_subscriber::fmt()
@@ -57,7 +56,10 @@ async fn main() -> Result<()> {
             }
         }
         Err(e) => {
-            tracing::warn!("S3 client initialization failed: {}. File uploads disabled.", e);
+            tracing::warn!(
+                "S3 client initialization failed: {}. File uploads disabled.",
+                e
+            );
             None
         }
     };

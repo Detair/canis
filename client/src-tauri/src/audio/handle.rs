@@ -134,16 +134,23 @@ impl AudioHandle {
             }
             None => {
                 if is_input {
-                    self.host.default_input_device().ok_or(AudioError::NoInputDevice)
+                    self.host
+                        .default_input_device()
+                        .ok_or(AudioError::NoInputDevice)
                 } else {
-                    self.host.default_output_device().ok_or(AudioError::NoOutputDevice)
+                    self.host
+                        .default_output_device()
+                        .ok_or(AudioError::NoOutputDevice)
                 }
             }
         }
     }
 
     /// Start audio capture in a background task
-    pub async fn start_capture(&mut self, output_tx: mpsc::Sender<Vec<u8>>) -> Result<(), AudioError> {
+    pub async fn start_capture(
+        &mut self,
+        output_tx: mpsc::Sender<Vec<u8>>,
+    ) -> Result<(), AudioError> {
         // Stop existing capture if running
         self.stop_capture().await;
 
@@ -172,7 +179,10 @@ impl AudioHandle {
     }
 
     /// Start audio playback in a background task
-    pub async fn start_playback(&mut self, input_rx: mpsc::Receiver<Vec<u8>>) -> Result<(), AudioError> {
+    pub async fn start_playback(
+        &mut self,
+        input_rx: mpsc::Receiver<Vec<u8>>,
+    ) -> Result<(), AudioError> {
         // Stop existing playback if running
         self.stop_playback().await;
 
@@ -298,7 +308,9 @@ fn run_capture_task(
         }
     };
 
-    let sample_buffer = Arc::new(std::sync::Mutex::new(Vec::with_capacity(FRAME_SIZE * CHANNELS as usize * 2)));
+    let sample_buffer = Arc::new(std::sync::Mutex::new(Vec::with_capacity(
+        FRAME_SIZE * CHANNELS as usize * 2,
+    )));
     let frame_samples = FRAME_SIZE * CHANNELS as usize;
 
     let encoder_clone = encoder;

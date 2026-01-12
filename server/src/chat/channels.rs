@@ -35,7 +35,10 @@ impl IntoResponse for ChannelError {
             Self::NotFound => (StatusCode::NOT_FOUND, "Channel not found"),
             Self::Forbidden => (StatusCode::FORBIDDEN, "Access denied"),
             Self::Validation(msg) => {
-                return (StatusCode::BAD_REQUEST, Json(serde_json::json!({ "error": msg })))
+                return (
+                    StatusCode::BAD_REQUEST,
+                    Json(serde_json::json!({ "error": msg })),
+                )
                     .into_response()
             }
             Self::Database(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Database error"),
@@ -122,7 +125,9 @@ pub struct MemberResponse {
 
 /// List all channels.
 /// GET /api/channels
-pub async fn list(State(state): State<AppState>) -> Result<Json<Vec<ChannelResponse>>, ChannelError> {
+pub async fn list(
+    State(state): State<AppState>,
+) -> Result<Json<Vec<ChannelResponse>>, ChannelError> {
     let channels = db::list_channels(&state.db).await?;
     let response: Vec<ChannelResponse> = channels.into_iter().map(Into::into).collect();
     Ok(Json(response))

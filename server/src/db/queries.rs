@@ -6,7 +6,7 @@ use chrono::{DateTime, Utc};
 use sqlx::{PgPool, Row};
 use uuid::Uuid;
 
-use super::models::{User, Session, Channel, ChannelType, ChannelMember, Message, FileAttachment};
+use super::models::{Channel, ChannelMember, ChannelType, FileAttachment, Message, Session, User};
 
 // ============================================================================
 // User Queries
@@ -61,24 +61,20 @@ pub async fn find_users_by_ids(pool: &PgPool, ids: &[Uuid]) -> sqlx::Result<Vec<
 
 /// Check if username exists.
 pub async fn username_exists(pool: &PgPool, username: &str) -> sqlx::Result<bool> {
-    let result: (bool,) = sqlx::query_as(
-        "SELECT EXISTS(SELECT 1 FROM users WHERE username = $1)",
-    )
-    .bind(username)
-    .fetch_one(pool)
-    .await?;
+    let result: (bool,) = sqlx::query_as("SELECT EXISTS(SELECT 1 FROM users WHERE username = $1)")
+        .bind(username)
+        .fetch_one(pool)
+        .await?;
 
     Ok(result.0)
 }
 
 /// Check if email exists.
 pub async fn email_exists(pool: &PgPool, email: &str) -> sqlx::Result<bool> {
-    let result: (bool,) = sqlx::query_as(
-        "SELECT EXISTS(SELECT 1 FROM users WHERE email = $1)",
-    )
-    .bind(email)
-    .fetch_one(pool)
-    .await?;
+    let result: (bool,) = sqlx::query_as("SELECT EXISTS(SELECT 1 FROM users WHERE email = $1)")
+        .bind(email)
+        .fetch_one(pool)
+        .await?;
 
     Ok(result.0)
 }
@@ -112,13 +108,11 @@ pub async fn set_mfa_secret(
     user_id: Uuid,
     mfa_secret: Option<&str>,
 ) -> sqlx::Result<()> {
-    sqlx::query(
-        "UPDATE users SET mfa_secret = $1, updated_at = NOW() WHERE id = $2",
-    )
-    .bind(mfa_secret)
-    .bind(user_id)
-    .execute(pool)
-    .await?;
+    sqlx::query("UPDATE users SET mfa_secret = $1, updated_at = NOW() WHERE id = $2")
+        .bind(mfa_secret)
+        .bind(user_id)
+        .execute(pool)
+        .await?;
 
     Ok(())
 }
@@ -409,13 +403,11 @@ pub async fn remove_channel_member(
     channel_id: Uuid,
     user_id: Uuid,
 ) -> sqlx::Result<bool> {
-    let result = sqlx::query(
-        "DELETE FROM channel_members WHERE channel_id = $1 AND user_id = $2",
-    )
-    .bind(channel_id)
-    .bind(user_id)
-    .execute(pool)
-    .await?;
+    let result = sqlx::query("DELETE FROM channel_members WHERE channel_id = $1 AND user_id = $2")
+        .bind(channel_id)
+        .bind(user_id)
+        .execute(pool)
+        .await?;
     Ok(result.rows_affected() > 0)
 }
 
@@ -465,12 +457,10 @@ pub async fn list_messages(
 
 /// Find message by ID.
 pub async fn find_message_by_id(pool: &PgPool, id: Uuid) -> sqlx::Result<Option<Message>> {
-    sqlx::query_as::<_, Message>(
-        "SELECT * FROM messages WHERE id = $1 AND deleted_at IS NULL",
-    )
-    .bind(id)
-    .fetch_optional(pool)
-    .await
+    sqlx::query_as::<_, Message>("SELECT * FROM messages WHERE id = $1 AND deleted_at IS NULL")
+        .bind(id)
+        .fetch_optional(pool)
+        .await
 }
 
 /// Create a new message.
@@ -627,12 +617,10 @@ pub async fn delete_file_attachment(
     pool: &PgPool,
     id: Uuid,
 ) -> sqlx::Result<Option<FileAttachment>> {
-    sqlx::query_as::<_, FileAttachment>(
-        "DELETE FROM file_attachments WHERE id = $1 RETURNING *",
-    )
-    .bind(id)
-    .fetch_optional(pool)
-    .await
+    sqlx::query_as::<_, FileAttachment>("DELETE FROM file_attachments WHERE id = $1 RETURNING *")
+        .bind(id)
+        .fetch_optional(pool)
+        .await
 }
 
 /// Delete all file attachments for a message, returning the deleted records.

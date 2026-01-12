@@ -5,7 +5,9 @@
 
 use aws_config::Region;
 use aws_sdk_s3::{
-    config::{Credentials, IdentityCache, SharedCredentialsProvider, StalledStreamProtectionConfig},
+    config::{
+        Credentials, IdentityCache, SharedCredentialsProvider, StalledStreamProtectionConfig,
+    },
     presigning::PresigningConfig,
     primitives::ByteStream,
     Client,
@@ -54,9 +56,8 @@ impl S3Client {
     /// Supports custom endpoints for S3-compatible backends (`MinIO`, R2, B2).
     /// Uses path-style addressing when a custom endpoint is configured.
     pub async fn new(config: &Config) -> Result<Self, S3Error> {
-        let region = Region::new(
-            std::env::var("AWS_REGION").unwrap_or_else(|_| "us-east-1".to_string()),
-        );
+        let region =
+            Region::new(std::env::var("AWS_REGION").unwrap_or_else(|_| "us-east-1".to_string()));
 
         let mut s3_config_builder = aws_sdk_s3::Config::builder()
             .region(region)
@@ -108,7 +109,12 @@ impl S3Client {
     /// * `key` - The S3 object key (path)
     /// * `data` - File contents as bytes
     /// * `content_type` - MIME type of the file
-    pub async fn upload(&self, key: &str, data: Vec<u8>, content_type: &str) -> Result<(), S3Error> {
+    pub async fn upload(
+        &self,
+        key: &str,
+        data: Vec<u8>,
+        content_type: &str,
+    ) -> Result<(), S3Error> {
         self.client
             .put_object()
             .bucket(&self.bucket)
@@ -170,7 +176,8 @@ impl S3Client {
 
     /// Get the raw object stream for a file (for proxying).
     pub async fn get_object_stream(&self, key: &str) -> Result<ByteStream, S3Error> {
-        let output = self.client
+        let output = self
+            .client
             .get_object()
             .bucket(&self.bucket)
             .key(key)
@@ -182,7 +189,7 @@ impl S3Client {
     }
 
     /// Get the bucket name.
-    #[must_use] 
+    #[must_use]
     pub fn bucket(&self) -> &str {
         &self.bucket
     }

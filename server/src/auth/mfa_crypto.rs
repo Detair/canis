@@ -51,8 +51,8 @@ pub fn encrypt_mfa_secret(secret: &str, key: &[u8]) -> CryptoResult<String> {
     }
 
     // Create cipher
-    let cipher = Aes256Gcm::new_from_slice(key)
-        .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
+    let cipher =
+        Aes256Gcm::new_from_slice(key).map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
 
     // Generate random nonce (12 bytes for GCM)
     let nonce = Aes256Gcm::generate_nonce(&mut OsRng);
@@ -102,8 +102,8 @@ pub fn decrypt_mfa_secret(encrypted: &str, key: &[u8]) -> CryptoResult<String> {
     let nonce = Nonce::from_slice(nonce_bytes);
 
     // Create cipher
-    let cipher = Aes256Gcm::new_from_slice(key)
-        .map_err(|e| CryptoError::DecryptionFailed(e.to_string()))?;
+    let cipher =
+        Aes256Gcm::new_from_slice(key).map_err(|e| CryptoError::DecryptionFailed(e.to_string()))?;
 
     // Decrypt
     let plaintext = cipher

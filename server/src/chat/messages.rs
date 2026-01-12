@@ -39,7 +39,10 @@ impl IntoResponse for MessageError {
             Self::ChannelNotFound => (StatusCode::NOT_FOUND, "Channel not found"),
             Self::Forbidden => (StatusCode::FORBIDDEN, "Access denied"),
             Self::Validation(msg) => {
-                return (StatusCode::BAD_REQUEST, Json(serde_json::json!({ "error": msg })))
+                return (
+                    StatusCode::BAD_REQUEST,
+                    Json(serde_json::json!({ "error": msg })),
+                )
                     .into_response()
             }
             Self::Database(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Database error"),
@@ -249,7 +252,9 @@ pub async fn create(
     if let Some(reply_id) = body.reply_to {
         let reply_msg = db::find_message_by_id(&state.db, reply_id).await?;
         if reply_msg.is_none() {
-            return Err(MessageError::Validation("Reply target not found".to_string()));
+            return Err(MessageError::Validation(
+                "Reply target not found".to_string(),
+            ));
         }
     }
 
@@ -359,7 +364,10 @@ pub async fn update(
             channel_id: message.channel_id,
             message_id: message.id,
             content: message.content,
-            edited_at: message.edited_at.map(|t| t.to_rfc3339()).unwrap_or_default(),
+            edited_at: message
+                .edited_at
+                .map(|t| t.to_rfc3339())
+                .unwrap_or_default(),
         },
     )
     .await;
@@ -425,7 +433,13 @@ mod tests {
             .await
             .expect("Failed to connect to Redis");
 
-        AppState::new(pool, redis, config, None, crate::voice::SfuServer::new(std::sync::Arc::new(Config::default_for_test())).unwrap())
+        AppState::new(
+            pool,
+            redis,
+            config,
+            None,
+            crate::voice::SfuServer::new(std::sync::Arc::new(Config::default_for_test())).unwrap(),
+        )
     }
 
     #[sqlx::test]
@@ -442,9 +456,16 @@ mod tests {
             .expect("Failed to create user2");
 
         // Create a channel
-        let channel = db::create_channel(&pool, "test-channel", &db::ChannelType::Text, None, None, None)
-            .await
-            .expect("Failed to create channel");
+        let channel = db::create_channel(
+            &pool,
+            "test-channel",
+            &db::ChannelType::Text,
+            None,
+            None,
+            None,
+        )
+        .await
+        .expect("Failed to create channel");
 
         // Create 5 messages: 3 from user1, 2 from user2
         let msg1 = db::create_message(&pool, channel.id, user1.id, "Message 1", false, None, None)
@@ -473,13 +494,9 @@ mod tests {
             limit: 50,
         };
 
-        let result = list(
-            State(state),
-            Path(channel.id),
-            Query(query),
-        )
-        .await
-        .expect("Handler failed");
+        let result = list(State(state), Path(channel.id), Query(query))
+            .await
+            .expect("Handler failed");
 
         let messages = result.0;
 
@@ -534,14 +551,29 @@ mod tests {
             .expect("Failed to create user");
 
         // Create channel
-        let channel = db::create_channel(&pool, "test-channel", &db::ChannelType::Text, None, None, None)
-            .await
-            .expect("Failed to create channel");
+        let channel = db::create_channel(
+            &pool,
+            "test-channel",
+            &db::ChannelType::Text,
+            None,
+            None,
+            None,
+        )
+        .await
+        .expect("Failed to create channel");
 
         // Create message
-        let _msg = db::create_message(&pool, channel.id, user.id, "Message before delete", false, None, None)
-            .await
-            .expect("Failed to create message");
+        let _msg = db::create_message(
+            &pool,
+            channel.id,
+            user.id,
+            "Message before delete",
+            false,
+            None,
+            None,
+        )
+        .await
+        .expect("Failed to create message");
 
         // Delete the user (CASCADE will also delete messages)
         sqlx::query("DELETE FROM users WHERE id = $1")
@@ -556,13 +588,9 @@ mod tests {
             limit: 50,
         };
 
-        let result = list(
-            State(state),
-            Path(channel.id),
-            Query(query),
-        )
-        .await
-        .expect("Handler should not fail");
+        let result = list(State(state), Path(channel.id), Query(query))
+            .await
+            .expect("Handler should not fail");
 
         let messages = result.0;
 
@@ -582,15 +610,30 @@ mod tests {
             .expect("Failed to create user");
 
         // Create channel
-        let channel = db::create_channel(&pool, "test-channel", &db::ChannelType::Text, None, None, None)
-            .await
-            .expect("Failed to create channel");
+        let channel = db::create_channel(
+            &pool,
+            "test-channel",
+            &db::ChannelType::Text,
+            None,
+            None,
+            None,
+        )
+        .await
+        .expect("Failed to create channel");
 
         // Create 10 messages
         for i in 1..=10 {
-            db::create_message(&pool, channel.id, user.id, &format!("Message {i}"), false, None, None)
-                .await
-                .expect("Failed to create message");
+            db::create_message(
+                &pool,
+                channel.id,
+                user.id,
+                &format!("Message {i}"),
+                false,
+                None,
+                None,
+            )
+            .await
+            .expect("Failed to create message");
             tokio::time::sleep(tokio::time::Duration::from_millis(5)).await;
         }
 
@@ -600,13 +643,9 @@ mod tests {
             limit: 3,
         };
 
-        let result1 = list(
-            State(state.clone()),
-            Path(channel.id),
-            Query(query1),
-        )
-        .await
-        .expect("First page failed");
+        let result1 = list(State(state.clone()), Path(channel.id), Query(query1))
+            .await
+            .expect("First page failed");
 
         let page1 = result1.0;
         assert_eq!(page1.len(), 3, "First page should have 3 messages");
@@ -619,13 +658,9 @@ mod tests {
             limit: 3,
         };
 
-        let result2 = list(
-            State(state.clone()),
-            Path(channel.id),
-            Query(query2),
-        )
-        .await
-        .expect("Second page failed");
+        let result2 = list(State(state.clone()), Path(channel.id), Query(query2))
+            .await
+            .expect("Second page failed");
 
         let page2 = result2.0;
 
@@ -646,13 +681,9 @@ mod tests {
             limit: 100,
         };
 
-        let result_all = list(
-            State(state),
-            Path(channel.id),
-            Query(query_all),
-        )
-        .await
-        .expect("Fetch all failed");
+        let result_all = list(State(state), Path(channel.id), Query(query_all))
+            .await
+            .expect("Fetch all failed");
 
         assert_eq!(result_all.0.len(), 10, "Should have 10 total messages");
     }
@@ -662,22 +693,25 @@ mod tests {
         let state = create_test_state(pool.clone()).await;
 
         // Create channel with no messages
-        let channel = db::create_channel(&pool, "empty-channel", &db::ChannelType::Text, None, None, None)
-            .await
-            .expect("Failed to create channel");
+        let channel = db::create_channel(
+            &pool,
+            "empty-channel",
+            &db::ChannelType::Text,
+            None,
+            None,
+            None,
+        )
+        .await
+        .expect("Failed to create channel");
 
         let query = ListMessagesQuery {
             before: None,
             limit: 50,
         };
 
-        let result = list(
-            State(state),
-            Path(channel.id),
-            Query(query),
-        )
-        .await
-        .expect("Handler failed");
+        let result = list(State(state), Path(channel.id), Query(query))
+            .await
+            .expect("Handler failed");
 
         let messages = result.0;
         assert_eq!(messages.len(), 0, "Empty channel should return 0 messages");
@@ -723,15 +757,30 @@ mod tests {
             .await
             .expect("Failed to create user");
 
-        let channel = db::create_channel(&pool, "test-channel", &db::ChannelType::Text, None, None, None)
-            .await
-            .expect("Failed to create channel");
+        let channel = db::create_channel(
+            &pool,
+            "test-channel",
+            &db::ChannelType::Text,
+            None,
+            None,
+            None,
+        )
+        .await
+        .expect("Failed to create channel");
 
         // Create 10 messages
         for i in 1..=10 {
-            db::create_message(&pool, channel.id, user.id, &format!("Msg {i}"), false, None, None)
-                .await
-                .expect("Failed to create message");
+            db::create_message(
+                &pool,
+                channel.id,
+                user.id,
+                &format!("Msg {i}"),
+                false,
+                None,
+                None,
+            )
+            .await
+            .expect("Failed to create message");
         }
 
         // Test limit = 0 (should clamp to 1)
@@ -740,13 +789,9 @@ mod tests {
             limit: 0,
         };
 
-        let result_zero = list(
-            State(state.clone()),
-            Path(channel.id),
-            Query(query_zero),
-        )
-        .await
-        .expect("Handler failed");
+        let result_zero = list(State(state.clone()), Path(channel.id), Query(query_zero))
+            .await
+            .expect("Handler failed");
 
         assert_eq!(result_zero.0.len(), 1, "Limit 0 should clamp to 1");
 
@@ -756,15 +801,15 @@ mod tests {
             limit: 200,
         };
 
-        let result_large = list(
-            State(state),
-            Path(channel.id),
-            Query(query_large),
-        )
-        .await
-        .expect("Handler failed");
+        let result_large = list(State(state), Path(channel.id), Query(query_large))
+            .await
+            .expect("Handler failed");
 
         // Should return all 10 messages (max available), not more than 100
-        assert_eq!(result_large.0.len(), 10, "Should return all available messages");
+        assert_eq!(
+            result_large.0.len(),
+            10,
+            "Should return all available messages"
+        );
     }
 }

@@ -78,10 +78,7 @@ pub async fn require_auth(
     let claims = validate_access_token(token, &state.config.jwt_secret)?;
 
     // Parse user ID from claims
-    let user_id: Uuid = claims
-        .sub
-        .parse()
-        .map_err(|_| AuthError::InvalidToken)?;
+    let user_id: Uuid = claims.sub.parse().map_err(|_| AuthError::InvalidToken)?;
 
     // Load user from database
     let user = find_user_by_id(&state.db, user_id)

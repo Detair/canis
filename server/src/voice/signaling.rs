@@ -53,7 +53,11 @@ pub enum SignalingMessage {
     /// User unmuted notification
     UserUnmuted { channel_id: Uuid, user_id: Uuid },
     /// User speaking indicator
-    Speaking { channel_id: Uuid, user_id: Uuid, speaking: bool },
+    Speaking {
+        channel_id: Uuid,
+        user_id: Uuid,
+        speaking: bool,
+    },
     /// Current room state (sent on join)
     RoomState {
         channel_id: Uuid,

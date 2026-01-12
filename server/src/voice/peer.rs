@@ -99,7 +99,9 @@ impl Peer {
     ) -> Result<(), VoiceError> {
         // Add track to peer connection
         self.peer_connection
-            .add_track(track.clone() as Arc<dyn webrtc::track::track_local::TrackLocal + Send + Sync>)
+            .add_track(
+                track.clone() as Arc<dyn webrtc::track::track_local::TrackLocal + Send + Sync>
+            )
             .await?;
 
         // Store reference

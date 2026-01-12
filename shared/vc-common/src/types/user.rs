@@ -20,7 +20,6 @@ pub enum UserStatus {
     Offline,
 }
 
-
 /// User profile (public information).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UserProfile {

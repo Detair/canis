@@ -50,5 +50,7 @@ pub async fn get_ice_servers(State(state): State<AppState>) -> Json<IceServersRe
         });
     }
 
-    Json(IceServersResponse { ice_servers: servers })
+    Json(IceServersResponse {
+        ice_servers: servers,
+    })
 }

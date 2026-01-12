@@ -43,7 +43,9 @@ mod tests {
     }
 
     #[sqlx::test]
-    async fn test_voice_join_includes_username(pool: PgPool) -> Result<(), Box<dyn std::error::Error>> {
+    async fn test_voice_join_includes_username(
+        pool: PgPool,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         // Create test user
         let user_id = create_test_user(&pool, "testuser", "Test User").await?;
 
@@ -58,8 +60,14 @@ mod tests {
         let (tx, mut rx) = mpsc::channel::<ServerEvent>(10);
 
         // Join voice channel
-        ws_handler::handle_voice_event(&sfu, &pool, user_id, ClientEvent::VoiceJoin { channel_id }, &tx)
-            .await?;
+        ws_handler::handle_voice_event(
+            &sfu,
+            &pool,
+            user_id,
+            ClientEvent::VoiceJoin { channel_id },
+            &tx,
+        )
+        .await?;
 
         // Verify VoiceOffer was sent
         let event = rx.recv().await.expect("Should receive VoiceOffer");
@@ -80,7 +88,9 @@ mod tests {
     }
 
     #[sqlx::test]
-    async fn test_rate_limiting_blocks_rapid_joins(pool: PgPool) -> Result<(), Box<dyn std::error::Error>> {
+    async fn test_rate_limiting_blocks_rapid_joins(
+        pool: PgPool,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         // Create test user
         let user_id = create_test_user(&pool, "ratelimituser", "Rate Limit User").await?;
 
@@ -95,8 +105,14 @@ mod tests {
         let (tx, _rx) = mpsc::channel::<ServerEvent>(10);
 
         // First join should succeed
-        ws_handler::handle_voice_event(&sfu, &pool, user_id, ClientEvent::VoiceJoin { channel_id }, &tx)
-            .await?;
+        ws_handler::handle_voice_event(
+            &sfu,
+            &pool,
+            user_id,
+            ClientEvent::VoiceJoin { channel_id },
+            &tx,
+        )
+        .await?;
 
         // Immediate second join should fail with rate limit error
         let result = ws_handler::handle_voice_event(
@@ -139,11 +155,23 @@ mod tests {
         let (tx2, _rx2) = mpsc::channel::<ServerEvent>(10);
 
         // Both users should be able to join
-        ws_handler::handle_voice_event(&sfu, &pool, user1_id, ClientEvent::VoiceJoin { channel_id }, &tx1)
-            .await?;
+        ws_handler::handle_voice_event(
+            &sfu,
+            &pool,
+            user1_id,
+            ClientEvent::VoiceJoin { channel_id },
+            &tx1,
+        )
+        .await?;
 
-        ws_handler::handle_voice_event(&sfu, &pool, user2_id, ClientEvent::VoiceJoin { channel_id }, &tx2)
-            .await?;
+        ws_handler::handle_voice_event(
+            &sfu,
+            &pool,
+            user2_id,
+            ClientEvent::VoiceJoin { channel_id },
+            &tx2,
+        )
+        .await?;
 
         // Verify both are in the room
         let room = sfu.get_or_create_room(channel_id).await;

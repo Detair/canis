@@ -30,7 +30,7 @@ pub struct AppState {
 
 impl AppState {
     /// Create new application state.
-    #[must_use] 
+    #[must_use]
     pub fn new(
         db: PgPool,
         redis: fred::clients::RedisClient,
@@ -48,7 +48,7 @@ impl AppState {
     }
 
     /// Check if S3 storage is configured and available.
-    #[must_use] 
+    #[must_use]
     pub const fn has_s3(&self) -> bool {
         self.s3.is_some()
     }

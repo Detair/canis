@@ -11,7 +11,7 @@ pub struct OlmAccount {
 
 impl OlmAccount {
     /// Create a new Olm account.
-    #[must_use] 
+    #[must_use]
     pub const fn new() -> Self {
         Self {}
     }

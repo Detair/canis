@@ -11,10 +11,7 @@ use uuid::Uuid;
 use webrtc::{
     rtp::packet::Packet as RtpPacket,
     rtp_transceiver::rtp_codec::RTCRtpCodecCapability,
-    track::track_local::{
-        track_local_static_rtp::TrackLocalStaticRTP,
-        TrackLocalWriter,
-    },
+    track::track_local::{track_local_static_rtp::TrackLocalStaticRTP, TrackLocalWriter},
     track::track_remote::TrackRemote,
 };
 

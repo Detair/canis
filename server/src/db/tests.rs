@@ -6,7 +6,6 @@
 mod postgres_tests {
     use super::super::*;
     use sqlx::PgPool;
-    
 
     // ========================================================================
     // User Tests
@@ -97,20 +96,22 @@ mod postgres_tests {
         let password_hash = "hash789";
 
         // Should not exist initially
-        let exists = email_exists(&pool, email)
-            .await
-            .expect("Query failed");
+        let exists = email_exists(&pool, email).await.expect("Query failed");
         assert!(!exists);
 
         // Create user with email
-        create_user(&pool, "userwithemail", "Display", Some(email), password_hash)
-            .await
-            .expect("Failed to create user");
+        create_user(
+            &pool,
+            "userwithemail",
+            "Display",
+            Some(email),
+            password_hash,
+        )
+        .await
+        .expect("Failed to create user");
 
         // Should exist now
-        let exists = email_exists(&pool, email)
-            .await
-            .expect("Query failed");
+        let exists = email_exists(&pool, email).await.expect("Query failed");
         assert!(exists);
     }
 
@@ -255,7 +256,7 @@ mod postgres_tests {
         let expired_time = Utc::now() - Duration::hours(1);
         sqlx::query(
             "INSERT INTO sessions (user_id, token_hash, expires_at, created_at)
-             VALUES ($1, $2, $3, $4)"
+             VALUES ($1, $2, $3, $4)",
         )
         .bind(user.id)
         .bind("expired_token")
@@ -297,27 +298,39 @@ mod postgres_tests {
     #[sqlx::test]
     async fn test_create_and_list_channels(pool: PgPool) {
         // Create text channel
-        let text_channel = create_channel(&pool, "general", &ChannelType::Text, None, Some("General discussion"), None)
-            .await
-            .expect("Failed to create text channel");
+        let text_channel = create_channel(
+            &pool,
+            "general",
+            &ChannelType::Text,
+            None,
+            Some("General discussion"),
+            None,
+        )
+        .await
+        .expect("Failed to create text channel");
 
         assert_eq!(text_channel.name, "general");
         assert_eq!(text_channel.channel_type, ChannelType::Text);
         assert_eq!(text_channel.topic.as_deref(), Some("General discussion"));
 
         // Create voice channel
-        let voice_channel = create_channel(&pool, "voice-lobby", &ChannelType::Voice, None, None, Some(10))
-            .await
-            .expect("Failed to create voice channel");
+        let voice_channel = create_channel(
+            &pool,
+            "voice-lobby",
+            &ChannelType::Voice,
+            None,
+            None,
+            Some(10),
+        )
+        .await
+        .expect("Failed to create voice channel");
 
         assert_eq!(voice_channel.name, "voice-lobby");
         assert_eq!(voice_channel.channel_type, ChannelType::Voice);
         assert_eq!(voice_channel.user_limit, Some(10));
 
         // List all channels
-        let channels = list_channels(&pool)
-            .await
-            .expect("Failed to list channels");
+        let channels = list_channels(&pool).await.expect("Failed to list channels");
         assert!(channels.len() >= 2);
     }
 
@@ -342,10 +355,17 @@ mod postgres_tests {
             .expect("Failed to create channel");
 
         // Update channel
-        let updated = update_channel(&pool, channel.id, Some("new-name"), Some("New topic"), None, None)
-            .await
-            .expect("Failed to update channel")
-            .expect("Channel not found");
+        let updated = update_channel(
+            &pool,
+            channel.id,
+            Some("new-name"),
+            Some("New topic"),
+            None,
+            None,
+        )
+        .await
+        .expect("Failed to update channel")
+        .expect("Channel not found");
 
         assert_eq!(updated.name, "new-name");
         assert_eq!(updated.topic.as_deref(), Some("New topic"));
@@ -421,9 +441,16 @@ mod postgres_tests {
     #[sqlx::test]
     async fn test_list_channel_members_with_users(pool: PgPool) {
         // Create channel
-        let channel = create_channel(&pool, "user-list-test", &ChannelType::Text, None, None, None)
-            .await
-            .expect("Failed to create channel");
+        let channel = create_channel(
+            &pool,
+            "user-list-test",
+            &ChannelType::Text,
+            None,
+            None,
+            None,
+        )
+        .await
+        .expect("Failed to create channel");
 
         // Create multiple users
         let user1 = create_user(&pool, "user1", "User One", None, "hash")
@@ -467,9 +494,17 @@ mod postgres_tests {
             .expect("Failed to create user");
 
         // Create message
-        let message = create_message(&pool, channel.id, user.id, "Hello, World!", false, None, None)
-            .await
-            .expect("Failed to create message");
+        let message = create_message(
+            &pool,
+            channel.id,
+            user.id,
+            "Hello, World!",
+            false,
+            None,
+            None,
+        )
+        .await
+        .expect("Failed to create message");
 
         assert_eq!(message.content, "Hello, World!");
         assert_eq!(message.channel_id, channel.id);
@@ -507,9 +542,16 @@ mod postgres_tests {
     #[sqlx::test]
     async fn test_list_messages_pagination(pool: PgPool) {
         // Create channel and user
-        let channel = create_channel(&pool, "pagination-test", &ChannelType::Text, None, None, None)
-            .await
-            .expect("Failed to create channel");
+        let channel = create_channel(
+            &pool,
+            "pagination-test",
+            &ChannelType::Text,
+            None,
+            None,
+            None,
+        )
+        .await
+        .expect("Failed to create channel");
 
         let user = create_user(&pool, "paginuser", "Pagination User", None, "hash")
             .await
@@ -517,9 +559,17 @@ mod postgres_tests {
 
         // Create multiple messages
         for i in 1..=5 {
-            create_message(&pool, channel.id, user.id, &format!("Message {i}"), false, None, None)
-                .await
-                .expect("Failed to create message");
+            create_message(
+                &pool,
+                channel.id,
+                user.id,
+                &format!("Message {i}"),
+                false,
+                None,
+                None,
+            )
+            .await
+            .expect("Failed to create message");
         }
 
         // List all messages
@@ -553,14 +603,30 @@ mod postgres_tests {
             .expect("Failed to create user");
 
         // Create original message
-        let original = create_message(&pool, channel.id, user.id, "Original message", false, None, None)
-            .await
-            .expect("Failed to create original message");
+        let original = create_message(
+            &pool,
+            channel.id,
+            user.id,
+            "Original message",
+            false,
+            None,
+            None,
+        )
+        .await
+        .expect("Failed to create original message");
 
         // Create reply
-        let reply = create_message(&pool, channel.id, user.id, "This is a reply", false, None, Some(original.id))
-            .await
-            .expect("Failed to create reply");
+        let reply = create_message(
+            &pool,
+            channel.id,
+            user.id,
+            "This is a reply",
+            false,
+            None,
+            Some(original.id),
+        )
+        .await
+        .expect("Failed to create reply");
 
         assert_eq!(reply.reply_to, Some(original.id));
     }
@@ -568,9 +634,16 @@ mod postgres_tests {
     #[sqlx::test]
     async fn test_admin_delete_message(pool: PgPool) {
         // Create channel and users
-        let channel = create_channel(&pool, "admin-del-test", &ChannelType::Text, None, None, None)
-            .await
-            .expect("Failed to create channel");
+        let channel = create_channel(
+            &pool,
+            "admin-del-test",
+            &ChannelType::Text,
+            None,
+            None,
+            None,
+        )
+        .await
+        .expect("Failed to create channel");
 
         let user = create_user(&pool, "regularuser", "Regular User", None, "hash")
             .await
@@ -601,17 +674,32 @@ mod postgres_tests {
     #[sqlx::test]
     async fn test_file_attachments(pool: PgPool) {
         // Create channel, user, and message
-        let channel = create_channel(&pool, "attachment-test", &ChannelType::Text, None, None, None)
-            .await
-            .expect("Failed to create channel");
+        let channel = create_channel(
+            &pool,
+            "attachment-test",
+            &ChannelType::Text,
+            None,
+            None,
+            None,
+        )
+        .await
+        .expect("Failed to create channel");
 
         let user = create_user(&pool, "attachuser", "Attachment User", None, "hash")
             .await
             .expect("Failed to create user");
 
-        let message = create_message(&pool, channel.id, user.id, "Message with attachment", false, None, None)
-            .await
-            .expect("Failed to create message");
+        let message = create_message(
+            &pool,
+            channel.id,
+            user.id,
+            "Message with attachment",
+            false,
+            None,
+            None,
+        )
+        .await
+        .expect("Failed to create message");
 
         // Create file attachment
         let attachment = create_file_attachment(
@@ -653,17 +741,32 @@ mod postgres_tests {
     #[sqlx::test]
     async fn test_delete_attachments_by_message(pool: PgPool) {
         // Create channel, user, and message
-        let channel = create_channel(&pool, "multi-attach-test", &ChannelType::Text, None, None, None)
-            .await
-            .expect("Failed to create channel");
+        let channel = create_channel(
+            &pool,
+            "multi-attach-test",
+            &ChannelType::Text,
+            None,
+            None,
+            None,
+        )
+        .await
+        .expect("Failed to create channel");
 
         let user = create_user(&pool, "multiattachuser", "Multi Attach User", None, "hash")
             .await
             .expect("Failed to create user");
 
-        let message = create_message(&pool, channel.id, user.id, "Multiple attachments", false, None, None)
-            .await
-            .expect("Failed to create message");
+        let message = create_message(
+            &pool,
+            channel.id,
+            user.id,
+            "Multiple attachments",
+            false,
+            None,
+            None,
+        )
+        .await
+        .expect("Failed to create message");
 
         // Create multiple attachments
         create_file_attachment(&pool, message.id, "file1.txt", "text/plain", 100, "path1")

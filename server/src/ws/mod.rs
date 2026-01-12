@@ -5,11 +5,11 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
+use axum::extract::ws::{Message, WebSocket};
 use axum::{
     extract::{Query, State, WebSocketUpgrade},
     response::Response,
 };
-use axum::extract::ws::{Message, WebSocket};
 use fred::prelude::*;
 use futures::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
@@ -35,58 +35,58 @@ pub enum ClientEvent {
     /// Subscribe to channel events
     Subscribe {
         /// Channel to subscribe to.
-        channel_id: Uuid
+        channel_id: Uuid,
     },
     /// Unsubscribe from channel events
     Unsubscribe {
         /// Channel to unsubscribe from.
-        channel_id: Uuid
+        channel_id: Uuid,
     },
     /// Send typing indicator
     Typing {
         /// Channel user is typing in.
-        channel_id: Uuid
+        channel_id: Uuid,
     },
     /// Stop typing indicator
     StopTyping {
         /// Channel user stopped typing in.
-        channel_id: Uuid
+        channel_id: Uuid,
     },
 
     // Voice events
     /// Join a voice channel
     VoiceJoin {
         /// Voice channel to join.
-        channel_id: Uuid
+        channel_id: Uuid,
     },
     /// Leave a voice channel
     VoiceLeave {
         /// Voice channel to leave.
-        channel_id: Uuid
+        channel_id: Uuid,
     },
     /// Send SDP answer to server
     VoiceAnswer {
         /// Voice channel.
         channel_id: Uuid,
         /// SDP answer.
-        sdp: String
+        sdp: String,
     },
     /// Send ICE candidate to server
     VoiceIceCandidate {
         /// Voice channel.
         channel_id: Uuid,
         /// ICE candidate string.
-        candidate: String
+        candidate: String,
     },
     /// Mute self in voice channel
     VoiceMute {
         /// Voice channel.
-        channel_id: Uuid
+        channel_id: Uuid,
     },
     /// Unmute self in voice channel
     VoiceUnmute {
         /// Voice channel.
-        channel_id: Uuid
+        channel_id: Uuid,
     },
 }
 
@@ -112,19 +112,19 @@ pub enum ServerEvent {
     /// Connection authenticated successfully
     Ready {
         /// Authenticated user ID.
-        user_id: Uuid
+        user_id: Uuid,
     },
     /// Pong response
     Pong,
     /// Subscribed to channel
     Subscribed {
         /// Channel subscribed to.
-        channel_id: Uuid
+        channel_id: Uuid,
     },
     /// Unsubscribed from channel
     Unsubscribed {
         /// Channel unsubscribed from.
-        channel_id: Uuid
+        channel_id: Uuid,
     },
     /// New message in channel
     MessageNew {
@@ -156,28 +156,28 @@ pub enum ServerEvent {
         /// Channel user is typing in.
         channel_id: Uuid,
         /// User who is typing.
-        user_id: Uuid
+        user_id: Uuid,
     },
     /// User stopped typing
     TypingStop {
         /// Channel user stopped typing in.
         channel_id: Uuid,
         /// User who stopped typing.
-        user_id: Uuid
+        user_id: Uuid,
     },
     /// Presence update
     PresenceUpdate {
         /// User whose presence changed.
         user_id: Uuid,
         /// New status (online, away, busy, offline).
-        status: String
+        status: String,
     },
     /// Error
     Error {
         /// Error code.
         code: String,
         /// Error message.
-        message: String
+        message: String,
     },
 
     // Voice events
@@ -186,14 +186,14 @@ pub enum ServerEvent {
         /// Voice channel.
         channel_id: Uuid,
         /// SDP offer.
-        sdp: String
+        sdp: String,
     },
     /// ICE candidate from server
     VoiceIceCandidate {
         /// Voice channel.
         channel_id: Uuid,
         /// ICE candidate string.
-        candidate: String
+        candidate: String,
     },
     /// User joined voice channel
     VoiceUserJoined {
@@ -211,21 +211,21 @@ pub enum ServerEvent {
         /// Voice channel.
         channel_id: Uuid,
         /// User who left.
-        user_id: Uuid
+        user_id: Uuid,
     },
     /// User muted in voice channel
     VoiceUserMuted {
         /// Voice channel.
         channel_id: Uuid,
         /// User who muted.
-        user_id: Uuid
+        user_id: Uuid,
     },
     /// User unmuted in voice channel
     VoiceUserUnmuted {
         /// Voice channel.
         channel_id: Uuid,
         /// User who unmuted.
-        user_id: Uuid
+        user_id: Uuid,
     },
     /// Current voice room state (sent on join)
     VoiceRoomState {
@@ -239,7 +239,7 @@ pub enum ServerEvent {
         /// Error code.
         code: String,
         /// Error message.
-        message: String
+        message: String,
     },
 }
 
@@ -248,14 +248,14 @@ pub mod channels {
     use uuid::Uuid;
 
     /// Redis channel for channel events.
-    #[must_use] 
+    #[must_use]
     pub fn channel_events(channel_id: Uuid) -> String {
         format!("channel:{channel_id}")
     }
 
     /// Redis channel for user presence updates (future feature).
     #[allow(dead_code)]
-    #[must_use] 
+    #[must_use]
     pub fn user_presence(user_id: Uuid) -> String {
         format!("presence:{user_id}")
     }
@@ -271,9 +271,8 @@ pub async fn broadcast_to_channel(
     channel_id: Uuid,
     event: &ServerEvent,
 ) -> Result<(), RedisError> {
-    let payload = serde_json::to_string(event).map_err(|e| {
-        RedisError::new(RedisErrorKind::Parse, format!("JSON error: {e}"))
-    })?;
+    let payload = serde_json::to_string(event)
+        .map_err(|e| RedisError::new(RedisErrorKind::Parse, format!("JSON error: {e}")))?;
 
     redis
         .publish::<(), _, _>(channels::channel_events(channel_id), payload)
@@ -365,14 +364,8 @@ async fn handle_socket(socket: WebSocket, state: AppState, user_id: Uuid) {
     while let Some(msg) = ws_receiver.next().await {
         match msg {
             Ok(Message::Text(text)) => {
-                if let Err(e) = handle_client_message(
-                    &text,
-                    user_id,
-                    &state,
-                    &tx,
-                    &subscribed_channels,
-                )
-                .await
+                if let Err(e) =
+                    handle_client_message(&text, user_id, &state, &tx, &subscribed_channels).await
                 {
                     warn!("Error handling message: {}", e);
                     let _ = tx
@@ -428,7 +421,10 @@ async fn handle_client_message(
 
         ClientEvent::Subscribe { channel_id } => {
             // Verify channel exists
-            if db::find_channel_by_id(&state.db, channel_id).await?.is_none() {
+            if db::find_channel_by_id(&state.db, channel_id)
+                .await?
+                .is_none()
+            {
                 tx.send(ServerEvent::Error {
                     code: "channel_not_found".to_string(),
                     message: "Channel not found".to_string(),
@@ -455,7 +451,10 @@ async fn handle_client_message(
             broadcast_to_channel(
                 &state.redis,
                 channel_id,
-                &ServerEvent::TypingStart { channel_id, user_id },
+                &ServerEvent::TypingStart {
+                    channel_id,
+                    user_id,
+                },
             )
             .await?;
         }
@@ -465,7 +464,10 @@ async fn handle_client_message(
             broadcast_to_channel(
                 &state.redis,
                 channel_id,
-                &ServerEvent::TypingStop { channel_id, user_id },
+                &ServerEvent::TypingStop {
+                    channel_id,
+                    user_id,
+                },
             )
             .await?;
         }
@@ -478,11 +480,7 @@ async fn handle_client_message(
         | ClientEvent::VoiceMute { .. }
         | ClientEvent::VoiceUnmute { .. } => {
             if let Err(e) = crate::voice::ws_handler::handle_voice_event(
-                &state.sfu,
-                &state.db,
-                user_id,
-                event,
-                tx,
+                &state.sfu, &state.db, user_id, event, tx,
             )
             .await
             {
@@ -547,18 +545,12 @@ async fn handle_pubsub(
 }
 
 /// Update user presence in the database.
-async fn update_presence(
-    state: &AppState,
-    user_id: Uuid,
-    status: &str,
-) -> Result<(), sqlx::Error> {
-    sqlx::query(
-        "UPDATE users SET status = $1::user_status WHERE id = $2",
-    )
-    .bind(status)
-    .bind(user_id)
-    .execute(&state.db)
-    .await?;
+async fn update_presence(state: &AppState, user_id: Uuid, status: &str) -> Result<(), sqlx::Error> {
+    sqlx::query("UPDATE users SET status = $1::user_status WHERE id = $2")
+        .bind(status)
+        .bind(user_id)
+        .execute(&state.db)
+        .await?;
 
     Ok(())
 }

@@ -2,23 +2,28 @@
 //!
 //! Handles file uploads to S3-compatible storage and metadata management.
 
+use axum::extract::Multipart;
 use axum::{
     extract::{Path, State},
     http::StatusCode,
     response::{IntoResponse, Response},
     Json,
 };
-use axum::extract::Multipart;
 use serde::Serialize;
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::{api::AppState, auth::AuthUser, db, ws::{broadcast_to_channel, ServerEvent}};
-use super::messages::{AuthorProfile, AttachmentInfo, MessageResponse};
+use super::messages::{AttachmentInfo, AuthorProfile, MessageResponse};
+use crate::{
+    api::AppState,
+    auth::AuthUser,
+    db,
+    ws::{broadcast_to_channel, ServerEvent},
+};
 
-// ============================================================================ 
+// ============================================================================
 // Error Types
-// ============================================================================ 
+// ============================================================================
 
 /// Errors that can occur during file upload operations.
 #[derive(Debug, Error)]
@@ -83,21 +88,23 @@ impl IntoResponse for UploadError {
                 self.to_string(),
             ),
             Self::NotFound => (StatusCode::NOT_FOUND, "FILE_NOT_FOUND", self.to_string()),
-            Self::TooLarge { .. } => {
-                (StatusCode::PAYLOAD_TOO_LARGE, "FILE_TOO_LARGE", self.to_string())
-            }
+            Self::TooLarge { .. } => (
+                StatusCode::PAYLOAD_TOO_LARGE,
+                "FILE_TOO_LARGE",
+                self.to_string(),
+            ),
             Self::InvalidMimeType { .. } => (
                 StatusCode::UNSUPPORTED_MEDIA_TYPE,
                 "INVALID_MIME_TYPE",
                 self.to_string(),
             ),
             Self::NoFile => (StatusCode::BAD_REQUEST, "NO_FILE", self.to_string()),
-            Self::InvalidFilename => {
-                (StatusCode::BAD_REQUEST, "INVALID_FILENAME", self.to_string())
-            }
-            Self::MessageNotFound => {
-                (StatusCode::NOT_FOUND, "MESSAGE_NOT_FOUND", self.to_string())
-            }
+            Self::InvalidFilename => (
+                StatusCode::BAD_REQUEST,
+                "INVALID_FILENAME",
+                self.to_string(),
+            ),
+            Self::MessageNotFound => (StatusCode::NOT_FOUND, "MESSAGE_NOT_FOUND", self.to_string()),
             Self::Forbidden => (StatusCode::FORBIDDEN, "FORBIDDEN", self.to_string()),
             Self::Storage(_) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
@@ -109,7 +116,11 @@ impl IntoResponse for UploadError {
                 "DATABASE_ERROR",
                 "Database operation failed".to_string(),
             ),
-            Self::Validation(_) => (StatusCode::BAD_REQUEST, "VALIDATION_ERROR", self.to_string()),
+            Self::Validation(_) => (
+                StatusCode::BAD_REQUEST,
+                "VALIDATION_ERROR",
+                self.to_string(),
+            ),
         };
 
         let body = Json(serde_json::json!({
@@ -121,9 +132,9 @@ impl IntoResponse for UploadError {
     }
 }
 
-// ============================================================================ 
+// ============================================================================
 // Request/Response Types
-// ============================================================================ 
+// ============================================================================
 
 /// Response for successful file upload.
 #[derive(Debug, Serialize)]
@@ -170,9 +181,9 @@ impl From<db::FileAttachment> for AttachmentResponse {
     }
 }
 
-// ============================================================================ 
+// ============================================================================
 // Constants
-// ============================================================================ 
+// ============================================================================
 
 /// Default allowed MIME types for uploads.
 const DEFAULT_ALLOWED_TYPES: &[&str] = &[
@@ -193,9 +204,9 @@ const DEFAULT_ALLOWED_TYPES: &[&str] = &[
     "video/webm",
 ];
 
-// ============================================================================ 
+// ============================================================================
 // Handlers
-// ============================================================================ 
+// ============================================================================
 
 /// Upload a file attachment.
 ///
@@ -260,8 +271,9 @@ pub async fn upload_file(
     // Validate required fields
     let file_data = file_data.ok_or(UploadError::NoFile)?;
     let filename = filename.ok_or(UploadError::InvalidFilename)?;
-    let message_id =
-        message_id.ok_or(UploadError::Validation("message_id is required".to_string()))?;
+    let message_id = message_id.ok_or(UploadError::Validation(
+        "message_id is required".to_string(),
+    ))?;
 
     // Sanitize filename
     let safe_filename = sanitize_filename(&filename);
@@ -279,10 +291,10 @@ pub async fn upload_file(
         .unwrap_or_else(|| "application/octet-stream".to_string());
 
     // Validate MIME type
-    let allowed_types: Vec<&str> = state
-        .config
-        .allowed_mime_types
-        .as_ref().map_or_else(|| DEFAULT_ALLOWED_TYPES.to_vec(), |v| v.iter().map(std::string::String::as_str).collect());
+    let allowed_types: Vec<&str> = state.config.allowed_mime_types.as_ref().map_or_else(
+        || DEFAULT_ALLOWED_TYPES.to_vec(),
+        |v| v.iter().map(std::string::String::as_str).collect(),
+    );
 
     if !allowed_types.contains(&content_type.as_str()) {
         return Err(UploadError::InvalidMimeType {
@@ -292,7 +304,7 @@ pub async fn upload_file(
 
     // Verify message exists and user has access
     let message = db::find_message_by_id(&state.db, message_id)
-        .await? 
+        .await?
         .ok_or(UploadError::MessageNotFound)?;
 
     // Only message author can attach files
@@ -308,10 +320,7 @@ pub async fn upload_file(
         .unwrap_or("bin");
     let s3_key = format!(
         "attachments/{}/{}/{}.{}",
-        message.channel_id,
-        message_id,
-        file_id,
-        extension
+        message.channel_id, message_id, file_id, extension
     );
 
     // Upload to S3
@@ -445,10 +454,10 @@ pub async fn upload_message_with_file(
         .unwrap_or_else(|| "application/octet-stream".to_string());
 
     // Validate MIME type
-    let allowed_types: Vec<&str> = state
-        .config
-        .allowed_mime_types
-        .as_ref().map_or_else(|| DEFAULT_ALLOWED_TYPES.to_vec(), |v| v.iter().map(std::string::String::as_str).collect());
+    let allowed_types: Vec<&str> = state.config.allowed_mime_types.as_ref().map_or_else(
+        || DEFAULT_ALLOWED_TYPES.to_vec(),
+        |v| v.iter().map(std::string::String::as_str).collect(),
+    );
 
     if !allowed_types.contains(&file_content_type.as_str()) {
         return Err(UploadError::InvalidMimeType {
@@ -509,7 +518,11 @@ pub async fn upload_message_with_file(
         let key_cleanup = s3_key.clone();
         tokio::spawn(async move {
             if let Err(cleanup_err) = s3_cleanup.delete(&key_cleanup).await {
-                tracing::error!("Failed to cleanup orphaned S3 object {}: {}", key_cleanup, cleanup_err);
+                tracing::error!(
+                    "Failed to cleanup orphaned S3 object {}: {}",
+                    key_cleanup,
+                    cleanup_err
+                );
             }
         });
         tracing::error!(
@@ -583,7 +596,7 @@ pub async fn get_attachment(
     Path(id): Path<Uuid>,
 ) -> Result<Json<AttachmentResponse>, UploadError> {
     let attachment = db::find_file_attachment_by_id(&state.db, id)
-        .await? 
+        .await?
         .ok_or(UploadError::NotFound)?;
 
     Ok(Json(attachment.into()))
@@ -611,7 +624,7 @@ pub async fn download(
 
     // Get attachment metadata
     let attachment = db::find_file_attachment_by_id(&state.db, id)
-        .await? 
+        .await?
         .ok_or(UploadError::NotFound)?;
 
     // Fetch from S3
@@ -641,9 +654,9 @@ pub async fn download(
     Ok((headers, body).into_response())
 }
 
-// ============================================================================ 
+// ============================================================================
 // Helpers
-// ============================================================================ 
+// ============================================================================
 
 /// Sanitize a filename to prevent path traversal and other issues.
 fn sanitize_filename(filename: &str) -> String {
@@ -676,7 +689,10 @@ mod tests {
     #[test]
     fn test_sanitize_removes_spaces() {
         // Spaces are removed (not in allowed chars)
-        assert_eq!(sanitize_filename("file with spaces.jpg"), "filewithspaces.jpg");
+        assert_eq!(
+            sanitize_filename("file with spaces.jpg"),
+            "filewithspaces.jpg"
+        );
     }
 
     #[test]

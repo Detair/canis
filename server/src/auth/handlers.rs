@@ -255,19 +255,19 @@ pub async fn login(
         .as_ref()
         .ok_or(AuthError::InvalidCredentials)?;
 
-    let valid = verify_password(&body.password, password_hash).map_err(|_| AuthError::PasswordHash)?;
+    let valid =
+        verify_password(&body.password, password_hash).map_err(|_| AuthError::PasswordHash)?;
 
     if !valid {
         return Err(AuthError::InvalidCredentials);
     }
 
     // Check MFA if enabled
-    if user.mfa_secret.is_some()
-        && body.mfa_code.is_none() {
-            return Err(AuthError::MfaRequired);
-        }
-        // TODO: Verify MFA code (Phase 2)
-        // For now, MFA verification is not implemented
+    if user.mfa_secret.is_some() && body.mfa_code.is_none() {
+        return Err(AuthError::MfaRequired);
+    }
+    // TODO: Verify MFA code (Phase 2)
+    // For now, MFA verification is not implemented
 
     // Generate tokens
     let tokens = generate_token_pair(
@@ -522,9 +522,9 @@ pub async fn mfa_verify(
     .map_err(|e| AuthError::Internal(format!("Failed to create TOTP: {e}")))?;
 
     // Verify the code
-    let is_valid = totp.check_current(&request.code).map_err(|e| {
-        AuthError::Internal(format!("Failed to verify TOTP code: {e}"))
-    })?;
+    let is_valid = totp
+        .check_current(&request.code)
+        .map_err(|e| AuthError::Internal(format!("Failed to verify TOTP code: {e}")))?;
 
     if !is_valid {
         return Err(AuthError::InvalidMfaCode);
@@ -546,12 +546,8 @@ pub async fn mfa_disable(
 ) -> AuthResult<Json<serde_json::Value>> {
     // Require MFA verification before disabling (security measure)
     // First verify the provided code is valid
-    let verification_result = mfa_verify(
-        State(state.clone()),
-        auth_user.clone(),
-        Json(request),
-    )
-    .await;
+    let verification_result =
+        mfa_verify(State(state.clone()), auth_user.clone(), Json(request)).await;
 
     if verification_result.is_err() {
         return Err(AuthError::InvalidMfaCode);

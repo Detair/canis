@@ -6,17 +6,14 @@ use crate::audio::{AudioDeviceList, FRAME_SIZE_MS, SAMPLE_RATE};
 use crate::network::ClientEvent;
 use crate::webrtc::IceServerConfig;
 use crate::AppState;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicU16, AtomicU32, Ordering};
+use std::sync::Arc;
 use tauri::{command, AppHandle, Emitter, State};
 use tokio::sync::mpsc;
 use tracing::{debug, error, info, warn};
 use webrtc::{
     rtp::packet::Packet as RtpPacket,
-    track::track_local::{
-        track_local_static_rtp::TrackLocalStaticRTP,
-        TrackLocalWriter,
-    },
+    track::track_local::{track_local_static_rtp::TrackLocalStaticRTP, TrackLocalWriter},
 };
 
 /// Join a voice channel.
@@ -369,9 +366,7 @@ pub async fn set_input_device(
     let mut voice = state.voice.write().await;
     let voice_state = voice.as_mut().ok_or("Voice not initialized")?;
 
-    voice_state
-        .audio
-        .set_input_device(device_id);
+    voice_state.audio.set_input_device(device_id);
 
     Ok(())
 }
@@ -389,9 +384,7 @@ pub async fn set_output_device(
     let mut voice = state.voice.write().await;
     let voice_state = voice.as_mut().ok_or("Voice not initialized")?;
 
-    voice_state
-        .audio
-        .set_output_device(device_id);
+    voice_state.audio.set_output_device(device_id);
 
     Ok(())
 }

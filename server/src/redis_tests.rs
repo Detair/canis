@@ -14,7 +14,10 @@ mod redis_tests {
         let config = RedisConfig::from_url("redis://localhost:6379").unwrap();
         let client = RedisClient::new(config, None, None, None);
         client.connect();
-        client.wait_for_connect().await.expect("Failed to connect to Redis");
+        client
+            .wait_for_connect()
+            .await
+            .expect("Failed to connect to Redis");
         client
     }
 
@@ -149,11 +152,17 @@ mod redis_tests {
             client.hgetall(key).await.expect("Failed to HGETALL");
         assert_eq!(all_fields.len(), 3);
         assert_eq!(all_fields.get("username"), Some(&"testuser".to_string()));
-        assert_eq!(all_fields.get("email"), Some(&"test@example.com".to_string()));
+        assert_eq!(
+            all_fields.get("email"),
+            Some(&"test@example.com".to_string())
+        );
         assert_eq!(all_fields.get("status"), Some(&"online".to_string()));
 
         // Check if field exists
-        let exists: bool = client.hexists(key, "username").await.expect("Failed to HEXISTS");
+        let exists: bool = client
+            .hexists(key, "username")
+            .await
+            .expect("Failed to HEXISTS");
         assert!(exists);
 
         // Delete a field
@@ -179,9 +188,18 @@ mod redis_tests {
         let key = "test:list:messages";
 
         // Push items to list
-        client.rpush::<(), _, _>(key, "message1").await.expect("Failed to RPUSH");
-        client.rpush::<(), _, _>(key, "message2").await.expect("Failed to RPUSH");
-        client.rpush::<(), _, _>(key, "message3").await.expect("Failed to RPUSH");
+        client
+            .rpush::<(), _, _>(key, "message1")
+            .await
+            .expect("Failed to RPUSH");
+        client
+            .rpush::<(), _, _>(key, "message2")
+            .await
+            .expect("Failed to RPUSH");
+        client
+            .rpush::<(), _, _>(key, "message3")
+            .await
+            .expect("Failed to RPUSH");
 
         // Get list length
         let len: i64 = client.llen(key).await.expect("Failed to LLEN");
@@ -227,10 +245,16 @@ mod redis_tests {
         assert_eq!(size, 3);
 
         // Check membership
-        let is_member: bool = client.sismember(key, "user2").await.expect("Failed to SISMEMBER");
+        let is_member: bool = client
+            .sismember(key, "user2")
+            .await
+            .expect("Failed to SISMEMBER");
         assert!(is_member);
 
-        let is_member: bool = client.sismember(key, "user99").await.expect("Failed to SISMEMBER");
+        let is_member: bool = client
+            .sismember(key, "user99")
+            .await
+            .expect("Failed to SISMEMBER");
         assert!(!is_member);
 
         // Get all members
@@ -260,21 +284,28 @@ mod redis_tests {
         let publisher = create_test_redis().await;
         let subscriber = publisher.clone_new();
         subscriber.connect();
-        subscriber.wait_for_connect().await.expect("Failed to connect subscriber");
+        subscriber
+            .wait_for_connect()
+            .await
+            .expect("Failed to connect subscriber");
 
         let channel = "test:pubsub:basic";
         let (tx, mut rx) = tokio::sync::mpsc::channel::<String>(10);
 
         // Subscribe to channel
         let mut pubsub_stream = subscriber.message_rx();
-        subscriber.subscribe(channel).await.expect("Failed to SUBSCRIBE");
+        subscriber
+            .subscribe(channel)
+            .await
+            .expect("Failed to SUBSCRIBE");
 
         // Spawn task to receive messages
         let channel_name = channel.to_string();
         tokio::spawn(async move {
             while let Ok(message) = pubsub_stream.recv().await {
                 if message.channel == channel_name {
-                    if let Ok(value) = String::from_utf8(message.value.as_bytes().unwrap().to_vec()) {
+                    if let Ok(value) = String::from_utf8(message.value.as_bytes().unwrap().to_vec())
+                    {
                         let _ = tx.send(value).await;
                     }
                 }
@@ -285,7 +316,10 @@ mod redis_tests {
         sleep(Duration::from_millis(100)).await;
 
         // Publish a message
-        let _: i64 = publisher.publish(channel, "Hello, World!").await.expect("Failed to PUBLISH");
+        let _: i64 = publisher
+            .publish(channel, "Hello, World!")
+            .await
+            .expect("Failed to PUBLISH");
 
         // Receive the message
         let received = tokio::time::timeout(Duration::from_secs(2), rx.recv())
@@ -295,7 +329,10 @@ mod redis_tests {
         assert_eq!(received, "Hello, World!");
 
         // Cleanup
-        subscriber.unsubscribe(channel).await.expect("Failed to UNSUBSCRIBE");
+        subscriber
+            .unsubscribe(channel)
+            .await
+            .expect("Failed to UNSUBSCRIBE");
     }
 
     #[tokio::test]
@@ -306,8 +343,14 @@ mod redis_tests {
 
         subscriber1.connect();
         subscriber2.connect();
-        subscriber1.wait_for_connect().await.expect("Failed to connect subscriber1");
-        subscriber2.wait_for_connect().await.expect("Failed to connect subscriber2");
+        subscriber1
+            .wait_for_connect()
+            .await
+            .expect("Failed to connect subscriber1");
+        subscriber2
+            .wait_for_connect()
+            .await
+            .expect("Failed to connect subscriber2");
 
         let channel = "test:pubsub:multiple";
         let (tx1, mut rx1) = tokio::sync::mpsc::channel::<String>(10);
@@ -316,8 +359,14 @@ mod redis_tests {
         // Subscribe both
         let mut stream1 = subscriber1.message_rx();
         let mut stream2 = subscriber2.message_rx();
-        subscriber1.subscribe(channel).await.expect("Failed to SUBSCRIBE");
-        subscriber2.subscribe(channel).await.expect("Failed to SUBSCRIBE");
+        subscriber1
+            .subscribe(channel)
+            .await
+            .expect("Failed to SUBSCRIBE");
+        subscriber2
+            .subscribe(channel)
+            .await
+            .expect("Failed to SUBSCRIBE");
 
         // Spawn receive tasks
         let ch1 = channel.to_string();
@@ -345,7 +394,10 @@ mod redis_tests {
         sleep(Duration::from_millis(100)).await;
 
         // Publish message
-        let _: i64 = publisher.publish(channel, "Broadcast message").await.expect("Failed to PUBLISH");
+        let _: i64 = publisher
+            .publish(channel, "Broadcast message")
+            .await
+            .expect("Failed to PUBLISH");
 
         // Both subscribers should receive it
         let msg1 = tokio::time::timeout(Duration::from_secs(2), rx1.recv())
@@ -361,8 +413,14 @@ mod redis_tests {
         assert_eq!(msg2, "Broadcast message");
 
         // Cleanup
-        subscriber1.unsubscribe(channel).await.expect("Failed to UNSUBSCRIBE");
-        subscriber2.unsubscribe(channel).await.expect("Failed to UNSUBSCRIBE");
+        subscriber1
+            .unsubscribe(channel)
+            .await
+            .expect("Failed to UNSUBSCRIBE");
+        subscriber2
+            .unsubscribe(channel)
+            .await
+            .expect("Failed to UNSUBSCRIBE");
     }
 
     // ========================================================================
@@ -376,15 +434,27 @@ mod redis_tests {
         let key = format!("session:{session_id}");
 
         // Store session data as hash
-        client.hset::<(), _, _>(&key, ("user_id", "12345")).await.expect("Failed to HSET user_id");
-        client.hset::<(), _, _>(&key, ("username", "testuser")).await.expect("Failed to HSET username");
-        client.hset::<(), _, _>(&key, ("ip", "192.168.1.1")).await.expect("Failed to HSET ip");
+        client
+            .hset::<(), _, _>(&key, ("user_id", "12345"))
+            .await
+            .expect("Failed to HSET user_id");
+        client
+            .hset::<(), _, _>(&key, ("username", "testuser"))
+            .await
+            .expect("Failed to HSET username");
+        client
+            .hset::<(), _, _>(&key, ("ip", "192.168.1.1"))
+            .await
+            .expect("Failed to HSET ip");
 
         // Set session expiry (15 minutes)
         let _: i64 = client.expire(&key, 900).await.expect("Failed to EXPIRE");
 
         // Retrieve session
-        let user_id: String = client.hget(&key, "user_id").await.expect("Failed to HGET user_id");
+        let user_id: String = client
+            .hget(&key, "user_id")
+            .await
+            .expect("Failed to HGET user_id");
         assert_eq!(user_id, "12345");
 
         // Check TTL
@@ -447,10 +517,16 @@ mod redis_tests {
         assert_eq!(count, 2);
 
         // Check if specific user is active
-        let is_active: bool = client.sismember(&key, &user1).await.expect("Failed to SISMEMBER");
+        let is_active: bool = client
+            .sismember(&key, &user1)
+            .await
+            .expect("Failed to SISMEMBER");
         assert!(is_active);
 
-        let is_active: bool = client.sismember(&key, &user2).await.expect("Failed to SISMEMBER");
+        let is_active: bool = client
+            .sismember(&key, &user2)
+            .await
+            .expect("Failed to SISMEMBER");
         assert!(!is_active);
 
         cleanup_key(&client, &key).await;
@@ -462,9 +538,18 @@ mod redis_tests {
         let queue_key = "test:queue:events";
 
         // Producer: Add events to queue
-        let _: i64 = client.rpush(queue_key, "event:user_joined:123").await.expect("Failed to RPUSH");
-        let _: i64 = client.rpush(queue_key, "event:message_sent:456").await.expect("Failed to RPUSH");
-        let _: i64 = client.rpush(queue_key, "event:user_left:789").await.expect("Failed to RPUSH");
+        let _: i64 = client
+            .rpush(queue_key, "event:user_joined:123")
+            .await
+            .expect("Failed to RPUSH");
+        let _: i64 = client
+            .rpush(queue_key, "event:message_sent:456")
+            .await
+            .expect("Failed to RPUSH");
+        let _: i64 = client
+            .rpush(queue_key, "event:user_left:789")
+            .await
+            .expect("Failed to RPUSH");
 
         // Consumer: Process events from queue
         let event1: String = client.lpop(queue_key, None).await.expect("Failed to LPOP");
@@ -507,8 +592,12 @@ mod redis_tests {
             .expect("Failed to cache user data");
 
         // Retrieve from cache
-        let cached: String = client.get(&cache_key).await.expect("Failed to GET cached data");
-        let parsed: serde_json::Value = serde_json::from_str(&cached).expect("Failed to parse JSON");
+        let cached: String = client
+            .get(&cache_key)
+            .await
+            .expect("Failed to GET cached data");
+        let parsed: serde_json::Value =
+            serde_json::from_str(&cached).expect("Failed to parse JSON");
 
         assert_eq!(parsed["username"], "cached_user");
         assert_eq!(parsed["status"], "online");

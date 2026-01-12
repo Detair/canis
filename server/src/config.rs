@@ -111,7 +111,7 @@ impl Config {
     }
 
     /// Check if OIDC is configured.
-    #[must_use] 
+    #[must_use]
     pub const fn has_oidc(&self) -> bool {
         self.oidc_issuer_url.is_some()
             && self.oidc_client_id.is_some()
@@ -119,14 +119,14 @@ impl Config {
     }
 
     /// Check if TURN is configured.
-    #[must_use] 
+    #[must_use]
     pub const fn has_turn(&self) -> bool {
         self.turn_server.is_some()
     }
 
     /// Create a default configuration for testing.
     #[cfg(any(test, feature = "test-utils"))]
-    #[must_use] 
+    #[must_use]
     pub fn default_for_test() -> Self {
         Self {
             bind_address: "127.0.0.1:8080".into(),

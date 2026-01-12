@@ -9,7 +9,10 @@ use tokio::sync::{mpsc, RwLock};
 use tracing::{debug, info, warn};
 use uuid::Uuid;
 use webrtc::{
-    api::{interceptor_registry::register_default_interceptors, media_engine::MediaEngine, APIBuilder, API},
+    api::{
+        interceptor_registry::register_default_interceptors, media_engine::MediaEngine, APIBuilder,
+        API,
+    },
     ice_transport::ice_server::RTCIceServer,
     interceptor::registry::Registry,
     peer_connection::{
@@ -58,7 +61,7 @@ pub struct Room {
 
 impl Room {
     /// Create a new room.
-    #[must_use] 
+    #[must_use]
     pub fn new(channel_id: Uuid, max_participants: usize) -> Self {
         Self {
             channel_id,
@@ -227,7 +230,7 @@ impl SfuServer {
     }
 
     /// Get `RTCConfiguration` with ICE servers from config.
-    #[must_use] 
+    #[must_use]
     pub fn rtc_config(&self) -> RTCConfiguration {
         let mut ice_servers = vec![RTCIceServer {
             urls: vec![self.config.stun_server.clone()],
@@ -294,7 +297,16 @@ impl SfuServer {
         signal_tx: mpsc::Sender<ServerEvent>,
     ) -> Result<Arc<Peer>, VoiceError> {
         let config = self.rtc_config();
-        let peer = Peer::new(user_id, username, display_name, channel_id, &self.api, config, signal_tx).await?;
+        let peer = Peer::new(
+            user_id,
+            username,
+            display_name,
+            channel_id,
+            &self.api,
+            config,
+            signal_tx,
+        )
+        .await?;
         let peer = Arc::new(peer);
 
         // Set up connection state handler
@@ -335,8 +347,8 @@ impl SfuServer {
         let user_id = peer.user_id;
         let channel_id = peer.channel_id;
 
-        peer.peer_connection.on_track(Box::new(
-            move |track, _receiver, _transceiver| {
+        peer.peer_connection
+            .on_track(Box::new(move |track, _receiver, _transceiver| {
                 let pw = peer_weak.clone();
                 let rw = room_weak.clone();
                 let uid = user_id;
@@ -366,7 +378,9 @@ impl SfuServer {
                                 .create_subscriber_track(uid, &other_peer, &track)
                                 .await
                             {
-                                if let Err(e) = other_peer.add_outgoing_track(uid, local_track).await {
+                                if let Err(e) =
+                                    other_peer.add_outgoing_track(uid, local_track).await
+                                {
                                     warn!(
                                         source = %uid,
                                         subscriber = %other_peer.user_id,
@@ -378,8 +392,7 @@ impl SfuServer {
                         }
                     }
                 })
-            },
-        ));
+            }));
     }
 
     /// Set up ICE candidate handler for a peer.
@@ -387,45 +400,44 @@ impl SfuServer {
         let signal_tx = peer.signal_tx.clone();
         let channel_id = peer.channel_id;
 
-        peer.peer_connection.on_ice_candidate(Box::new(move |candidate| {
-            let tx = signal_tx.clone();
-            let cid = channel_id;
+        peer.peer_connection
+            .on_ice_candidate(Box::new(move |candidate| {
+                let tx = signal_tx.clone();
+                let cid = channel_id;
 
-            Box::pin(async move {
-                if let Some(c) = candidate {
-                    match c.to_json() {
-                        Ok(json) => {
-                            if let Ok(candidate_str) = serde_json::to_string(&json) {
-                                let _ = tx
-                                    .send(ServerEvent::VoiceIceCandidate {
-                                        channel_id: cid,
-                                        candidate: candidate_str,
-                                    })
-                                    .await;
+                Box::pin(async move {
+                    if let Some(c) = candidate {
+                        match c.to_json() {
+                            Ok(json) => {
+                                if let Ok(candidate_str) = serde_json::to_string(&json) {
+                                    let _ = tx
+                                        .send(ServerEvent::VoiceIceCandidate {
+                                            channel_id: cid,
+                                            candidate: candidate_str,
+                                        })
+                                        .await;
+                                }
+                            }
+                            Err(e) => {
+                                warn!(error = %e, "Failed to serialize ICE candidate");
                             }
                         }
-                        Err(e) => {
-                            warn!(error = %e, "Failed to serialize ICE candidate");
-                        }
                     }
-                }
-            })
-        }));
+                })
+            }));
     }
 
     /// Create an offer for a peer.
     pub async fn create_offer(&self, peer: &Peer) -> Result<RTCSessionDescription, VoiceError> {
         let offer = peer.peer_connection.create_offer(None).await?;
-        peer.peer_connection.set_local_description(offer.clone()).await?;
+        peer.peer_connection
+            .set_local_description(offer.clone())
+            .await?;
         Ok(offer)
     }
 
     /// Handle an answer from a peer.
-    pub async fn handle_answer(
-        &self,
-        peer: &Peer,
-        sdp: &str,
-    ) -> Result<(), VoiceError> {
+    pub async fn handle_answer(&self, peer: &Peer, sdp: &str) -> Result<(), VoiceError> {
         let answer = RTCSessionDescription::answer(sdp.to_string())
             .map_err(|e| VoiceError::Signaling(e.to_string()))?;
 
@@ -443,9 +455,7 @@ impl SfuServer {
             serde_json::from_str(candidate_str)
                 .map_err(|e| VoiceError::Signaling(format!("Invalid ICE candidate: {e}")))?;
 
-        peer.peer_connection
-            .add_ice_candidate(candidate)
-            .await?;
+        peer.peer_connection.add_ice_candidate(candidate).await?;
 
         Ok(())
     }
