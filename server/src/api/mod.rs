@@ -81,6 +81,7 @@ pub fn create_router(state: AppState) -> Router {
     // Get max upload size from config (default 50MB)
     let max_upload_size = state.config.max_upload_size;
 
+<<<<<<< HEAD
     // Social routes with Social rate limit category (20 req/60s)
     let social_routes = social::router()
         .layer(from_fn_with_state(state.clone(), rate_limit_by_user))
@@ -88,6 +89,10 @@ pub fn create_router(state: AppState) -> Router {
 
     // Other API routes with Write rate limit category (30 req/60s)
     let api_routes = Router::new()
+=======
+    // Protected routes that require authentication
+    let protected_routes = Router::new()
+>>>>>>> 6b8b5f2 (fix: Resolve file upload and download issues)
         .nest("/api/channels", chat::channels_router())
         .nest("/api/messages", chat::messages_router())
         .nest("/api/guilds", guild::router())
