@@ -236,11 +236,11 @@ ALTER TABLE guilds ADD COLUMN IF NOT EXISTS security_settings JSONB NOT NULL DEF
     "require_dual_owner_delete": false,
     "require_webauthn_transfer": false,
     "cooling_off_hours": 4
-}';
+}'::jsonb;
 
 -- Guild suspension fields
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS suspended_at TIMESTAMPTZ;
-ALTER TABLE guilds ADD COLUMN IF NOT EXISTS suspended_by UUID REFERENCES users(id);
+ALTER TABLE guilds ADD COLUMN IF NOT EXISTS suspended_by UUID REFERENCES users(id) ON DELETE SET NULL;
 ALTER TABLE guilds ADD COLUMN IF NOT EXISTS suspension_reason TEXT;
 
 -- ============================================================================
