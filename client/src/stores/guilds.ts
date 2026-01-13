@@ -95,21 +95,63 @@ export async function loadGuildChannels(guildId: string): Promise<void> {
  * This will trigger channel list reload scoped to guild
  */
 export async function selectGuild(guildId: string): Promise<void> {
+  const previousGuildId = guildsState.activeGuildId;
   setGuildsState({ activeGuildId: guildId });
 
-  // Load guild members and channels
-  await Promise.all([
-    loadGuildMembers(guildId),
-    loadGuildChannels(guildId),
-  ]);
+  // Load channels for this guild (this will update the channels store)
+  const { loadChannelsForGuild } = await import("./channels");
+  await loadChannelsForGuild(guildId);
+
+  // Load guild members
+  await loadGuildMembers(guildId);
+
+  // Check if we need to disconnect from voice
+  // If user is in a voice channel from a different guild, disconnect
+  if (previousGuildId && previousGuildId !== guildId) {
+    const { voiceState } = await import("./voice");
+    const { channelsState } = await import("./channels");
+
+    if (voiceState.channelId) {
+      const currentChannel = channelsState.channels.find(
+        (c) => c.id === voiceState.channelId
+      );
+      if (currentChannel && currentChannel.guild_id !== guildId) {
+        const { leaveVoice } = await import("./voice");
+        await leaveVoice();
+      }
+    }
+  }
 }
 
 /**
  * Select "Home" view (no guild selected)
  * This shows DMs, mentions, and cross-server activity
  */
-export function selectHome(): void {
+export async function selectHome(): Promise<void> {
+  const previousGuildId = guildsState.activeGuildId;
   setGuildsState({ activeGuildId: null });
+
+  // Load DM channels for home view
+  const { loadDMChannels } = await import("./channels");
+  await loadDMChannels();
+
+  // Check if we need to disconnect from voice
+  // If user is in a voice channel from a guild, disconnect
+  if (previousGuildId) {
+    const { voiceState } = await import("./voice");
+    const { channelsState } = await import("./channels");
+
+    if (voiceState.channelId) {
+      const currentChannel = channelsState.channels.find(
+        (c) => c.id === voiceState.channelId
+      );
+      // If the voice channel belongs to a guild, disconnect
+      if (currentChannel && currentChannel.guild_id !== null) {
+        const { leaveVoice } = await import("./voice");
+        await leaveVoice();
+      }
+    }
+  }
 }
 
 /**
