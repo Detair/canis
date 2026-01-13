@@ -250,11 +250,31 @@ These prompts are designed to be used by implementation agents to execute specif
 - **Goal:** Provide Slack-like formatting controls without clutter.
 - **UI:** 
     - Add a formatting toggle button ("Aa") to the input bar.
-    - When active, show a toolbar above the text area containing: Bold, Italic, Strike, Quote, Code Block, Inline Code.
+    - When active, show a toolbar above the text area containing: Bold, Italic, Strike, Spoiler (`||`), Quote, Code Block, Inline Code.
 - **Logic:** 
     - Clicking a button wraps the currently selected text in Markdown syntax (e.g., `**selected**`).
     - If no text is selected, insert the syntax with cursor in between.
     - Support keyboard shortcuts (`Ctrl+B`, `Ctrl+I`).
+
+**Task E: Shortcuts Cheat Sheet**
+- **Goal:** Help users discover power features.
+- **UI:** A modal overlay triggered by `?` or a help icon.
+- **Content:** List all global shortcuts (e.g., `Ctrl+K` Palette, `Ctrl+Shift+M` Mute, Markdown syntax).
+- **Design:** Clean, two-column grid using the "Focused Hybrid" theme.
+
+**Task F: Slash Command System**
+- **Trigger:** Typing `/` at the start of the message input.
+- **UI:** A popover menu listing available commands (reusing logic from Emoji Picker/Command Palette).
+- **Core Commands:**
+    - `/help` or `/?`: Opens the Shortcuts Cheat Sheet.
+    - `/shrug`: Appends `¯\_(ツ)_/¯`.
+    - `/spoiler [text]`: Wraps text in spoiler tags.
+    - `/me [action]`: Formats message as an action (italicized).
+    - `/roll [NdX]`: Rolls dice (e.g., `/roll d6`, `/roll 2d20`).
+    - `/flip`: Flips a coin (Heads/Tails).
+    - `/slap @user`: "User slaps @user around a bit with a large trout."
+    - `/tableflip`: `(╯°□°）╯︵ ┻━┻`
+    - `/unflip`: `┬─┬ノ( º _ ºノ)`
 
 ## [Phase 3] Friends, Status & Social Graph
 **Task A: Social Backend**
