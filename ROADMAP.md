@@ -4,7 +4,7 @@ This roadmap outlines the development path from the current prototype to a produ
 
 **Current Phase:** Phase 2 (Rich Interactions & Modern UX) - Near Complete
 
-**Last Updated:** 2026-01-11
+**Last Updated:** 2026-01-13
 
 ## Quick Status Overview
 
@@ -12,7 +12,7 @@ This roadmap outlines the development path from the current prototype to a produ
 |-------|--------|------------|------------------|
 | **Phase 0** | ✅ Complete | 100% | N+1 fix, WebRTC optimization, MFA encryption |
 | **Phase 1** | ✅ Complete | 100% | Voice state sync, audio device selection |
-| **Phase 2** | ✅ Near Complete | 95% | Voice Island, VAD, Speaking Indicators, Command Palette |
+| **Phase 2** | ✅ Near Complete | 97% | Voice Island, VAD, Speaking Indicators, Command Palette, File Attachments, Token Refresh |
 | **Phase 3** | 📋 Planned | 5% | Guild store skeleton prepared |
 | **Phase 4** | 📋 Planned | 0% | - |
 | **Phase 5** | 📋 Planned | 0% | - |
@@ -26,6 +26,8 @@ This roadmap outlines the development path from the current prototype to a produ
 - ✅ Auto-retry voice join on connection conflicts
 - ✅ Participant list with instant local user display
 - ✅ Guild architecture preparation (Phase 3 ready)
+- ✅ Automatic JWT token refresh (prevents session expiration)
+- ✅ File attachments with drag-and-drop upload and image previews
 
 ---
 
@@ -114,6 +116,7 @@ This roadmap outlines the development path from the current prototype to a produ
   - Local user shown immediately when joining voice channel.
   - Participant count updates during "connecting" state, not just "connected".
   - Speaking/muted indicators for local user in channel list.
+  - Fixed duplicate user display by filtering current user from server participants.
   - **Location**: `client/src/components/voice/VoiceParticipants.tsx`, `client/src/components/channels/ChannelItem.tsx`
 - [x] **[UX] Draggable Voice Island** `New` ✅
   - Voice Island can be dragged anywhere on screen.
@@ -124,8 +127,15 @@ This roadmap outlines the development path from the current prototype to a produ
 - [x] **[Voice] Basic Noise Reduction (Tier 1)**
   - Implemented in `browser.ts` via constraints.
   - UI Toggle in Audio Settings.
-- [ ] **[Media] File Attachments & Previews**
+- [x] **[Auth] Automatic Token Refresh** `New` ✅
+  - JWT access tokens auto-refresh 60 seconds before expiration.
+  - Refresh tokens stored and managed in browser state.
+  - Seamless session continuity without manual re-login.
+  - **Location**: `client/src/lib/tauri.ts`
+- [x] **[Media] File Attachments & Previews** ✅
   - [x] **Backend:** Implement `Proxy Method` for authenticated file downloads.
+  - [x] **Backend:** Token query parameter support for browser requests (img src, a href).
+  - [x] **Backend:** Configurable upload size limit (default 50MB).
   - [x] **Client:** Implement drag-and-drop file upload.
   - [ ] **UX:** Add an "Upload Preview Tray" in `MessageInput` to see images before sending.
   - [x] **UI:** Render image previews in the message list.
