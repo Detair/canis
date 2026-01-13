@@ -1,13 +1,13 @@
-//! Permission system for the VoiceChat platform.
+//! Permission system types and utilities.
 //!
-//! This module provides types and utilities for managing permissions:
-//! - Guild-level permissions using bitflags for efficient storage and operations
-//! - System-level permissions for administrative actions
-//!
-//! Permissions are stored as BIGINT in PostgreSQL and support efficient bitwise operations.
+//! Two-tier permission model:
+//! - System permissions: Platform-level admin actions
+//! - Guild permissions: Per-guild role-based access control
 
-mod guild;
-mod system;
+pub mod guild;
+pub mod models;
+pub mod system;
 
 pub use guild::GuildPermissions;
+pub use models::*;
 pub use system::SystemPermission;
