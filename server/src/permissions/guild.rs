@@ -13,7 +13,8 @@ bitflags! {
     /// Guild permissions represented as a 64-bit bitfield.
     ///
     /// Stored as BIGINT in PostgreSQL for efficient database operations.
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+    #[serde(transparent)]
     pub struct GuildPermissions: u64 {
         // === Content (bits 0-4) ===
         /// Permission to send text messages in channels
@@ -126,10 +127,10 @@ impl GuildPermissions {
 
     /// Create permissions from a database BIGINT value.
     ///
-    /// This safely handles the i64 to u64 conversion required for PostgreSQL compatibility.
+    /// This safely handles the i64 to u64 conversion required for `PostgreSQL` compatibility.
     /// Invalid bits are silently ignored to maintain forward compatibility.
     #[must_use]
-    pub fn from_db(value: i64) -> Self {
+    pub const fn from_db(value: i64) -> Self {
         // Reinterpret the i64 bit pattern as u64
         let bits = value as u64;
         // Only keep known permission bits, ignore unknown ones
@@ -138,9 +139,9 @@ impl GuildPermissions {
 
     /// Convert permissions to a database BIGINT value.
     ///
-    /// Returns the bit pattern as i64 for PostgreSQL storage.
+    /// Returns the bit pattern as i64 for `PostgreSQL` storage.
     #[must_use]
-    pub fn to_db(self) -> i64 {
+    pub const fn to_db(self) -> i64 {
         self.bits() as i64
     }
 
@@ -158,7 +159,7 @@ impl GuildPermissions {
     /// assert!(!perms.has(GuildPermissions::BAN_MEMBERS));
     /// ```
     #[must_use]
-    pub fn has(self, permission: Self) -> bool {
+    pub const fn has(self, permission: Self) -> bool {
         self.contains(permission)
     }
 
@@ -178,7 +179,7 @@ impl GuildPermissions {
     /// assert!(!unsafe_perms.validate_for_everyone());
     /// ```
     #[must_use]
-    pub fn validate_for_everyone(self) -> bool {
+    pub const fn validate_for_everyone(self) -> bool {
         !self.intersects(Self::EVERYONE_FORBIDDEN)
     }
 }
@@ -556,5 +557,72 @@ mod tests {
         let sum: u64 = all_perms.iter().map(|p| p.bits()).sum();
 
         assert_eq!(combined, sum, "Some permissions share the same bit!");
+    }
+
+    // === Serde Tests ===
+
+    #[test]
+    fn test_serialize_single_permission() {
+        let perms = GuildPermissions::SEND_MESSAGES;
+        let json = serde_json::to_string(&perms).unwrap();
+        // With #[serde(transparent)], serializes as the underlying u64 bits value
+        assert_eq!(json, "1");
+    }
+
+    #[test]
+    fn test_serialize_multiple_permissions() {
+        let perms = GuildPermissions::SEND_MESSAGES | GuildPermissions::VOICE_CONNECT;
+        let json = serde_json::to_string(&perms).unwrap();
+        // SEND_MESSAGES = 1 << 0 = 1, VOICE_CONNECT = 1 << 5 = 32
+        // Combined: 1 | 32 = 33
+        assert_eq!(json, "33");
+    }
+
+    #[test]
+    fn test_serialize_empty_permissions() {
+        let perms = GuildPermissions::empty();
+        let json = serde_json::to_string(&perms).unwrap();
+        assert_eq!(json, "0");
+    }
+
+    #[test]
+    fn test_deserialize_single_permission() {
+        let json = "1";
+        let perms: GuildPermissions = serde_json::from_str(json).unwrap();
+        assert_eq!(perms, GuildPermissions::SEND_MESSAGES);
+    }
+
+    #[test]
+    fn test_deserialize_multiple_permissions() {
+        // 1 | 32 = 33
+        let json = "33";
+        let perms: GuildPermissions = serde_json::from_str(json).unwrap();
+        assert!(perms.has(GuildPermissions::SEND_MESSAGES));
+        assert!(perms.has(GuildPermissions::VOICE_CONNECT));
+    }
+
+    #[test]
+    fn test_serde_roundtrip() {
+        let original = GuildPermissions::EVERYONE_DEFAULT;
+        let json = serde_json::to_string(&original).unwrap();
+        let restored: GuildPermissions = serde_json::from_str(&json).unwrap();
+        assert_eq!(original, restored);
+    }
+
+    #[test]
+    fn test_serde_roundtrip_all_permissions() {
+        let original = GuildPermissions::all();
+        let json = serde_json::to_string(&original).unwrap();
+        let restored: GuildPermissions = serde_json::from_str(&json).unwrap();
+        assert_eq!(original, restored);
+    }
+
+    #[test]
+    fn test_serde_matches_to_db() {
+        // Verify that serialized value matches what we store in DB
+        let perms = GuildPermissions::MODERATOR_DEFAULT;
+        let json = serde_json::to_string(&perms).unwrap();
+        let db_value = perms.to_db();
+        assert_eq!(json, db_value.to_string());
     }
 }

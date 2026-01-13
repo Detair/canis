@@ -85,7 +85,7 @@ utoipa-swagger-ui = { version = "6", features = ["axum"] }
 pulldown-cmark = "0.10"
 
 # Bitflags
-bitflags = "2.4"
+bitflags = { version = "2.4", features = ["serde"] }
 
 # Validation
 validator = { version = "0.16", features = ["derive"] }

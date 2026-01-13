@@ -7,7 +7,8 @@
 ///
 /// These permissions control access to platform-wide administrative functions
 /// and are typically assigned only to system administrators.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum SystemPermission {
     /// View all guilds on the platform (admin dashboard)
     ViewAllGuilds,
@@ -285,5 +286,58 @@ mod tests {
         set.insert(SystemPermission::ViewAllGuilds); // Duplicate
 
         assert_eq!(set.len(), 2);
+    }
+
+    // === Serde Tests ===
+
+    #[test]
+    fn test_serialize_permission() {
+        let perm = SystemPermission::SuspendGuild;
+        let json = serde_json::to_string(&perm).unwrap();
+        assert_eq!(json, "\"suspend_guild\"");
+    }
+
+    #[test]
+    fn test_serialize_all_permissions_snake_case() {
+        // Verify all permissions serialize to snake_case
+        for perm in SystemPermission::all() {
+            let json = serde_json::to_string(perm).unwrap();
+            let json_str = json.trim_matches('"');
+            assert!(
+                json_str.chars().all(|c| c.is_ascii_lowercase() || c == '_'),
+                "Serialized permission '{}' should be snake_case",
+                json_str
+            );
+        }
+    }
+
+    #[test]
+    fn test_deserialize_permission() {
+        let json = "\"suspend_guild\"";
+        let perm: SystemPermission = serde_json::from_str(json).unwrap();
+        assert_eq!(perm, SystemPermission::SuspendGuild);
+    }
+
+    #[test]
+    fn test_serde_roundtrip() {
+        for original in SystemPermission::all() {
+            let json = serde_json::to_string(original).unwrap();
+            let restored: SystemPermission = serde_json::from_str(&json).unwrap();
+            assert_eq!(*original, restored);
+        }
+    }
+
+    #[test]
+    fn test_serde_matches_action_name() {
+        // Verify serialized form matches action_name()
+        for perm in SystemPermission::all() {
+            let json = serde_json::to_string(perm).unwrap();
+            let expected = format!("\"{}\"", perm.action_name());
+            assert_eq!(
+                json, expected,
+                "Serialized form should match action_name() for {:?}",
+                perm
+            );
+        }
     }
 }
