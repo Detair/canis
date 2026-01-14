@@ -57,4 +57,38 @@ pub struct GuildMember {
     pub avatar_url: Option<String>,
     pub nickname: Option<String>,
     pub joined_at: chrono::DateTime<chrono::Utc>,
+    pub status: String,
+    pub last_seen_at: Option<chrono::DateTime<chrono::Utc>>,
+}
+
+// ============================================================================
+// Invite Types
+// ============================================================================
+
+#[derive(Debug, Clone, FromRow, Serialize)]
+pub struct GuildInvite {
+    pub id: Uuid,
+    pub guild_id: Uuid,
+    pub code: String,
+    pub created_by: Uuid,
+    pub expires_at: Option<chrono::DateTime<chrono::Utc>>,
+    pub use_count: i32,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CreateInviteRequest {
+    /// Expiry duration: "30m", "1h", "1d", "7d", or "never"
+    pub expires_in: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct InviteResponse {
+    pub id: Uuid,
+    pub code: String,
+    pub guild_id: Uuid,
+    pub guild_name: String,
+    pub expires_at: Option<chrono::DateTime<chrono::Utc>>,
+    pub use_count: i32,
+    pub created_at: chrono::DateTime<chrono::Utc>,
 }
