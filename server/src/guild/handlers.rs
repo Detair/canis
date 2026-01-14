@@ -86,8 +86,8 @@ pub async fn create_guild(
 
     // Create default @everyone role
     sqlx::query(
-        r#"INSERT INTO roles (name, guild_id, permissions, position)
-           VALUES ('everyone', $1, '{}', 0)"#,
+        r#"INSERT INTO guild_roles (guild_id, name, permissions, position, is_default)
+           VALUES ($1, 'everyone', 0, 0, true)"#,
     )
     .bind(guild_id)
     .execute(&state.db)
@@ -332,7 +332,9 @@ pub async fn list_members(
             u.display_name,
             u.avatar_url,
             gm.nickname,
-            gm.joined_at
+            gm.joined_at,
+            u.status::text as status,
+            u.last_seen_at
            FROM guild_members gm
            INNER JOIN users u ON gm.user_id = u.id
            WHERE gm.guild_id = $1
@@ -343,6 +345,47 @@ pub async fn list_members(
     .await?;
 
     Ok(Json(members))
+}
+
+/// Kick a member from guild (owner only)
+#[tracing::instrument(skip(state))]
+pub async fn kick_member(
+    State(state): State<AppState>,
+    auth: AuthUser,
+    Path((guild_id, user_id)): Path<(Uuid, Uuid)>,
+) -> Result<StatusCode, GuildError> {
+    // Verify ownership
+    let owner_check: Option<(Uuid,)> =
+        sqlx::query_as("SELECT owner_id FROM guilds WHERE id = $1")
+            .bind(guild_id)
+            .fetch_optional(&state.db)
+            .await?;
+
+    let owner_id = owner_check.ok_or(GuildError::NotFound)?.0;
+
+    if owner_id != auth.id {
+        return Err(GuildError::Forbidden);
+    }
+
+    // Cannot kick yourself (owner)
+    if user_id == auth.id {
+        return Err(GuildError::Validation(
+            "Cannot kick yourself from the guild".to_string(),
+        ));
+    }
+
+    // Remove membership
+    let result = sqlx::query("DELETE FROM guild_members WHERE guild_id = $1 AND user_id = $2")
+        .bind(guild_id)
+        .bind(user_id)
+        .execute(&state.db)
+        .await?;
+
+    if result.rows_affected() == 0 {
+        return Err(GuildError::NotFound);
+    }
+
+    Ok(StatusCode::NO_CONTENT)
 }
 
 /// List guild channels

@@ -59,6 +59,9 @@ hkdf = "0.12"
 sha2 = "0.10"
 vodozemac = "0.5"
 
+# Random
+rand = "0.8"
+
 # Utils
 uuid = { version = "1", features = ["v7", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }

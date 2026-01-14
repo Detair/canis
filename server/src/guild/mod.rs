@@ -1,12 +1,13 @@
 //! Guild (Server) Management Module
 //!
-//! Handles guild creation, membership, and management.
+//! Handles guild creation, membership, invites, and management.
 
 pub mod handlers;
+pub mod invites;
 pub mod types;
 
 use axum::{
-    routing::{get, post},
+    routing::{delete, get, post},
     Router,
 };
 
@@ -25,5 +26,17 @@ pub fn router() -> Router<AppState> {
         .route("/:id/join", post(handlers::join_guild))
         .route("/:id/leave", post(handlers::leave_guild))
         .route("/:id/members", get(handlers::list_members))
+        .route("/:id/members/:user_id", delete(handlers::kick_member))
         .route("/:id/channels", get(handlers::list_channels))
+        // Invite routes
+        .route(
+            "/:id/invites",
+            get(invites::list_invites).post(invites::create_invite),
+        )
+        .route("/:id/invites/:code", delete(invites::delete_invite))
+}
+
+/// Create the invite join router (separate for public access pattern)
+pub fn invite_router() -> Router<AppState> {
+    Router::new().route("/:code/join", post(invites::join_via_invite))
 }
