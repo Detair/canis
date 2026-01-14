@@ -9,6 +9,7 @@ import { getSelectedDM, markDMAsRead } from "@/stores/dms";
 import MessageList from "@/components/messages/MessageList";
 import MessageInput from "@/components/messages/MessageInput";
 import TypingIndicator from "@/components/messages/TypingIndicator";
+import { CallBanner } from "@/components/call";
 
 const DMConversation: Component = () => {
   const dm = () => getSelectedDM();
@@ -74,6 +75,9 @@ const DMConversation: Component = () => {
             </span>
           </Show>
         </header>
+
+        {/* Call Banner */}
+        <CallBanner channelId={dm()!.id} />
 
         {/* Messages */}
         <MessageList channelId={dm()!.id} />
