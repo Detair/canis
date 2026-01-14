@@ -7,6 +7,7 @@
 import { createStore } from "solid-js/store";
 import type { Channel } from "@/lib/types";
 import * as tauri from "@/lib/tauri";
+import { subscribeChannel } from "@/stores/websocket";
 
 // Channels state interface
 interface ChannelsState {
@@ -98,6 +99,37 @@ export async function loadChannelsForGuild(guildId: string): Promise<void> {
       // No channels in this guild, clear selection
       setChannelsState({ selectedChannelId: null });
     }
+
+    // Subscribe to all text channels for real-time message updates
+    // Wait for WebSocket to be connected first
+    const maxWaitMs = 5000;
+    const pollIntervalMs = 100;
+    let waited = 0;
+
+    while (waited < maxWaitMs) {
+      const status = await tauri.wsStatus();
+      if (status.type === "connected") {
+        break;
+      }
+      await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
+      waited += pollIntervalMs;
+    }
+
+    const finalStatus = await tauri.wsStatus();
+    if (finalStatus.type !== "connected") {
+      console.warn("[Channels] WebSocket not connected, skipping subscriptions");
+      return;
+    }
+
+    // Subscribe to text channels
+    for (const channel of channels.filter(c => c.channel_type === "text")) {
+      try {
+        await subscribeChannel(channel.id);
+        console.log(`[Channels] Subscribed to channel ${channel.name}`);
+      } catch (err) {
+        console.warn(`Failed to subscribe to channel ${channel.id}:`, err);
+      }
+    }
   } catch (err) {
     const error = err instanceof Error ? err.message : String(err);
     console.error("Failed to load guild channels:", error);
@@ -164,14 +196,15 @@ export function getChannel(channelId: string): Channel | undefined {
 }
 
 /**
- * Create a new channel.
+ * Create a new channel in a guild.
  */
 export async function createChannel(
   name: string,
   channelType: "text" | "voice",
+  guildId?: string,
   topic?: string
 ): Promise<Channel> {
-  const channel = await tauri.createChannel(name, channelType, topic);
+  const channel = await tauri.createChannel(name, channelType, guildId, topic);
   setChannelsState("channels", (prev) => [...prev, channel]);
   return channel;
 }

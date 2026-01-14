@@ -363,16 +363,18 @@ export async function getChannels(): Promise<Channel[]> {
 export async function createChannel(
   name: string,
   channelType: "text" | "voice",
+  guildId?: string,
   topic?: string
 ): Promise<Channel> {
   if (isTauri) {
     const { invoke } = await import("@tauri-apps/api/core");
-    return invoke("create_channel", { name, channelType, topic });
+    return invoke("create_channel", { name, channelType, guildId, topic });
   }
 
   return httpRequest<Channel>("POST", "/api/channels", {
     name,
     channel_type: channelType,
+    guild_id: guildId,
     topic,
   });
 }

@@ -5,15 +5,18 @@ import {
   textChannels,
   voiceChannels,
   selectChannel,
-  createChannel,
 } from "@/stores/channels";
+import { guildsState } from "@/stores/guilds";
 import { joinVoice, leaveVoice, isInChannel } from "@/stores/voice";
 import ChannelItem from "./ChannelItem";
+import CreateChannelModal from "./CreateChannelModal";
 import MicrophoneTest from "../voice/MicrophoneTest";
 import VoiceParticipants from "../voice/VoiceParticipants";
 
 const ChannelList: Component = () => {
   const [showMicTest, setShowMicTest] = createSignal(false);
+  const [showCreateModal, setShowCreateModal] = createSignal(false);
+  const [createModalType, setCreateModalType] = createSignal<"text" | "voice">("text");
 
   const handleVoiceChannelClick = async (channelId: string) => {
     if (isInChannel(channelId)) {
@@ -29,18 +32,15 @@ const ChannelList: Component = () => {
     }
   };
 
-  const handleCreateChannel = async (type: "text" | "voice") => {
-    const name = prompt(`Enter ${type} channel name:`);
-    if (!name || !name.trim()) return;
+  const openCreateModal = (type: "text" | "voice") => {
+    setCreateModalType(type);
+    setShowCreateModal(true);
+  };
 
-    try {
-      const channel = await createChannel(name.trim(), type);
-      if (type === "text") {
-        selectChannel(channel.id);
-      }
-    } catch (err) {
-      console.error("Failed to create channel:", err);
-      alert("Failed to create channel: " + (err instanceof Error ? err.message : String(err)));
+  const handleChannelCreated = (channelId: string) => {
+    // Auto-select text channels after creation
+    if (createModalType() === "text") {
+      selectChannel(channelId);
     }
   };
 
@@ -58,7 +58,7 @@ const ChannelList: Component = () => {
           <button
             class="p-1 text-text-secondary hover:text-text-primary rounded-lg hover:bg-white/10 transition-all duration-200 opacity-0 group-hover:opacity-100"
             title="Create Text Channel"
-            onClick={() => handleCreateChannel("text")}
+            onClick={() => openCreateModal("text")}
           >
             <Plus class="w-4 h-4" />
           </button>
@@ -96,7 +96,7 @@ const ChannelList: Component = () => {
             <button
               class="p-1 text-text-secondary hover:text-text-primary rounded-lg hover:bg-white/10 transition-all duration-200"
               title="Create Voice Channel"
-              onClick={() => handleCreateChannel("voice")}
+              onClick={() => openCreateModal("voice")}
             >
               <Plus class="w-4 h-4" />
             </button>
@@ -133,7 +133,7 @@ const ChannelList: Component = () => {
 
       {/* Error state */}
       <Show when={channelsState.error}>
-        <div class="px-2 py-4 text-center text-accent-danger text-sm">
+        <div class="px-2 py-4 text-center text-sm" style="color: var(--color-error-text)">
           {channelsState.error}
         </div>
       </Show>
@@ -141,6 +141,16 @@ const ChannelList: Component = () => {
       {/* Microphone Test Modal */}
       <Show when={showMicTest()}>
         <MicrophoneTest onClose={() => setShowMicTest(false)} />
+      </Show>
+
+      {/* Create Channel Modal */}
+      <Show when={showCreateModal() && guildsState.activeGuildId}>
+        <CreateChannelModal
+          guildId={guildsState.activeGuildId!}
+          initialType={createModalType()}
+          onClose={() => setShowCreateModal(false)}
+          onCreated={handleChannelCreated}
+        />
       </Show>
     </nav>
   );
