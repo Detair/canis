@@ -2,14 +2,26 @@
 
 use fred::prelude::*;
 use std::sync::Arc;
-use tracing::{debug, warn};
+use tokio::sync::RwLock;
+use tracing::{debug, info, warn};
 
 use crate::ratelimit::{
     LimitConfig, RateLimitCategory, RateLimitConfig, RateLimitError, RateLimitResult,
+    SCRIPT_ALLOWED,
 };
 
 /// Embedded Lua script for atomic rate limit check and increment.
 const RATE_LIMIT_SCRIPT: &str = include_str!("rate_limit.lua");
+
+/// Embedded Lua script for atomic failed auth tracking and blocking.
+const FAILED_AUTH_SCRIPT: &str = include_str!("failed_auth.lua");
+
+/// Script SHAs for Lua scripts loaded in Redis.
+#[derive(Clone, Default)]
+struct ScriptShas {
+    rate_limit: String,
+    failed_auth: String,
+}
 
 /// Core rate limiter service backed by Redis.
 ///
@@ -19,29 +31,50 @@ const RATE_LIMIT_SCRIPT: &str = include_str!("rate_limit.lua");
 pub struct RateLimiter {
     redis: RedisClient,
     config: Arc<RateLimitConfig>,
-    script_sha: String,
+    scripts: Arc<RwLock<ScriptShas>>,
 }
 
 impl RateLimiter {
     /// Creates a new rate limiter instance.
     ///
-    /// Call `init()` after creation to load the Lua script into Redis.
+    /// Call `init()` after creation to load the Lua scripts into Redis.
     pub fn new(redis: RedisClient, config: RateLimitConfig) -> Self {
         Self {
             redis,
             config: Arc::new(config),
-            script_sha: String::new(),
+            scripts: Arc::new(RwLock::new(ScriptShas::default())),
         }
     }
 
-    /// Initializes the rate limiter by loading the Lua script into Redis.
+    /// Initializes the rate limiter by loading Lua scripts into Redis.
     ///
-    /// Must be called before using `check()`.
+    /// Must be called before using `check()` or `record_failed_auth()`.
     pub async fn init(&mut self) -> Result<(), RedisError> {
-        let sha: String = self.redis.script_load(RATE_LIMIT_SCRIPT).await?;
-        debug!(script_sha = %sha, "Rate limit Lua script loaded");
-        self.script_sha = sha;
+        self.load_scripts().await
+    }
+
+    /// Loads or reloads Lua scripts into Redis.
+    ///
+    /// Called during init and when NOSCRIPT errors are encountered.
+    async fn load_scripts(&self) -> Result<(), RedisError> {
+        let rate_limit_sha: String = self.redis.script_load(RATE_LIMIT_SCRIPT).await?;
+        let failed_auth_sha: String = self.redis.script_load(FAILED_AUTH_SCRIPT).await?;
+
+        let mut scripts = self.scripts.write().await;
+        scripts.rate_limit = rate_limit_sha.clone();
+        scripts.failed_auth = failed_auth_sha.clone();
+
+        info!(
+            rate_limit_sha = %rate_limit_sha,
+            failed_auth_sha = %failed_auth_sha,
+            "Lua scripts loaded into Redis"
+        );
         Ok(())
+    }
+
+    /// Checks if an error is a NOSCRIPT error (script not found in Redis).
+    fn is_noscript_error(error: &RedisError) -> bool {
+        error.to_string().contains("NOSCRIPT")
     }
 
     /// Checks and increments the rate limit for a given category and identifier.
@@ -87,25 +120,11 @@ impl RateLimiter {
         let limit_config = self.get_limit_config(category);
         let key = self.build_key(category.as_str(), identifier);
 
-        // Execute Lua script atomically
-        let result: Vec<i64> = self
-            .redis
-            .evalsha(
-                &self.script_sha,
-                vec![key.as_str()],
-                vec![
-                    limit_config.window_secs.to_string(),
-                    limit_config.requests.to_string(),
-                ],
-            )
-            .await
-            .map_err(|e| {
-                warn!(error = %e, "Redis rate limit check failed");
-                RateLimitError::RedisUnavailable
-            })?;
+        // Execute Lua script atomically with NOSCRIPT retry
+        let result = self.execute_rate_limit_script(&key, limit_config).await?;
 
         let count = result[0] as u32;
-        let allowed = result[1] == 1;
+        let allowed = result[1] == SCRIPT_ALLOWED;
         let ttl = result[2].max(0) as u64;
 
         let now = std::time::SystemTime::now()
@@ -126,6 +145,64 @@ impl RateLimiter {
         })
     }
 
+    /// Executes the rate limit Lua script with NOSCRIPT retry.
+    async fn execute_rate_limit_script(
+        &self,
+        key: &str,
+        limit_config: &LimitConfig,
+    ) -> Result<Vec<i64>, RateLimitError> {
+        let scripts = self.scripts.read().await;
+        let sha = scripts.rate_limit.clone();
+        drop(scripts);
+
+        let result: Result<Vec<i64>, _> = self
+            .redis
+            .evalsha(
+                &sha,
+                vec![key],
+                vec![
+                    limit_config.window_secs.to_string(),
+                    limit_config.requests.to_string(),
+                ],
+            )
+            .await;
+
+        match result {
+            Ok(r) => Ok(r),
+            Err(e) if Self::is_noscript_error(&e) => {
+                warn!("NOSCRIPT error, reloading Lua scripts");
+                self.load_scripts().await.map_err(|e| {
+                    warn!(error = %e, "Failed to reload scripts");
+                    RateLimitError::RedisUnavailable
+                })?;
+
+                // Retry with new SHA
+                let scripts = self.scripts.read().await;
+                let new_sha = scripts.rate_limit.clone();
+                drop(scripts);
+
+                self.redis
+                    .evalsha(
+                        &new_sha,
+                        vec![key],
+                        vec![
+                            limit_config.window_secs.to_string(),
+                            limit_config.requests.to_string(),
+                        ],
+                    )
+                    .await
+                    .map_err(|e| {
+                        warn!(error = %e, "Redis rate limit check failed after reload");
+                        RateLimitError::RedisUnavailable
+                    })
+            }
+            Err(e) => {
+                warn!(error = %e, "Redis rate limit check failed");
+                Err(RateLimitError::RedisUnavailable)
+            }
+        }
+    }
+
     /// Checks if the identifier is in the allowlist configuration.
     pub fn is_allowed_by_config(&self, identifier: &str) -> bool {
         self.config.allowlist.contains(identifier)
@@ -133,7 +210,8 @@ impl RateLimiter {
 
     /// Records a failed authentication attempt for the given IP.
     ///
-    /// Increments the failure counter and blocks the IP if the threshold is exceeded.
+    /// Atomically increments the failure counter and blocks the IP if the threshold is exceeded.
+    /// Uses a Lua script to ensure atomicity of the increment, expiry, and block operations.
     ///
     /// # Returns
     /// * `Ok(true)` if the IP is now blocked after this failure
@@ -151,57 +229,88 @@ impl RateLimiter {
             return Ok(false);
         }
 
-        let key = self.build_key("failed_auth", ip);
+        let failed_key = self.build_key("failed_auth", ip);
+        let block_key = self.build_key("blocked", ip);
         let config = &self.config.limits.failed_auth;
 
-        // Increment failure counter
-        let count: i64 = self.redis.incr(&key).await.map_err(|e| {
-            warn!(error = %e, "Failed to increment auth failure counter");
-            RateLimitError::RedisUnavailable
-        })?;
+        // Execute atomic Lua script with NOSCRIPT retry
+        let result = self
+            .execute_failed_auth_script(&failed_key, &block_key, config)
+            .await?;
 
-        // Set expiry on first failure
-        if count == 1 {
-            if let Err(e) = self.redis.expire::<(), _>(&key, config.window_secs as i64).await {
-                warn!(error = %e, "Failed to set expiry on failure counter");
-            }
-        }
+        let count = result[0];
+        let is_blocked = result[1] == SCRIPT_ALLOWED;
+        let is_newly_blocked = result[2] == SCRIPT_ALLOWED;
 
-        // Check if threshold exceeded
-        if count >= i64::from(config.max_failures) {
-            let block_key = self.build_key("blocked", ip);
-
-            // Block the IP
-            if let Err(e) = self
-                .redis
-                .set::<(), _, _>(
-                    &block_key,
-                    "1",
-                    Some(Expiration::EX(config.block_duration_secs as i64)),
-                    None,
-                    false,
-                )
-                .await
-            {
-                warn!(error = %e, "Failed to set IP block");
-            }
-
+        if is_newly_blocked {
             warn!(
                 ip = %ip,
                 failures = count,
                 block_duration = config.block_duration_secs,
                 "IP blocked due to repeated auth failures"
             );
-            return Ok(true);
+        } else {
+            debug!(
+                ip = %ip,
+                failures = count,
+                max_failures = config.max_failures,
+                is_blocked = is_blocked,
+                "Auth failure recorded"
+            );
         }
 
-        debug!(
-            ip = %ip,
-            failures = count,
-            max_failures = config.max_failures,
-            "Auth failure recorded"
-        );
-        Ok(false)
+        Ok(is_blocked)
+    }
+
+    /// Executes the failed auth Lua script with NOSCRIPT retry.
+    async fn execute_failed_auth_script(
+        &self,
+        failed_key: &str,
+        block_key: &str,
+        config: &crate::ratelimit::FailedAuthConfig,
+    ) -> Result<Vec<i64>, RateLimitError> {
+        let scripts = self.scripts.read().await;
+        let sha = scripts.failed_auth.clone();
+        drop(scripts);
+
+        let args = vec![
+            config.window_secs.to_string(),
+            config.max_failures.to_string(),
+            config.block_duration_secs.to_string(),
+        ];
+
+        let result: Result<Vec<i64>, _> = self
+            .redis
+            .evalsha(&sha, vec![failed_key, block_key], args.clone())
+            .await;
+
+        match result {
+            Ok(r) => Ok(r),
+            Err(e) if Self::is_noscript_error(&e) => {
+                warn!("NOSCRIPT error in failed_auth, reloading Lua scripts");
+                self.load_scripts().await.map_err(|e| {
+                    warn!(error = %e, "Failed to reload scripts");
+                    RateLimitError::RedisUnavailable
+                })?;
+
+                // Retry with new SHA
+                let scripts = self.scripts.read().await;
+                let new_sha = scripts.failed_auth.clone();
+                drop(scripts);
+
+                self.redis
+                    .evalsha(&new_sha, vec![failed_key, block_key], args)
+                    .await
+                    .map_err(|e| {
+                        warn!(error = %e, "Failed auth script failed after reload");
+                        RateLimitError::RedisUnavailable
+                    })
+            }
+            Err(e) => {
+                warn!(error = %e, "Failed to execute failed auth script");
+                Err(RateLimitError::RedisUnavailable)
+            }
+        }
     }
 
     /// Checks if the given IP address is currently blocked.
@@ -293,13 +402,10 @@ impl RateLimiter {
             RateLimitCategory::WsConnect => &self.config.limits.ws_connect,
             RateLimitCategory::WsMessage => &self.config.limits.ws_message,
             RateLimitCategory::FailedAuth => {
-                // Return a pseudo-config for FailedAuth using the window_secs
-                // This category is handled specially by record_failed_auth
-                static FAILED_AUTH_LIMIT: LimitConfig = LimitConfig {
-                    requests: 10,
-                    window_secs: 300,
-                };
-                &FAILED_AUTH_LIMIT
+                // FailedAuth uses max_failures as requests and window_secs from failed_auth config.
+                // Note: This category should not be used with check() - use record_failed_auth() instead.
+                // This exists for consistency in the type system.
+                &self.config.limits.failed_auth_as_limit
             }
         }
     }
@@ -321,15 +427,17 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_build_key() {
-        let config = mock_config();
-        // Create a mock limiter without Redis for key building tests
-        let limiter = RateLimiter {
+    fn create_mock_limiter(config: RateLimitConfig) -> RateLimiter {
+        RateLimiter {
             redis: create_mock_client(),
             config: Arc::new(config),
-            script_sha: String::new(),
-        };
+            scripts: Arc::new(RwLock::new(ScriptShas::default())),
+        }
+    }
+
+    #[test]
+    fn test_build_key() {
+        let limiter = create_mock_limiter(mock_config());
 
         let key = limiter.build_key("auth_login", "192.168.1.1");
         assert_eq!(key, "test:rl:auth_login:192.168.1.1");
@@ -337,12 +445,7 @@ mod tests {
 
     #[test]
     fn test_is_allowed_by_config() {
-        let config = mock_config();
-        let limiter = RateLimiter {
-            redis: create_mock_client(),
-            config: Arc::new(config),
-            script_sha: String::new(),
-        };
+        let limiter = create_mock_limiter(mock_config());
 
         assert!(limiter.is_allowed_by_config("127.0.0.1"));
         assert!(!limiter.is_allowed_by_config("192.168.1.1"));
@@ -350,12 +453,7 @@ mod tests {
 
     #[test]
     fn test_get_limit_config() {
-        let config = mock_config();
-        let limiter = RateLimiter {
-            redis: create_mock_client(),
-            config: Arc::new(config),
-            script_sha: String::new(),
-        };
+        let limiter = create_mock_limiter(mock_config());
 
         let auth_login = limiter.get_limit_config(RateLimitCategory::AuthLogin);
         assert_eq!(auth_login.requests, 3);

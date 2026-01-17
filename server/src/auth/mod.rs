@@ -79,11 +79,23 @@ pub fn router(state: AppState) -> Router<AppState> {
             RateLimitCategory::AuthOther,
         )));
 
-    // Public routes without rate limiting (OIDC routes)
-    let oidc_routes = Router::new()
-        .route("/oidc/providers", get(handlers::oidc_providers))
+    // OIDC routes - authorize gets rate limiting to prevent abuse
+    let oidc_authorize_route = Router::new()
         .route("/oidc/authorize/:provider", get(handlers::oidc_authorize))
+        .layer(axum_middleware::from_fn_with_state(
+            state.clone(),
+            rate_limit_by_ip,
+        ))
+        .layer(axum_middleware::from_fn(with_category(
+            RateLimitCategory::AuthOther,
+        )));
+
+    // OIDC routes without rate limiting (providers list + callback from IdP)
+    let oidc_other_routes = Router::new()
+        .route("/oidc/providers", get(handlers::oidc_providers))
         .route("/oidc/callback", get(handlers::oidc_callback));
+
+    let oidc_routes = oidc_authorize_route.merge(oidc_other_routes);
 
     // Merge all public routes
     let public_routes = login_route

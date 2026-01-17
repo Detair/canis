@@ -6,6 +6,7 @@
 
 use axum::{
     extract::{ConnectInfo, Request, State},
+    http::header::HeaderValue,
     middleware::Next,
     response::Response,
 };
@@ -16,7 +17,33 @@ use crate::api::AppState;
 use crate::auth::AuthUser;
 use crate::ratelimit::{
     extract_client_ip, normalize_ip, NormalizedIp, RateLimitCategory, RateLimitError,
+    RateLimitResult,
 };
+
+/// Standard rate limit header names.
+const HEADER_LIMIT: &str = "X-RateLimit-Limit";
+const HEADER_REMAINING: &str = "X-RateLimit-Remaining";
+const HEADER_RESET: &str = "X-RateLimit-Reset";
+
+/// Adds rate limit headers to a response.
+///
+/// Adds the following headers:
+/// - `X-RateLimit-Limit`: Maximum requests allowed in the window
+/// - `X-RateLimit-Remaining`: Requests remaining in the current window
+/// - `X-RateLimit-Reset`: Unix timestamp when the window resets
+fn add_rate_limit_headers(response: &mut Response, result: &RateLimitResult) {
+    let headers = response.headers_mut();
+
+    if let Ok(v) = HeaderValue::from_str(&result.limit.to_string()) {
+        headers.insert(HEADER_LIMIT, v);
+    }
+    if let Ok(v) = HeaderValue::from_str(&result.remaining.to_string()) {
+        headers.insert(HEADER_REMAINING, v);
+    }
+    if let Ok(v) = HeaderValue::from_str(&result.reset_at.to_string()) {
+        headers.insert(HEADER_RESET, v);
+    }
+}
 
 /// Middleware to rate limit requests by client IP address.
 ///
@@ -107,7 +134,10 @@ pub async fn rate_limit_by_ip(
         return Err(RateLimitError::LimitExceeded(result));
     }
 
-    Ok(next.run(request).await)
+    // Run the request and add rate limit headers to response
+    let mut response = next.run(request).await;
+    add_rate_limit_headers(&mut response, &result);
+    Ok(response)
 }
 
 /// Middleware to rate limit requests by authenticated user ID.
@@ -203,7 +233,10 @@ pub async fn rate_limit_by_user(
         return Err(RateLimitError::LimitExceeded(result));
     }
 
-    Ok(next.run(request).await)
+    // Run the request and add rate limit headers to response
+    let mut response = next.run(request).await;
+    add_rate_limit_headers(&mut response, &result);
+    Ok(response)
 }
 
 /// Middleware to check if an IP is blocked due to failed authentication attempts.
@@ -267,7 +300,12 @@ pub async fn check_ip_not_blocked(
     };
 
     if is_blocked {
-        let retry_after = rate_limiter.get_block_ttl(&normalized_ip).await.unwrap_or(0);
+        // Use configured block_duration_secs as fallback if TTL lookup fails
+        let default_block_duration = rate_limiter.config().limits.failed_auth.block_duration_secs;
+        let retry_after = rate_limiter
+            .get_block_ttl(&normalized_ip)
+            .await
+            .unwrap_or(default_block_duration);
         debug!(
             ip = %normalized_ip,
             retry_after = retry_after,

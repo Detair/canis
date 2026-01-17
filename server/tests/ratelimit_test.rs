@@ -69,6 +69,10 @@ async fn create_test_limiter(redis: RedisClient) -> RateLimiter {
                 block_duration_secs: 60,
                 window_secs: 300,
             },
+            failed_auth_as_limit: LimitConfig {
+                requests: 3,
+                window_secs: 300,
+            },
         },
     };
     let mut limiter = RateLimiter::new(redis, config);
@@ -545,4 +549,238 @@ async fn test_disabled_rate_limiter_allows_all() {
     assert!(!blocked, "Should never report blocked when disabled");
 
     println!("Disabled limiter test passed: all requests allowed when disabled");
+}
+
+/// Test concurrent requests are handled atomically.
+///
+/// This verifies that the Lua script correctly handles concurrent requests
+/// without race conditions. Multiple requests should each get an accurate
+/// count and the total should not exceed the limit.
+#[tokio::test]
+#[ignore] // Requires Redis
+async fn test_concurrent_requests_are_atomic() {
+    let redis = create_test_redis().await;
+
+    let config = RateLimitConfig {
+        enabled: true,
+        redis_key_prefix: format!("test:rl:{}", uuid::Uuid::new_v4()),
+        fail_open: false,
+        trust_proxy: false,
+        allowlist: HashSet::new(),
+        limits: RateLimits {
+            auth_login: LimitConfig {
+                requests: 10,
+                window_secs: 60,
+            },
+            failed_auth: FailedAuthConfig {
+                max_failures: 3,
+                block_duration_secs: 60,
+                window_secs: 300,
+            },
+            failed_auth_as_limit: LimitConfig {
+                requests: 3,
+                window_secs: 300,
+            },
+            ..RateLimits::default()
+        },
+    };
+
+    let mut limiter = RateLimiter::new(redis, config);
+    limiter.init().await.expect("Failed to initialize limiter");
+
+    let identifier = format!("test-ip-concurrent-{}", uuid::Uuid::new_v4());
+
+    // Spawn 20 concurrent requests (limit is 10)
+    let mut handles = Vec::new();
+    for _ in 0..20 {
+        let limiter = limiter.clone();
+        let id = identifier.clone();
+        handles.push(tokio::spawn(async move {
+            limiter
+                .check(RateLimitCategory::AuthLogin, &id)
+                .await
+                .expect("Rate limit check failed")
+        }));
+    }
+
+    // Collect all results
+    let mut allowed_count = 0;
+    let mut blocked_count = 0;
+    for handle in handles {
+        let result = handle.await.expect("Task panicked");
+        if result.allowed {
+            allowed_count += 1;
+        } else {
+            blocked_count += 1;
+        }
+    }
+
+    // Exactly 10 should be allowed (the limit)
+    assert_eq!(
+        allowed_count, 10,
+        "Exactly 10 requests should be allowed (got {})",
+        allowed_count
+    );
+    assert_eq!(
+        blocked_count, 10,
+        "Exactly 10 requests should be blocked (got {})",
+        blocked_count
+    );
+
+    println!(
+        "Concurrent requests test passed: {} allowed, {} blocked",
+        allowed_count, blocked_count
+    );
+}
+
+/// Test concurrent failed auth attempts are handled atomically.
+///
+/// This verifies that the failed auth Lua script correctly handles concurrent
+/// requests without race conditions. The IP should be blocked after exactly
+/// max_failures attempts.
+#[tokio::test]
+#[ignore] // Requires Redis
+async fn test_concurrent_failed_auth_is_atomic() {
+    let redis = create_test_redis().await;
+
+    let config = RateLimitConfig {
+        enabled: true,
+        redis_key_prefix: format!("test:rl:{}", uuid::Uuid::new_v4()),
+        fail_open: false,
+        trust_proxy: false,
+        allowlist: HashSet::new(),
+        limits: RateLimits {
+            failed_auth: FailedAuthConfig {
+                max_failures: 5,
+                block_duration_secs: 60,
+                window_secs: 300,
+            },
+            failed_auth_as_limit: LimitConfig {
+                requests: 5,
+                window_secs: 300,
+            },
+            ..RateLimits::default()
+        },
+    };
+
+    let mut limiter = RateLimiter::new(redis, config);
+    limiter.init().await.expect("Failed to initialize limiter");
+
+    let ip = format!("test-ip-concurrent-fail-{}", uuid::Uuid::new_v4());
+
+    // Spawn 10 concurrent failed auth attempts (threshold is 5)
+    let mut handles = Vec::new();
+    for _ in 0..10 {
+        let limiter = limiter.clone();
+        let ip = ip.clone();
+        handles.push(tokio::spawn(async move {
+            limiter
+                .record_failed_auth(&ip)
+                .await
+                .expect("record_failed_auth failed")
+        }));
+    }
+
+    // Collect all results
+    let mut blocked_count = 0;
+    for handle in handles {
+        let is_blocked = handle.await.expect("Task panicked");
+        if is_blocked {
+            blocked_count += 1;
+        }
+    }
+
+    // At least 6 should report blocked (those that pushed count to >= 5)
+    assert!(
+        blocked_count >= 6,
+        "At least 6 requests should report blocked (got {})",
+        blocked_count
+    );
+
+    // IP should definitely be blocked now
+    let blocked = limiter.is_blocked(&ip).await.expect("is_blocked failed");
+    assert!(blocked, "IP should be blocked after concurrent failures");
+
+    println!(
+        "Concurrent failed auth test passed: {} reported blocked, IP is blocked",
+        blocked_count
+    );
+}
+
+/// Test that rate limit response includes correct reset_at timestamp.
+#[tokio::test]
+#[ignore] // Requires Redis
+async fn test_reset_at_is_in_future() {
+    let redis = create_test_redis().await;
+    let limiter = create_test_limiter(redis).await;
+
+    let identifier = format!("test-ip-reset-{}", uuid::Uuid::new_v4());
+
+    let result = limiter
+        .check(RateLimitCategory::AuthLogin, &identifier)
+        .await
+        .expect("Rate limit check failed");
+
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+
+    assert!(
+        result.reset_at > now,
+        "reset_at ({}) should be in the future (now: {})",
+        result.reset_at,
+        now
+    );
+    assert!(
+        result.reset_at <= now + 60,
+        "reset_at should be within window_secs from now"
+    );
+
+    println!(
+        "Reset timestamp test passed: reset_at = {}, now = {}",
+        result.reset_at, now
+    );
+}
+
+/// Test that all rate limit categories work correctly.
+#[tokio::test]
+#[ignore] // Requires Redis
+async fn test_all_categories_work() {
+    let redis = create_test_redis().await;
+    let limiter = create_test_limiter(redis).await;
+
+    let identifier = format!("test-ip-allcat-{}", uuid::Uuid::new_v4());
+
+    let categories = [
+        RateLimitCategory::AuthLogin,
+        RateLimitCategory::AuthRegister,
+        RateLimitCategory::AuthPasswordReset,
+        RateLimitCategory::AuthOther,
+        RateLimitCategory::Write,
+        RateLimitCategory::Social,
+        RateLimitCategory::Read,
+        RateLimitCategory::WsConnect,
+        RateLimitCategory::WsMessage,
+    ];
+
+    for category in categories {
+        let result = limiter
+            .check(category, &identifier)
+            .await
+            .expect("Rate limit check failed");
+
+        assert!(
+            result.allowed,
+            "First request for {:?} should be allowed",
+            category
+        );
+        assert!(
+            result.limit > 0,
+            "Limit for {:?} should be positive",
+            category
+        );
+    }
+
+    println!("All categories test passed");
 }

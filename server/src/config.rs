@@ -125,7 +125,8 @@ impl Config {
     }
 
     /// Create a default configuration for testing.
-    #[cfg(any(test, feature = "test-utils"))]
+    ///
+    /// Note: This is available in all builds but should only be used in tests.
     #[must_use]
     pub fn default_for_test() -> Self {
         Self {

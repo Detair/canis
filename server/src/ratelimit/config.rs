@@ -42,6 +42,9 @@ pub struct RateLimits {
     pub ws_message: LimitConfig,
     /// Failed authentication tracking
     pub failed_auth: FailedAuthConfig,
+    /// Failed auth as LimitConfig (for consistency in get_limit_config)
+    /// This is computed from failed_auth config.
+    pub failed_auth_as_limit: LimitConfig,
 }
 
 /// Configuration for a single rate limit.
@@ -79,6 +82,11 @@ impl Default for RateLimitConfig {
 
 impl Default for RateLimits {
     fn default() -> Self {
+        let failed_auth = FailedAuthConfig {
+            max_failures: 10,
+            block_duration_secs: 900,
+            window_secs: 300,
+        };
         Self {
             auth_login: LimitConfig { requests: 3, window_secs: 60 },
             auth_register: LimitConfig { requests: 5, window_secs: 60 },
@@ -89,11 +97,11 @@ impl Default for RateLimits {
             read: LimitConfig { requests: 200, window_secs: 60 },
             ws_connect: LimitConfig { requests: 10, window_secs: 60 },
             ws_message: LimitConfig { requests: 60, window_secs: 60 },
-            failed_auth: FailedAuthConfig {
-                max_failures: 10,
-                block_duration_secs: 900,
-                window_secs: 300,
+            failed_auth_as_limit: LimitConfig {
+                requests: failed_auth.max_failures,
+                window_secs: failed_auth.window_secs,
             },
+            failed_auth,
         }
     }
 }
@@ -187,6 +195,12 @@ impl RateLimitConfig {
                 config.limits.failed_auth = limit;
             }
         }
+
+        // Keep failed_auth_as_limit in sync with failed_auth
+        config.limits.failed_auth_as_limit = LimitConfig {
+            requests: config.limits.failed_auth.max_failures,
+            window_secs: config.limits.failed_auth.window_secs,
+        };
 
         config
     }
