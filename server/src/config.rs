@@ -126,13 +126,17 @@ impl Config {
 
     /// Create a default configuration for testing.
     ///
-    /// Note: This is available in all builds but should only be used in tests.
+    /// Uses Docker test containers:
+    /// - PostgreSQL: `docker run -d --name canis-test-postgres -e POSTGRESQL_USERNAME=test -e POSTGRESQL_PASSWORD=test -e POSTGRESQL_DATABASE=test -p 5434:5432 bitnami/postgresql:latest`
+    /// - Redis: `docker run -d --name canis-test-redis -e ALLOW_EMPTY_PASSWORD=yes -p 6380:6379 bitnami/redis:latest`
+    ///
+    /// Run migrations: `DATABASE_URL="postgresql://test:test@localhost:5434/test" sqlx migrate run --source server/migrations`
     #[must_use]
     pub fn default_for_test() -> Self {
         Self {
             bind_address: "127.0.0.1:8080".into(),
-            database_url: "postgresql://localhost/test".into(),
-            redis_url: "redis://localhost:6379".into(),
+            database_url: "postgresql://test:test@localhost:5434/test".into(),
+            redis_url: "redis://localhost:6380".into(),
             jwt_secret: "test-secret".into(),
             jwt_access_expiry: 900,
             jwt_refresh_expiry: 604800,
