@@ -1,0 +1,277 @@
+//! Rate limiting configuration.
+
+use std::collections::HashSet;
+
+/// Configuration for the rate limiting system.
+#[derive(Debug, Clone)]
+pub struct RateLimitConfig {
+    /// Whether rate limiting is enabled
+    pub enabled: bool,
+    /// Prefix for Redis keys (e.g., "canis:rl")
+    pub redis_key_prefix: String,
+    /// Whether to allow requests when Redis is unavailable
+    pub fail_open: bool,
+    /// Whether to trust X-Forwarded-For headers
+    pub trust_proxy: bool,
+    /// IP addresses that bypass rate limiting
+    pub allowlist: HashSet<String>,
+    /// Per-category rate limits
+    pub limits: RateLimits,
+}
+
+/// Rate limits for each category.
+#[derive(Debug, Clone)]
+pub struct RateLimits {
+    /// Login attempts
+    pub auth_login: LimitConfig,
+    /// Registration attempts
+    pub auth_register: LimitConfig,
+    /// Password reset requests
+    pub auth_password_reset: LimitConfig,
+    /// Other auth operations (token refresh, etc.)
+    pub auth_other: LimitConfig,
+    /// Write operations (create/update/delete)
+    pub write: LimitConfig,
+    /// Social operations (friend requests, invites)
+    pub social: LimitConfig,
+    /// Read operations (fetch data)
+    pub read: LimitConfig,
+    /// WebSocket connection attempts
+    pub ws_connect: LimitConfig,
+    /// WebSocket message rate
+    pub ws_message: LimitConfig,
+    /// Failed authentication tracking
+    pub failed_auth: FailedAuthConfig,
+}
+
+/// Configuration for a single rate limit.
+#[derive(Debug, Clone)]
+pub struct LimitConfig {
+    /// Maximum requests allowed in the window
+    pub requests: u32,
+    /// Window duration in seconds
+    pub window_secs: u64,
+}
+
+/// Configuration for failed authentication tracking.
+#[derive(Debug, Clone)]
+pub struct FailedAuthConfig {
+    /// Maximum failed attempts before blocking
+    pub max_failures: u32,
+    /// Duration to block in seconds after max failures
+    pub block_duration_secs: u64,
+    /// Window for counting failures in seconds
+    pub window_secs: u64,
+}
+
+impl Default for RateLimitConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            redis_key_prefix: "canis:rl".to_string(),
+            fail_open: true,
+            trust_proxy: false,
+            allowlist: HashSet::new(),
+            limits: RateLimits::default(),
+        }
+    }
+}
+
+impl Default for RateLimits {
+    fn default() -> Self {
+        Self {
+            auth_login: LimitConfig { requests: 3, window_secs: 60 },
+            auth_register: LimitConfig { requests: 5, window_secs: 60 },
+            auth_password_reset: LimitConfig { requests: 2, window_secs: 60 },
+            auth_other: LimitConfig { requests: 20, window_secs: 60 },
+            write: LimitConfig { requests: 30, window_secs: 60 },
+            social: LimitConfig { requests: 10, window_secs: 60 },
+            read: LimitConfig { requests: 200, window_secs: 60 },
+            ws_connect: LimitConfig { requests: 10, window_secs: 60 },
+            ws_message: LimitConfig { requests: 60, window_secs: 60 },
+            failed_auth: FailedAuthConfig {
+                max_failures: 10,
+                block_duration_secs: 900,
+                window_secs: 300,
+            },
+        }
+    }
+}
+
+impl RateLimitConfig {
+    /// Creates configuration from environment variables.
+    ///
+    /// Environment variables:
+    /// - `RATE_LIMIT_ENABLED`: Enable/disable rate limiting (default: true)
+    /// - `RATE_LIMIT_PREFIX`: Redis key prefix (default: "canis:rl")
+    /// - `RATE_LIMIT_FAIL_OPEN`: Allow requests when Redis unavailable (default: true)
+    /// - `RATE_LIMIT_TRUST_PROXY`: Trust X-Forwarded-For headers (default: false)
+    /// - `RATE_LIMIT_ALLOWLIST`: Comma-separated IP allowlist
+    /// - `RATE_LIMIT_AUTH_LOGIN`: Login limit as "requests,window_secs"
+    /// - `RATE_LIMIT_AUTH_REGISTER`: Register limit as "requests,window_secs"
+    /// - `RATE_LIMIT_AUTH_PASSWORD_RESET`: Password reset limit as "requests,window_secs"
+    /// - `RATE_LIMIT_AUTH_OTHER`: Other auth limit as "requests,window_secs"
+    /// - `RATE_LIMIT_WRITE`: Write limit as "requests,window_secs"
+    /// - `RATE_LIMIT_SOCIAL`: Social limit as "requests,window_secs"
+    /// - `RATE_LIMIT_READ`: Read limit as "requests,window_secs"
+    /// - `RATE_LIMIT_WS_CONNECT`: WebSocket connect limit as "requests,window_secs"
+    /// - `RATE_LIMIT_WS_MESSAGE`: WebSocket message limit as "requests,window_secs"
+    /// - `RATE_LIMIT_FAILED_AUTH`: Failed auth as "max_failures,block_duration_secs,window_secs"
+    pub fn from_env() -> Self {
+        let mut config = Self::default();
+
+        if let Ok(val) = std::env::var("RATE_LIMIT_ENABLED") {
+            config.enabled = val.parse().unwrap_or(true);
+        }
+        if let Ok(val) = std::env::var("RATE_LIMIT_PREFIX") {
+            config.redis_key_prefix = val;
+        }
+        if let Ok(val) = std::env::var("RATE_LIMIT_FAIL_OPEN") {
+            config.fail_open = val.parse().unwrap_or(true);
+        }
+        if let Ok(val) = std::env::var("RATE_LIMIT_TRUST_PROXY") {
+            config.trust_proxy = val.parse().unwrap_or(false);
+        }
+        if let Ok(val) = std::env::var("RATE_LIMIT_ALLOWLIST") {
+            config.allowlist = val.split(',').map(|s| s.trim().to_string()).collect();
+        }
+
+        // Parse per-category limits (format: "requests,window_secs")
+        if let Ok(val) = std::env::var("RATE_LIMIT_AUTH_LOGIN") {
+            if let Some(limit) = parse_limit_config(&val) {
+                config.limits.auth_login = limit;
+            }
+        }
+        if let Ok(val) = std::env::var("RATE_LIMIT_AUTH_REGISTER") {
+            if let Some(limit) = parse_limit_config(&val) {
+                config.limits.auth_register = limit;
+            }
+        }
+        if let Ok(val) = std::env::var("RATE_LIMIT_AUTH_PASSWORD_RESET") {
+            if let Some(limit) = parse_limit_config(&val) {
+                config.limits.auth_password_reset = limit;
+            }
+        }
+        if let Ok(val) = std::env::var("RATE_LIMIT_AUTH_OTHER") {
+            if let Some(limit) = parse_limit_config(&val) {
+                config.limits.auth_other = limit;
+            }
+        }
+        if let Ok(val) = std::env::var("RATE_LIMIT_WRITE") {
+            if let Some(limit) = parse_limit_config(&val) {
+                config.limits.write = limit;
+            }
+        }
+        if let Ok(val) = std::env::var("RATE_LIMIT_SOCIAL") {
+            if let Some(limit) = parse_limit_config(&val) {
+                config.limits.social = limit;
+            }
+        }
+        if let Ok(val) = std::env::var("RATE_LIMIT_READ") {
+            if let Some(limit) = parse_limit_config(&val) {
+                config.limits.read = limit;
+            }
+        }
+        if let Ok(val) = std::env::var("RATE_LIMIT_WS_CONNECT") {
+            if let Some(limit) = parse_limit_config(&val) {
+                config.limits.ws_connect = limit;
+            }
+        }
+        if let Ok(val) = std::env::var("RATE_LIMIT_WS_MESSAGE") {
+            if let Some(limit) = parse_limit_config(&val) {
+                config.limits.ws_message = limit;
+            }
+        }
+        if let Ok(val) = std::env::var("RATE_LIMIT_FAILED_AUTH") {
+            if let Some(limit) = parse_failed_auth_config(&val) {
+                config.limits.failed_auth = limit;
+            }
+        }
+
+        config
+    }
+}
+
+/// Parses a limit config from "requests,window_secs" format.
+fn parse_limit_config(val: &str) -> Option<LimitConfig> {
+    let parts: Vec<&str> = val.split(',').collect();
+    if parts.len() == 2 {
+        let requests = parts[0].trim().parse().ok()?;
+        let window_secs = parts[1].trim().parse().ok()?;
+        Some(LimitConfig { requests, window_secs })
+    } else {
+        None
+    }
+}
+
+/// Parses a failed auth config from "max_failures,block_duration_secs,window_secs" format.
+fn parse_failed_auth_config(val: &str) -> Option<FailedAuthConfig> {
+    let parts: Vec<&str> = val.split(',').collect();
+    if parts.len() == 3 {
+        let max_failures = parts[0].trim().parse().ok()?;
+        let block_duration_secs = parts[1].trim().parse().ok()?;
+        let window_secs = parts[2].trim().parse().ok()?;
+        Some(FailedAuthConfig {
+            max_failures,
+            block_duration_secs,
+            window_secs,
+        })
+    } else {
+        None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_default_config() {
+        let config = RateLimitConfig::default();
+        assert!(config.enabled);
+        assert_eq!(config.redis_key_prefix, "canis:rl");
+        assert!(config.fail_open);
+        assert!(!config.trust_proxy);
+        assert!(config.allowlist.is_empty());
+    }
+
+    #[test]
+    fn test_default_limits() {
+        let limits = RateLimits::default();
+        assert_eq!(limits.auth_login.requests, 3);
+        assert_eq!(limits.auth_login.window_secs, 60);
+        assert_eq!(limits.read.requests, 200);
+        assert_eq!(limits.failed_auth.max_failures, 10);
+        assert_eq!(limits.failed_auth.block_duration_secs, 900);
+    }
+
+    #[test]
+    fn test_parse_limit_config() {
+        assert!(parse_limit_config("10,60").is_some());
+        let limit = parse_limit_config("10,60").unwrap();
+        assert_eq!(limit.requests, 10);
+        assert_eq!(limit.window_secs, 60);
+
+        // With whitespace
+        let limit = parse_limit_config(" 20 , 120 ").unwrap();
+        assert_eq!(limit.requests, 20);
+        assert_eq!(limit.window_secs, 120);
+
+        // Invalid formats
+        assert!(parse_limit_config("10").is_none());
+        assert!(parse_limit_config("10,60,extra").is_none());
+        assert!(parse_limit_config("abc,60").is_none());
+    }
+
+    #[test]
+    fn test_parse_failed_auth_config() {
+        let config = parse_failed_auth_config("5,300,120").unwrap();
+        assert_eq!(config.max_failures, 5);
+        assert_eq!(config.block_duration_secs, 300);
+        assert_eq!(config.window_secs, 120);
+
+        // Invalid formats
+        assert!(parse_failed_auth_config("5,300").is_none());
+        assert!(parse_failed_auth_config("abc,300,120").is_none());
+    }
+}
