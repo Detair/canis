@@ -5,8 +5,10 @@
 
 pub mod config;
 pub mod constants;
+pub mod ip;
 pub mod types;
 
 pub use config::*;
 pub use constants::*;
+pub use ip::*;
 pub use types::*;
