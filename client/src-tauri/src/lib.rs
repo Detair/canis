@@ -75,6 +75,21 @@ pub fn run() {
             commands::websocket::ws_typing,
             commands::websocket::ws_stop_typing,
             commands::websocket::ws_ping,
+            // Pages commands
+            commands::pages::list_platform_pages,
+            commands::pages::get_platform_page,
+            commands::pages::create_platform_page,
+            commands::pages::update_platform_page,
+            commands::pages::delete_platform_page,
+            commands::pages::reorder_platform_pages,
+            commands::pages::list_guild_pages,
+            commands::pages::get_guild_page,
+            commands::pages::create_guild_page,
+            commands::pages::update_guild_page,
+            commands::pages::delete_guild_page,
+            commands::pages::reorder_guild_pages,
+            commands::pages::accept_page,
+            commands::pages::get_pending_acceptance,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

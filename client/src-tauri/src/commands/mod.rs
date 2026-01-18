@@ -4,6 +4,7 @@
 
 pub mod auth;
 pub mod chat;
+pub mod pages;
 pub mod settings;
 pub mod voice;
 pub mod websocket;

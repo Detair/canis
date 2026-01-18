@@ -18,10 +18,12 @@ import type {
   Friendship,
   DMChannel,
   DMListItem,
+  Page,
+  PageListItem,
 } from "./types";
 
 // Re-export types for convenience
-export type { User, Channel, Message, AppSettings, Guild, GuildMember, GuildInvite, InviteResponse, InviteExpiry, Friend, Friendship, DMChannel, DMListItem };
+export type { User, Channel, Message, AppSettings, Guild, GuildMember, GuildInvite, InviteResponse, InviteExpiry, Friend, Friendship, DMChannel, DMListItem, Page, PageListItem };
 
 // Detect if running in Tauri
 const isTauri = typeof window !== "undefined" && "__TAURI__" in window;
@@ -1093,4 +1095,244 @@ export async function wsSend(message: any): Promise<void> {
     }
     browserWs.send(JSON.stringify(message));
   }
+}
+
+// Pages Commands
+
+/**
+ * List all platform pages.
+ */
+export async function listPlatformPages(): Promise<PageListItem[]> {
+  if (isTauri) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return invoke("list_platform_pages");
+  }
+
+  return httpRequest<PageListItem[]>("GET", "/api/pages");
+}
+
+/**
+ * Get a platform page by slug.
+ */
+export async function getPlatformPage(slug: string): Promise<Page> {
+  if (isTauri) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return invoke("get_platform_page", { slug });
+  }
+
+  return httpRequest<Page>("GET", `/api/pages/${slug}`);
+}
+
+/**
+ * Create a platform page (admin only).
+ */
+export async function createPlatformPage(
+  title: string,
+  content: string,
+  slug?: string,
+  requiresAcceptance?: boolean
+): Promise<Page> {
+  if (isTauri) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return invoke("create_platform_page", {
+      title,
+      content,
+      slug,
+      requiresAcceptance,
+    });
+  }
+
+  return httpRequest<Page>("POST", "/api/pages", {
+    title,
+    content,
+    slug,
+    requires_acceptance: requiresAcceptance,
+  });
+}
+
+/**
+ * Update a platform page (admin only).
+ */
+export async function updatePlatformPage(
+  pageId: string,
+  title?: string,
+  slug?: string,
+  content?: string,
+  requiresAcceptance?: boolean
+): Promise<Page> {
+  if (isTauri) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return invoke("update_platform_page", {
+      pageId,
+      title,
+      slug,
+      content,
+      requiresAcceptance,
+    });
+  }
+
+  return httpRequest<Page>("PATCH", `/api/pages/${pageId}`, {
+    title,
+    slug,
+    content,
+    requires_acceptance: requiresAcceptance,
+  });
+}
+
+/**
+ * Delete a platform page (admin only).
+ */
+export async function deletePlatformPage(pageId: string): Promise<void> {
+  if (isTauri) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return invoke("delete_platform_page", { pageId });
+  }
+
+  await httpRequest<void>("DELETE", `/api/pages/${pageId}`);
+}
+
+/**
+ * Reorder platform pages (admin only).
+ */
+export async function reorderPlatformPages(pageIds: string[]): Promise<void> {
+  if (isTauri) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return invoke("reorder_platform_pages", { pageIds });
+  }
+
+  await httpRequest<void>("POST", "/api/pages/reorder", { page_ids: pageIds });
+}
+
+/**
+ * List guild pages.
+ */
+export async function listGuildPages(guildId: string): Promise<PageListItem[]> {
+  if (isTauri) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return invoke("list_guild_pages", { guildId });
+  }
+
+  return httpRequest<PageListItem[]>("GET", `/api/guilds/${guildId}/pages`);
+}
+
+/**
+ * Get a guild page by slug.
+ */
+export async function getGuildPage(guildId: string, slug: string): Promise<Page> {
+  if (isTauri) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return invoke("get_guild_page", { guildId, slug });
+  }
+
+  return httpRequest<Page>("GET", `/api/guilds/${guildId}/pages/${slug}`);
+}
+
+/**
+ * Create a guild page.
+ */
+export async function createGuildPage(
+  guildId: string,
+  title: string,
+  content: string,
+  slug?: string,
+  requiresAcceptance?: boolean
+): Promise<Page> {
+  if (isTauri) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return invoke("create_guild_page", {
+      guildId,
+      title,
+      content,
+      slug,
+      requiresAcceptance,
+    });
+  }
+
+  return httpRequest<Page>("POST", `/api/guilds/${guildId}/pages`, {
+    title,
+    content,
+    slug,
+    requires_acceptance: requiresAcceptance,
+  });
+}
+
+/**
+ * Update a guild page.
+ */
+export async function updateGuildPage(
+  guildId: string,
+  pageId: string,
+  title?: string,
+  slug?: string,
+  content?: string,
+  requiresAcceptance?: boolean
+): Promise<Page> {
+  if (isTauri) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return invoke("update_guild_page", {
+      guildId,
+      pageId,
+      title,
+      slug,
+      content,
+      requiresAcceptance,
+    });
+  }
+
+  return httpRequest<Page>("PATCH", `/api/guilds/${guildId}/pages/${pageId}`, {
+    title,
+    slug,
+    content,
+    requires_acceptance: requiresAcceptance,
+  });
+}
+
+/**
+ * Delete a guild page.
+ */
+export async function deleteGuildPage(guildId: string, pageId: string): Promise<void> {
+  if (isTauri) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return invoke("delete_guild_page", { guildId, pageId });
+  }
+
+  await httpRequest<void>("DELETE", `/api/guilds/${guildId}/pages/${pageId}`);
+}
+
+/**
+ * Reorder guild pages.
+ */
+export async function reorderGuildPages(guildId: string, pageIds: string[]): Promise<void> {
+  if (isTauri) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return invoke("reorder_guild_pages", { guildId, pageIds });
+  }
+
+  await httpRequest<void>("POST", `/api/guilds/${guildId}/pages/reorder`, {
+    page_ids: pageIds,
+  });
+}
+
+/**
+ * Accept a page.
+ */
+export async function acceptPage(pageId: string): Promise<void> {
+  if (isTauri) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return invoke("accept_page", { pageId });
+  }
+
+  await httpRequest<void>("POST", `/api/pages/${pageId}/accept`);
+}
+
+/**
+ * Get pages pending acceptance.
+ */
+export async function getPendingAcceptance(): Promise<PageListItem[]> {
+  if (isTauri) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return invoke("get_pending_acceptance");
+  }
+
+  return httpRequest<PageListItem[]>("GET", "/api/pages/pending-acceptance");
 }

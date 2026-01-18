@@ -286,3 +286,45 @@ export interface DMListItem {
   last_message: LastMessagePreview | null;
   unread_count: number;
 }
+
+// Pages Types
+
+export interface Page {
+  id: string;
+  guild_id: string | null;
+  title: string;
+  slug: string;
+  content: string;
+  content_hash: string;
+  position: number;
+  requires_acceptance: boolean;
+  created_by: string;
+  updated_by: string;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}
+
+export interface PageListItem {
+  id: string;
+  guild_id: string | null;
+  title: string;
+  slug: string;
+  position: number;
+  requires_acceptance: boolean;
+  updated_at: string;
+}
+
+export interface CreatePageRequest {
+  title: string;
+  slug?: string;
+  content: string;
+  requires_acceptance?: boolean;
+}
+
+export interface UpdatePageRequest {
+  title?: string;
+  slug?: string;
+  content?: string;
+  requires_acceptance?: boolean;
+}
