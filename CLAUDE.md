@@ -398,6 +398,63 @@ Ask [Faramir|Elrond|Gandalf|Éowyn|Pippin] about [topic]
 
 ---
 
+# Git Workflow
+
+> Full specification: `docs/plans/2026-01-18-git-workflow-design.md`
+
+## Commit Convention
+
+**Format:** `type(scope): subject`
+
+**Types:** `feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `perf`, `style`
+
+**Scopes:** `auth`, `voice`, `chat`, `db`, `api`, `ws`, `ratelimit`, `infra`, `client`, `crypto`
+
+**Rules:**
+- Max 72 chars subject line
+- Imperative mood ("add" not "added")
+- Breaking changes: `type(scope)!: message`
+
+## Branch & Worktree Strategy
+
+**Branch naming:** `feature/<name>`, `fix/<name>`, `refactor/<area>`, `docs/<topic>`
+
+**Worktree workflow:**
+```bash
+# Create worktree for feature
+git worktree add ../canis-feature-xyz -b feature/xyz
+
+# Work in isolated directory
+cd ../canis-feature-xyz
+
+# Clean up after merge
+git worktree remove ../canis-feature-xyz
+```
+
+**Rules:**
+- Main worktree stays on `main`
+- One worktree per feature
+- Clean up after merge
+- Never commit directly to `main` in feature worktrees
+
+## Pre-Push Quality Gates
+
+Before pushing:
+
+1. **Tests pass:** `cargo test` (server), `bun test` (client)
+2. **Lint clean:** `cargo fmt --check && cargo clippy -- -D warnings`
+3. **Self-review:** No secrets, correct scope, proper error handling
+4. **Code review:** For significant changes (new modules, auth/crypto, API changes)
+
+## Transparency
+
+- Commit bodies explain *why* for non-trivial changes
+- Reference issues: `Closes #42`, `Relates to #42`
+- Reference design docs for major features
+- No force-push to `main`
+
+---
+
 # Quick Reference
 
 ## Erlaubte Lizenzen
