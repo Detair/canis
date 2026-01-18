@@ -63,7 +63,7 @@ services:
   # PostgreSQL Database (Bitnami hardened image)
   # ==========================================================================
   postgres:
-    image: bitnami/postgresql:16
+    image: bitnami/postgresql:latest
     container_name: canis-postgres
     restart: unless-stopped
     environment:
@@ -84,7 +84,7 @@ services:
   # Redis (Bitnami hardened image)
   # ==========================================================================
   redis:
-    image: bitnami/redis:7.4
+    image: bitnami/redis:latest
     container_name: canis-redis
     restart: unless-stopped
     environment:
