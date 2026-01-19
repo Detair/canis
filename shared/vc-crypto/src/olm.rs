@@ -3,11 +3,85 @@
 //! Double Ratchet protocol for 1:1 encrypted communication.
 
 use serde::{Deserialize, Serialize};
-use vodozemac::olm::{Account, AccountPickle, OlmMessage, Session, SessionConfig, SessionPickle};
+use vodozemac::olm::{
+    Account, AccountPickle, OlmMessage, PreKeyMessage, Session, SessionConfig, SessionPickle,
+};
 use vodozemac::Curve25519PublicKey;
 use zeroize::ZeroizeOnDrop;
 
 use crate::{CryptoError, Result};
+
+/// Encrypted message from Olm.
+///
+/// This is a serializable wrapper around vodozemac's `OlmMessage` that can be
+/// transmitted over the network or stored.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EncryptedMessage {
+    /// Message type: 0 = prekey, 1 = normal
+    pub message_type: u8,
+    /// Base64-encoded ciphertext
+    pub ciphertext: String,
+}
+
+impl EncryptedMessage {
+    /// Create from a vodozemac `OlmMessage`.
+    #[must_use]
+    pub fn from_olm_message(message: OlmMessage) -> Self {
+        match message {
+            OlmMessage::PreKey(prekey) => Self {
+                message_type: 0,
+                ciphertext: prekey.to_base64(),
+            },
+            OlmMessage::Normal(normal) => Self {
+                message_type: 1,
+                ciphertext: normal.to_base64(),
+            },
+        }
+    }
+
+    /// Convert to `OlmMessage` for decryption.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the ciphertext is not valid base64 or the message type is invalid.
+    pub fn to_olm_message(&self) -> Result<OlmMessage> {
+        match self.message_type {
+            0 => {
+                let prekey = PreKeyMessage::from_base64(&self.ciphertext)
+                    .map_err(|e| CryptoError::Vodozemac(e.to_string()))?;
+                Ok(OlmMessage::PreKey(prekey))
+            }
+            1 => {
+                let normal = vodozemac::olm::Message::from_base64(&self.ciphertext)
+                    .map_err(|e| CryptoError::Vodozemac(e.to_string()))?;
+                Ok(OlmMessage::Normal(normal))
+            }
+            _ => Err(CryptoError::Vodozemac(format!(
+                "Invalid message type: {}",
+                self.message_type
+            ))),
+        }
+    }
+
+    /// Try to get as prekey message.
+    ///
+    /// Returns `Some` if this is a prekey message (`message_type == 0`),
+    /// `None` otherwise.
+    #[must_use]
+    pub fn into_prekey_message(&self) -> Option<PreKeyMessage> {
+        if self.message_type == 0 {
+            PreKeyMessage::from_base64(&self.ciphertext).ok()
+        } else {
+            None
+        }
+    }
+
+    /// Check if this is a prekey message.
+    #[must_use]
+    pub const fn is_prekey(&self) -> bool {
+        self.message_type == 0
+    }
+}
 
 /// Identity key pair containing both Ed25519 (signing) and Curve25519 (encryption) keys.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -126,24 +200,24 @@ impl OlmAccount {
     /// Create an inbound session from a prekey message.
     ///
     /// Used when receiving the first message from a new sender.
+    /// Returns the session and the decrypted plaintext from the prekey message.
+    ///
+    /// Note: The prekey message is automatically decrypted during session creation,
+    /// so you should NOT call `session.decrypt()` again on the same message.
     pub fn create_inbound_session(
         &mut self,
         sender_identity_key: &Curve25519PublicKey,
-        message: &OlmMessage,
-    ) -> Result<(OlmSession, Vec<u8>)> {
-        match message {
-            OlmMessage::PreKey(prekey_message) => {
-                let result = self
-                    .inner
-                    .create_inbound_session(*sender_identity_key, prekey_message)
-                    .map_err(|e| CryptoError::Vodozemac(e.to_string()))?;
+        message: &PreKeyMessage,
+    ) -> Result<(OlmSession, String)> {
+        let result = self
+            .inner
+            .create_inbound_session(*sender_identity_key, message)
+            .map_err(|e| CryptoError::Vodozemac(e.to_string()))?;
 
-                Ok((OlmSession::new(result.session), result.plaintext))
-            }
-            OlmMessage::Normal(_) => Err(CryptoError::Vodozemac(
-                "Expected PreKey message for inbound session".to_string(),
-            )),
-        }
+        let plaintext = String::from_utf8(result.plaintext)
+            .map_err(|e| CryptoError::DecryptionFailed(e.to_string()))?;
+
+        Ok((OlmSession::new(result.session), plaintext))
     }
 }
 
@@ -167,15 +241,27 @@ impl OlmSession {
     }
 
     /// Encrypt a message.
-    pub fn encrypt(&mut self, plaintext: &str) -> OlmMessage {
-        self.inner.encrypt(plaintext)
+    ///
+    /// Returns an `EncryptedMessage` that can be serialized and transmitted.
+    pub fn encrypt(&mut self, plaintext: &str) -> EncryptedMessage {
+        let olm_message = self.inner.encrypt(plaintext);
+        EncryptedMessage::from_olm_message(olm_message)
     }
 
     /// Decrypt a message.
-    pub fn decrypt(&mut self, message: &OlmMessage) -> Result<String> {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The message cannot be converted to an `OlmMessage`
+    /// - Decryption fails (wrong session, corrupted message, etc.)
+    /// - The decrypted plaintext is not valid UTF-8
+    pub fn decrypt(&mut self, message: &EncryptedMessage) -> Result<String> {
+        let olm_message = message.to_olm_message()?;
+
         let plaintext = self
             .inner
-            .decrypt(message)
+            .decrypt(&olm_message)
             .map_err(|e| CryptoError::DecryptionFailed(e.to_string()))?;
 
         String::from_utf8(plaintext).map_err(|e| CryptoError::DecryptionFailed(e.to_string()))
@@ -262,44 +348,45 @@ mod tests {
     }
 
     #[test]
-    fn test_session_establishment() {
-        // Alice creates her account and generates one-time keys
+    fn test_session_encrypt_decrypt() {
+        // Create Alice and Bob accounts
         let mut alice = OlmAccount::new();
-        alice.generate_one_time_keys(1);
-        let alice_otks = alice.one_time_keys();
-        let alice_identity_key = alice.curve25519_key();
-        let (_, alice_otk_base64) = &alice_otks[0];
-        let alice_otk =
-            Curve25519PublicKey::from_base64(alice_otk_base64).expect("valid base64 key");
-
-        // Bob creates his account
         let mut bob = OlmAccount::new();
-        let bob_identity_key = bob.curve25519_key();
 
-        // Bob creates an outbound session to Alice
-        let mut bob_session = bob.create_outbound_session(&alice_identity_key, &alice_otk);
+        // Bob generates one-time keys
+        bob.generate_one_time_keys(1);
+        let bob_otk = bob.one_time_keys().pop().unwrap().1;
+        let bob_otk_key = Curve25519PublicKey::from_base64(&bob_otk).unwrap();
 
-        // Bob encrypts a message
-        let plaintext = "Hello Alice!";
-        let ciphertext = bob_session.encrypt(plaintext);
+        // Alice creates outbound session to Bob
+        let mut alice_session = alice.create_outbound_session(&bob.curve25519_key(), &bob_otk_key);
 
-        // Alice creates an inbound session from the prekey message
-        let (mut alice_session, decrypted_bytes) = alice
-            .create_inbound_session(&bob_identity_key, &ciphertext)
-            .expect("should create inbound session");
+        // Alice encrypts a message
+        let plaintext = "Hello, Bob!";
+        let ciphertext = alice_session.encrypt(plaintext);
 
-        let decrypted = String::from_utf8(decrypted_bytes).expect("valid utf8");
+        // Verify it's a prekey message
+        assert!(ciphertext.is_prekey());
+
+        // Bob creates inbound session from prekey message
+        // Note: create_inbound_session decrypts the prekey message automatically
+        let message = ciphertext.into_prekey_message().unwrap();
+        let (mut bob_session, decrypted) = bob
+            .create_inbound_session(&alice.curve25519_key(), &message)
+            .unwrap();
+
         assert_eq!(decrypted, plaintext);
 
-        // Alice can now encrypt a response
-        let response = "Hello Bob!";
-        let response_ciphertext = alice_session.encrypt(response);
+        // Bob can now respond
+        let response = "Hello, Alice!";
+        let response_ciphertext = bob_session.encrypt(response);
 
-        // Bob decrypts the response
-        let bob_decrypted = bob_session
-            .decrypt(&response_ciphertext)
-            .expect("should decrypt");
-        assert_eq!(bob_decrypted, response);
+        // Normal message (not prekey)
+        assert!(!response_ciphertext.is_prekey());
+
+        // Alice decrypts the response
+        let alice_decrypted = alice_session.decrypt(&response_ciphertext).unwrap();
+        assert_eq!(alice_decrypted, response);
     }
 
     #[test]
