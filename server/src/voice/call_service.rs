@@ -110,10 +110,10 @@ impl CallService {
             .await
             .map_err(|e| CallError::Redis(e.to_string()))?;
 
-        // Set TTL for auto-cleanup (120s ring timeout)
+        // Set TTL for auto-cleanup (90s ring timeout)
         let _: bool = self
             .redis
-            .expire(&key, 120)
+            .expire(&key, 90)
             .await
             .map_err(|e| CallError::Redis(e.to_string()))?;
 
