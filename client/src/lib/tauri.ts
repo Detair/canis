@@ -747,7 +747,7 @@ export type CallEndReason = "cancelled" | "all_declined" | "no_answer" | "last_l
 
 export interface CallStateResponse {
   channel_id: string;
-  // CallState is one of: Ringing, Active, Ended
+  status: "ringing" | "active" | "ended";
   started_by?: string;
   started_at?: string;
   declined_by?: string[];
@@ -756,6 +756,7 @@ export interface CallStateResponse {
   reason?: CallEndReason;
   duration_secs?: number;
   ended_at?: string;
+  capabilities?: string[];
 }
 
 // DM Commands
