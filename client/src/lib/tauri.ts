@@ -35,10 +35,12 @@ import type {
   AuditLogEntry,
   PaginatedResponse,
   ElevateResponse,
+  CallEndReason,
+  CallStateResponse,
 } from "./types";
 
 // Re-export types for convenience
-export type { User, Channel, Message, AppSettings, Guild, GuildMember, GuildInvite, InviteResponse, InviteExpiry, Friend, Friendship, DMChannel, DMListItem, Page, PageListItem, GuildRole, ChannelOverride, CreateRoleRequest, UpdateRoleRequest, SetChannelOverrideRequest, AssignRoleResponse, RemoveRoleResponse, DeleteRoleResponse, AdminStats, AdminStatus, UserSummary, GuildSummary, AuditLogEntry, PaginatedResponse, ElevateResponse };
+export type { User, Channel, Message, AppSettings, Guild, GuildMember, GuildInvite, InviteResponse, InviteExpiry, Friend, Friendship, DMChannel, DMListItem, Page, PageListItem, GuildRole, ChannelOverride, CreateRoleRequest, UpdateRoleRequest, SetChannelOverrideRequest, AssignRoleResponse, RemoveRoleResponse, DeleteRoleResponse, AdminStats, AdminStatus, UserSummary, GuildSummary, AuditLogEntry, PaginatedResponse, ElevateResponse, CallEndReason, CallStateResponse };
 
 // Detect if running in Tauri
 const isTauri = typeof window !== "undefined" && "__TAURI__" in window;
@@ -739,24 +741,6 @@ export async function blockUser(userId: string): Promise<Friendship> {
   }
 
   return httpRequest<Friendship>("POST", `/api/friends/${userId}/block`);
-}
-
-// Call State Types (matching backend)
-
-export type CallEndReason = "cancelled" | "all_declined" | "no_answer" | "last_left";
-
-export interface CallStateResponse {
-  channel_id: string;
-  status: "ringing" | "active" | "ended";
-  started_by?: string;
-  started_at?: string;
-  declined_by?: string[];
-  target_users?: string[];
-  participants?: string[];
-  reason?: CallEndReason;
-  duration_secs?: number;
-  ended_at?: string;
-  capabilities?: string[];
 }
 
 // DM Commands

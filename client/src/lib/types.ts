@@ -449,3 +449,21 @@ export interface ElevateResponse {
   expires_at: string;
   session_id: string;
 }
+
+// Call State Types
+
+export type CallEndReason = "cancelled" | "all_declined" | "no_answer" | "last_left";
+
+export interface CallStateResponse {
+  channel_id: string;
+  status: "ringing" | "active" | "ended";
+  started_by?: string;
+  started_at?: string;
+  declined_by?: string[];
+  target_users?: string[];
+  participants?: string[];
+  reason?: CallEndReason;
+  duration_secs?: number;
+  ended_at?: string;
+  capabilities?: string[];
+}
