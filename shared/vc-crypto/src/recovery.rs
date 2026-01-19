@@ -4,9 +4,18 @@
 //! The recovery key is a 256-bit random value displayed as Base58 for easy
 //! user storage and entry.
 
-use crate::{CryptoError, Result};
+use aes_gcm::{
+    aead::{Aead, KeyInit},
+    Aes256Gcm, Nonce,
+};
 use argon2::{Argon2, Params};
-use zeroize::{Zeroizing, ZeroizeOnDrop};
+use serde::{Deserialize, Serialize};
+use zeroize::{ZeroizeOnDrop, Zeroizing};
+
+use crate::{CryptoError, Result};
+
+/// Magic bytes for backup verification
+const BACKUP_MAGIC: &[u8] = b"CANIS_KEYS_V1";
 
 /// Recovery key for backing up E2EE identity keys.
 ///
@@ -102,6 +111,97 @@ impl RecoveryKey {
             .hash_password_into(&self.0, salt, &mut output)
             .expect("Argon2 hashing failed");
         BackupKey(output)
+    }
+}
+
+/// Encrypted backup of identity keys.
+///
+/// Uses AES-256-GCM for authenticated encryption. The backup includes:
+/// - A random salt for key derivation
+/// - A random nonce for AES-GCM
+/// - The encrypted data (with magic prefix for verification)
+/// - A version number for future compatibility
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EncryptedBackup {
+    /// Random salt for key derivation
+    pub salt: [u8; 16],
+    /// AES-GCM nonce
+    pub nonce: [u8; 12],
+    /// Encrypted data (includes magic prefix)
+    pub ciphertext: Vec<u8>,
+    /// Backup version for future compatibility
+    pub version: u32,
+}
+
+impl EncryptedBackup {
+    /// Create an encrypted backup from the provided data.
+    ///
+    /// The data is encrypted using AES-256-GCM with a key derived from the
+    /// recovery key using Argon2id. A magic prefix is prepended to the plaintext
+    /// before encryption to allow verification during decryption.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the system CSPRNG fails to generate random bytes or if
+    /// encryption fails (which should never happen with valid inputs).
+    pub fn create(recovery_key: &RecoveryKey, data: &[u8]) -> Self {
+        let mut salt = [0u8; 16];
+        getrandom::getrandom(&mut salt).expect("Failed to generate salt");
+
+        let mut nonce_bytes = [0u8; 12];
+        getrandom::getrandom(&mut nonce_bytes).expect("Failed to generate nonce");
+
+        let backup_key = recovery_key.derive_backup_key(&salt);
+        let cipher = Aes256Gcm::new_from_slice(backup_key.as_ref()).expect("Invalid key length");
+        let nonce = Nonce::from_slice(&nonce_bytes);
+
+        // Prepend magic bytes for verification
+        let mut plaintext = BACKUP_MAGIC.to_vec();
+        plaintext.extend_from_slice(data);
+
+        let ciphertext = cipher
+            .encrypt(nonce, plaintext.as_slice())
+            .expect("Encryption failed");
+
+        Self {
+            salt,
+            nonce: nonce_bytes,
+            ciphertext,
+            version: 1,
+        }
+    }
+
+    /// Decrypt the backup using the provided recovery key.
+    ///
+    /// # Errors
+    ///
+    /// Returns `CryptoError::InvalidKey` if the backup key cannot be created.
+    /// Returns `CryptoError::DecryptionFailed` if:
+    /// - The recovery key is wrong (AES-GCM authentication fails)
+    /// - The decrypted data doesn't have the expected magic prefix
+    pub fn decrypt(&self, recovery_key: &RecoveryKey) -> Result<Vec<u8>> {
+        let backup_key = recovery_key.derive_backup_key(&self.salt);
+        let cipher = Aes256Gcm::new_from_slice(backup_key.as_ref())
+            .map_err(|_| CryptoError::InvalidKey("Invalid backup key".into()))?;
+        let nonce = Nonce::from_slice(&self.nonce);
+
+        let plaintext = cipher
+            .decrypt(nonce, self.ciphertext.as_slice())
+            .map_err(|_| {
+                CryptoError::DecryptionFailed(
+                    "Backup decryption failed - wrong recovery key?".into(),
+                )
+            })?;
+
+        // Verify magic bytes
+        if plaintext.len() < BACKUP_MAGIC.len() || &plaintext[..BACKUP_MAGIC.len()] != BACKUP_MAGIC
+        {
+            return Err(CryptoError::DecryptionFailed(
+                "Invalid backup format".into(),
+            ));
+        }
+
+        Ok(plaintext[BACKUP_MAGIC.len()..].to_vec())
     }
 }
 
@@ -215,5 +315,70 @@ mod tests {
 
         // Different recovery keys should produce different backup keys
         assert_ne!(backup_key1.as_ref(), backup_key2.as_ref());
+    }
+
+    #[test]
+    fn test_backup_encrypt_decrypt() {
+        let recovery_key = RecoveryKey::generate();
+        let original_data = b"secret identity keys";
+
+        let backup = EncryptedBackup::create(&recovery_key, original_data);
+
+        let decrypted = backup.decrypt(&recovery_key).unwrap();
+        assert_eq!(decrypted, original_data);
+    }
+
+    #[test]
+    fn test_backup_wrong_key_fails() {
+        let recovery_key = RecoveryKey::generate();
+        let wrong_key = RecoveryKey::generate();
+        let data = b"secret";
+
+        let backup = EncryptedBackup::create(&recovery_key, data);
+        let result = backup.decrypt(&wrong_key);
+
+        assert!(result.is_err());
+        match result {
+            Err(CryptoError::DecryptionFailed(msg)) => {
+                assert!(msg.contains("wrong recovery key"));
+            }
+            _ => panic!("Expected DecryptionFailed error"),
+        }
+    }
+
+    #[test]
+    fn test_backup_serialization() {
+        let recovery_key = RecoveryKey::generate();
+        let data = b"secret";
+
+        let backup = EncryptedBackup::create(&recovery_key, data);
+        let json = serde_json::to_string(&backup).unwrap();
+        let restored: EncryptedBackup = serde_json::from_str(&json).unwrap();
+
+        let decrypted = restored.decrypt(&recovery_key).unwrap();
+        assert_eq!(decrypted, data);
+    }
+
+    #[test]
+    fn test_backup_version() {
+        let recovery_key = RecoveryKey::generate();
+        let backup = EncryptedBackup::create(&recovery_key, b"data");
+
+        assert_eq!(backup.version, 1);
+    }
+
+    #[test]
+    fn test_backup_unique_salts_and_nonces() {
+        let recovery_key = RecoveryKey::generate();
+        let data = b"same data";
+
+        let backup1 = EncryptedBackup::create(&recovery_key, data);
+        let backup2 = EncryptedBackup::create(&recovery_key, data);
+
+        // Each backup should have unique salt and nonce
+        assert_ne!(backup1.salt, backup2.salt);
+        assert_ne!(backup1.nonce, backup2.nonce);
+        // And therefore different ciphertext
+        assert_ne!(backup1.ciphertext, backup2.ciphertext);
     }
 }
