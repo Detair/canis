@@ -25,6 +25,7 @@ pub struct CallStateResponse {
     pub channel_id: Uuid,
     #[serde(flatten)]
     pub state: CallState,
+    pub capabilities: Vec<String>,
 }
 
 /// Call API error response
@@ -138,6 +139,7 @@ async fn verify_dm_participant(
 }
 
 /// GET /api/dm/:id/call - Get current call state
+#[tracing::instrument(skip(state, auth))]
 pub async fn get_call(
     State(state): State<AppState>,
     auth: AuthUser,
@@ -149,9 +151,11 @@ pub async fn get_call(
     let call_service = CallService::new(state.redis.clone());
     let call_state = call_service.get_call_state(channel_id).await?;
 
-    Ok(Json(
-        call_state.map(|state| CallStateResponse { channel_id, state }),
-    ))
+    Ok(Json(call_state.map(|state| CallStateResponse {
+        channel_id,
+        state,
+        capabilities: vec!["audio".to_string()],
+    })))
 }
 
 /// Get username for a user ID
@@ -163,6 +167,7 @@ async fn get_username(state: &AppState, user_id: Uuid) -> Result<String, CallHan
 }
 
 /// POST /api/dm/:id/call/start - Start a new call
+#[tracing::instrument(skip(state, auth))]
 pub async fn start_call(
     State(state): State<AppState>,
     auth: AuthUser,
@@ -186,27 +191,35 @@ pub async fn start_call(
 
     // Broadcast IncomingCall to all participants (they're subscribed to the DM channel)
     let initiator_name = get_username(&state, auth.id).await?;
-    let _ = broadcast_to_channel(
+    // Default capabilities: audio only for now
+    let capabilities = vec!["audio".to_string()];
+    if let Err(e) = broadcast_to_channel(
         &state.redis,
         channel_id,
         &ServerEvent::IncomingCall {
             channel_id,
             initiator: auth.id,
             initiator_name,
+            capabilities,
         },
     )
-    .await;
+    .await
+    {
+        tracing::warn!(error = %e, %channel_id, "Failed to broadcast IncomingCall event");
+    }
 
     Ok((
         StatusCode::CREATED,
         Json(CallStateResponse {
             channel_id,
             state: call_state,
+            capabilities: vec!["audio".to_string()],
         }),
     ))
 }
 
 /// POST /api/dm/:id/call/join - Join an active call
+#[tracing::instrument(skip(state, auth))]
 pub async fn join_call(
     State(state): State<AppState>,
     auth: AuthUser,
@@ -220,7 +233,7 @@ pub async fn join_call(
 
     // Broadcast ParticipantJoined to all participants
     let username = get_username(&state, auth.id).await?;
-    let _ = broadcast_to_channel(
+    if let Err(e) = broadcast_to_channel(
         &state.redis,
         channel_id,
         &ServerEvent::CallParticipantJoined {
@@ -229,15 +242,20 @@ pub async fn join_call(
             username,
         },
     )
-    .await;
+    .await
+    {
+        tracing::warn!(error = %e, %channel_id, "Failed to broadcast CallParticipantJoined event");
+    }
 
     Ok(Json(CallStateResponse {
         channel_id,
         state: call_state,
+        capabilities: vec!["audio".to_string()],
     }))
 }
 
 /// POST /api/dm/:id/call/decline - Decline a call
+#[tracing::instrument(skip(state, auth))]
 pub async fn decline_call(
     State(state): State<AppState>,
     auth: AuthUser,
@@ -250,7 +268,7 @@ pub async fn decline_call(
     let call_state = call_service.decline_call(channel_id, auth.id).await?;
 
     // Broadcast CallDeclined to all participants
-    let _ = broadcast_to_channel(
+    if let Err(e) = broadcast_to_channel(
         &state.redis,
         channel_id,
         &ServerEvent::CallDeclined {
@@ -258,12 +276,18 @@ pub async fn decline_call(
             user_id: auth.id,
         },
     )
-    .await;
+    .await
+    {
+        tracing::warn!(error = %e, %channel_id, "Failed to broadcast CallDeclined event");
+    }
 
     // If call ended due to all declining, broadcast CallEnded
     if let CallState::Ended { reason, .. } = &call_state {
-        let reason_str = format!("{reason:?}").to_lowercase();
-        let _ = broadcast_to_channel(
+        let reason_str = serde_json::to_string(&reason)
+            .unwrap_or_default()
+            .trim_matches('"')
+            .to_string();
+        if let Err(e) = broadcast_to_channel(
             &state.redis,
             channel_id,
             &ServerEvent::CallEnded {
@@ -272,16 +296,21 @@ pub async fn decline_call(
                 duration_secs: None,
             },
         )
-        .await;
+        .await
+        {
+            tracing::warn!(error = %e, %channel_id, "Failed to broadcast CallEnded event");
+        }
     }
 
     Ok(Json(CallStateResponse {
         channel_id,
         state: call_state,
+        capabilities: vec!["audio".to_string()],
     }))
 }
 
 /// POST /api/dm/:id/call/leave - Leave an active call
+#[tracing::instrument(skip(state, auth))]
 pub async fn leave_call(
     State(state): State<AppState>,
     auth: AuthUser,
@@ -294,7 +323,7 @@ pub async fn leave_call(
     let call_state = call_service.leave_call(channel_id, auth.id).await?;
 
     // Broadcast ParticipantLeft
-    let _ = broadcast_to_channel(
+    if let Err(e) = broadcast_to_channel(
         &state.redis,
         channel_id,
         &ServerEvent::CallParticipantLeft {
@@ -302,7 +331,10 @@ pub async fn leave_call(
             user_id: auth.id,
         },
     )
-    .await;
+    .await
+    {
+        tracing::warn!(error = %e, %channel_id, "Failed to broadcast CallParticipantLeft event");
+    }
 
     // If call ended due to last person leaving, broadcast CallEnded
     if let CallState::Ended {
@@ -311,8 +343,11 @@ pub async fn leave_call(
         ..
     } = &call_state
     {
-        let reason_str = format!("{reason:?}").to_lowercase();
-        let _ = broadcast_to_channel(
+        let reason_str = serde_json::to_string(&reason)
+            .unwrap_or_default()
+            .trim_matches('"')
+            .to_string();
+        if let Err(e) = broadcast_to_channel(
             &state.redis,
             channel_id,
             &ServerEvent::CallEnded {
@@ -321,12 +356,16 @@ pub async fn leave_call(
                 duration_secs: *duration_secs,
             },
         )
-        .await;
+        .await
+        {
+            tracing::warn!(error = %e, %channel_id, "Failed to broadcast CallEnded event");
+        }
     }
 
     Ok(Json(CallStateResponse {
         channel_id,
         state: call_state,
+        capabilities: vec!["audio".to_string()],
     }))
 }
 

@@ -124,7 +124,7 @@ const CallBanner: Component<CallBannerProps> = (props) => {
   return (
     <Show when={currentCall()}>
       {(call) => (
-        <div class="px-4 py-3 border-b border-white/5 bg-surface-layer2">
+        <div class="px-4 py-3 border-b border-white/5 bg-surface-layer2" role="status" aria-live="polite">
           {/* Incoming Call */}
           <Show when={call().status === "incoming_ringing"}>
             <div class="flex items-center justify-between">
@@ -141,6 +141,7 @@ const CallBanner: Component<CallBannerProps> = (props) => {
               </div>
               <div class="flex items-center gap-2">
                 <button
+                  type="button"
                   onClick={handleDecline}
                   disabled={isLoading()}
                   class="px-4 py-2 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors flex items-center gap-2 disabled:opacity-50"
@@ -149,6 +150,7 @@ const CallBanner: Component<CallBannerProps> = (props) => {
                   <span>Decline</span>
                 </button>
                 <button
+                  type="button"
                   onClick={handleAccept}
                   disabled={isLoading()}
                   class="px-4 py-2 rounded-lg bg-green-500/20 text-green-400 hover:bg-green-500/30 transition-colors flex items-center gap-2 disabled:opacity-50"
@@ -173,6 +175,7 @@ const CallBanner: Component<CallBannerProps> = (props) => {
                 </div>
               </div>
               <button
+                type="button"
                 onClick={handleCancel}
                 disabled={isLoading()}
                 class="px-4 py-2 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors flex items-center gap-2 disabled:opacity-50"
@@ -217,6 +220,7 @@ const CallBanner: Component<CallBannerProps> = (props) => {
                 </div>
               </div>
               <button
+                type="button"
                 onClick={handleLeave}
                 disabled={isLoading()}
                 class="px-4 py-2 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors flex items-center gap-2 disabled:opacity-50"

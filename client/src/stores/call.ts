@@ -6,6 +6,12 @@
 
 import { createStore, produce } from "solid-js/store";
 
+// Constants
+const CALL_ENDED_DISPLAY_MS = 3000;
+
+// Module-level timeout tracking for cleanup
+let callEndedTimeoutId: ReturnType<typeof setTimeout> | null = null;
+
 // Call state types matching backend
 export type EndReason = "cancelled" | "all_declined" | "no_answer" | "last_left";
 
@@ -101,7 +107,10 @@ export function participantJoined(channelId: string, userId: string): void {
     setCallState(
       produce((state) => {
         if (state.currentCall.status === "connected") {
-          state.currentCall.participants = [...state.currentCall.participants, userId];
+          // Prevent duplicate participants
+          if (!state.currentCall.participants.includes(userId)) {
+            state.currentCall.participants = [...state.currentCall.participants, userId];
+          }
         }
       })
     );
@@ -110,7 +119,10 @@ export function participantJoined(channelId: string, userId: string): void {
   setCallState(
     produce((state) => {
       if (state.activeCallsByChannel[channelId]) {
-        state.activeCallsByChannel[channelId].participants.push(userId);
+        // Prevent duplicate participants
+        if (!state.activeCallsByChannel[channelId].participants.includes(userId)) {
+          state.activeCallsByChannel[channelId].participants.push(userId);
+        }
       }
     })
   );
@@ -158,6 +170,12 @@ export function declineCall(channelId: string): void {
  * End the current call (local action).
  */
 export function endCall(channelId: string, reason: EndReason, duration?: number): void {
+  // Clear any existing timeout to prevent race conditions
+  if (callEndedTimeoutId) {
+    clearTimeout(callEndedTimeoutId);
+    callEndedTimeoutId = null;
+  }
+
   setCallState("currentCall", {
     status: "ended",
     channelId,
@@ -172,12 +190,12 @@ export function endCall(channelId: string, reason: EndReason, duration?: number)
   );
 
   // Reset to idle after showing ended state briefly
-  setTimeout(() => {
-    const current = callState.currentCall;
-    if (current.status === "ended" && current.channelId === channelId) {
+  callEndedTimeoutId = setTimeout(() => {
+    if (callState.currentCall.status === "ended") {
       setCallState("currentCall", { status: "idle" });
     }
-  }, 3000);
+    callEndedTimeoutId = null;
+  }, CALL_ENDED_DISPLAY_MS);
 }
 
 /**
@@ -203,9 +221,15 @@ export function callEndedExternally(
 }
 
 // Selectors
+// NOTE: These selectors access Solid.js store state. For reactivity to work,
+// they MUST be called inside a reactive context (createEffect, createMemo, JSX).
+// When called inside reactive contexts, Solid.js automatically tracks store reads.
 
 /**
  * Get the current call state.
+ *
+ * @remarks Must be called inside a reactive context (createEffect, createMemo, JSX)
+ * for reactivity to work. Store reads are automatically tracked by Solid.js.
  */
 export function getCurrentCall(): CallState {
   return callState.currentCall;
@@ -213,6 +237,9 @@ export function getCurrentCall(): CallState {
 
 /**
  * Get active call info for a specific channel.
+ *
+ * @remarks Must be called inside a reactive context (createEffect, createMemo, JSX)
+ * for reactivity to work. Store reads are automatically tracked by Solid.js.
  */
 export function getActiveCallForChannel(
   channelId: string
@@ -222,6 +249,9 @@ export function getActiveCallForChannel(
 
 /**
  * Check if currently in any call.
+ *
+ * @remarks Must be called inside a reactive context (createEffect, createMemo, JSX)
+ * for reactivity to work. Store reads are automatically tracked by Solid.js.
  */
 export function isInCall(): boolean {
   const status = callState.currentCall.status;
@@ -230,6 +260,9 @@ export function isInCall(): boolean {
 
 /**
  * Check if in a call for a specific channel.
+ *
+ * @remarks Must be called inside a reactive context (createEffect, createMemo, JSX)
+ * for reactivity to work. Store reads are automatically tracked by Solid.js.
  */
 export function isInCallForChannel(channelId: string): boolean {
   const current = callState.currentCall;
@@ -243,6 +276,9 @@ export function isInCallForChannel(channelId: string): boolean {
 
 /**
  * Check if there's an active call in a channel (for sidebar indicator).
+ *
+ * @remarks Must be called inside a reactive context (createEffect, createMemo, JSX)
+ * for reactivity to work. Store reads are automatically tracked by Solid.js.
  */
 export function hasActiveCallInChannel(channelId: string): boolean {
   return !!callState.activeCallsByChannel[channelId];
