@@ -1,8 +1,9 @@
 //! E2EE Key Management HTTP Handlers
 //!
-//! Handlers for uploading identity keys, prekeys, and retrieving user keys.
+//! Handlers for uploading identity keys, prekeys, retrieving user keys, and key backups.
 
-use axum::{extract::Path, extract::State, Json};
+use axum::{extract::Path, extract::State, http::StatusCode, Json};
+use base64::{engine::general_purpose::STANDARD, Engine};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use uuid::Uuid;
@@ -101,7 +102,7 @@ pub struct DeviceKeys {
 // ============================================================================
 
 /// Maximum number of prekeys that can be uploaded in a single request.
-/// Prevents DoS attacks by limiting the amount of work per request.
+/// Prevents denial-of-service attacks by limiting the amount of work per request.
 const MAX_PREKEYS_PER_UPLOAD: usize = 100;
 
 // ============================================================================
@@ -143,8 +144,7 @@ pub async fn upload_keys(
     }
     if req.one_time_prekeys.len() > MAX_PREKEYS_PER_UPLOAD {
         return Err(AuthError::Validation(format!(
-            "Cannot upload more than {} prekeys at once",
-            MAX_PREKEYS_PER_UPLOAD
+            "Cannot upload more than {MAX_PREKEYS_PER_UPLOAD} prekeys at once"
         )));
     }
 
@@ -348,4 +348,149 @@ pub async fn claim_prekey(
 struct DeviceIdentityKeys {
     identity_key_ed25519: String,
     identity_key_curve25519: String,
+}
+
+// ============================================================================
+// Backup Request/Response Types
+// ============================================================================
+
+/// Request to upload an encrypted key backup.
+#[derive(Debug, Deserialize)]
+pub struct UploadBackupRequest {
+    /// Salt used for key derivation (Base64-encoded, must be 16 bytes).
+    pub salt: String,
+    /// AES-GCM nonce (Base64-encoded, must be 12 bytes).
+    pub nonce: String,
+    /// Encrypted backup data (Base64-encoded, max 1MB).
+    pub ciphertext: String,
+    /// Backup version for future compatibility.
+    pub version: i32,
+}
+
+/// Response containing an encrypted key backup.
+#[derive(Debug, Serialize)]
+pub struct BackupResponse {
+    /// Salt used for key derivation (Base64-encoded).
+    pub salt: String,
+    /// AES-GCM nonce (Base64-encoded).
+    pub nonce: String,
+    /// Encrypted backup data (Base64-encoded).
+    pub ciphertext: String,
+    /// Backup version.
+    pub version: i32,
+    /// When the backup was created.
+    pub created_at: chrono::DateTime<chrono::Utc>,
+}
+
+// ============================================================================
+// Backup Handlers
+// ============================================================================
+
+/// Upload an encrypted key backup.
+///
+/// Creates or updates the user's encrypted key backup. Only one backup is stored
+/// per user (UPSERT pattern). The client is responsible for encrypting the backup
+/// using a recovery key before uploading.
+///
+/// POST /api/keys/backup
+#[tracing::instrument(skip(state, req), fields(user_id = %auth_user.id))]
+pub async fn upload_backup(
+    State(state): State<AppState>,
+    auth_user: AuthUser,
+    Json(req): Json<UploadBackupRequest>,
+) -> Result<StatusCode, AuthError> {
+    let user_id = auth_user.id;
+
+    // Decode and validate base64
+    let salt = STANDARD
+        .decode(&req.salt)
+        .map_err(|_| AuthError::Validation("Invalid salt encoding".into()))?;
+    let nonce = STANDARD
+        .decode(&req.nonce)
+        .map_err(|_| AuthError::Validation("Invalid nonce encoding".into()))?;
+    let ciphertext = STANDARD
+        .decode(&req.ciphertext)
+        .map_err(|_| AuthError::Validation("Invalid ciphertext encoding".into()))?;
+
+    // Validate sizes (match DB constraints)
+    if salt.len() != 16 {
+        return Err(AuthError::Validation("Salt must be 16 bytes".into()));
+    }
+    if nonce.len() != 12 {
+        return Err(AuthError::Validation("Nonce must be 12 bytes".into()));
+    }
+    if ciphertext.len() > 1_048_576 {
+        // 1MB max
+        return Err(AuthError::Validation("Ciphertext too large".into()));
+    }
+
+    sqlx::query(
+        r"
+        INSERT INTO key_backups (user_id, salt, nonce, ciphertext, version)
+        VALUES ($1, $2, $3, $4, $5)
+        ON CONFLICT (user_id) DO UPDATE SET
+            salt = EXCLUDED.salt,
+            nonce = EXCLUDED.nonce,
+            ciphertext = EXCLUDED.ciphertext,
+            version = EXCLUDED.version,
+            created_at = NOW()
+        ",
+    )
+    .bind(user_id)
+    .bind(&salt)
+    .bind(&nonce)
+    .bind(&ciphertext)
+    .bind(req.version)
+    .execute(&state.db)
+    .await
+    .map_err(AuthError::Database)?;
+
+    tracing::info!(user_id = %user_id, version = req.version, "Key backup uploaded");
+
+    Ok(StatusCode::CREATED)
+}
+
+/// Download the user's encrypted key backup.
+///
+/// Returns the encrypted key backup if one exists. The client is responsible
+/// for decrypting the backup using their recovery key.
+///
+/// GET /api/keys/backup
+#[tracing::instrument(skip(state), fields(user_id = %auth_user.id))]
+pub async fn get_backup(
+    State(state): State<AppState>,
+    auth_user: AuthUser,
+) -> Result<Json<BackupResponse>, AuthError> {
+    let user_id = auth_user.id;
+
+    let backup = sqlx::query_as::<_, BackupRow>(
+        r"
+        SELECT salt, nonce, ciphertext, version, created_at
+        FROM key_backups
+        WHERE user_id = $1
+        ",
+    )
+    .bind(user_id)
+    .fetch_optional(&state.db)
+    .await
+    .map_err(AuthError::Database)?
+    .ok_or_else(|| AuthError::NotFound("No backup found".into()))?;
+
+    Ok(Json(BackupResponse {
+        salt: STANDARD.encode(&backup.salt),
+        nonce: STANDARD.encode(&backup.nonce),
+        ciphertext: STANDARD.encode(&backup.ciphertext),
+        version: backup.version,
+        created_at: backup.created_at,
+    }))
+}
+
+/// Internal struct for fetching backup data.
+#[derive(Debug, FromRow)]
+struct BackupRow {
+    salt: Vec<u8>,
+    nonce: Vec<u8>,
+    ciphertext: Vec<u8>,
+    version: i32,
+    created_at: chrono::DateTime<chrono::Utc>,
 }
