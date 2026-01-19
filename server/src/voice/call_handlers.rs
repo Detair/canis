@@ -188,7 +188,7 @@ pub async fn start_call(
 
     // Broadcast IncomingCall to all participants (they're subscribed to the DM channel)
     let initiator_name = get_username(&state, auth.id).await?;
-    let _ = broadcast_to_channel(
+    if let Err(e) = broadcast_to_channel(
         &state.redis,
         channel_id,
         &ServerEvent::IncomingCall {
@@ -197,7 +197,10 @@ pub async fn start_call(
             initiator_name,
         },
     )
-    .await;
+    .await
+    {
+        tracing::warn!(error = %e, %channel_id, "Failed to broadcast IncomingCall event");
+    }
 
     Ok((
         StatusCode::CREATED,
@@ -223,7 +226,7 @@ pub async fn join_call(
 
     // Broadcast ParticipantJoined to all participants
     let username = get_username(&state, auth.id).await?;
-    let _ = broadcast_to_channel(
+    if let Err(e) = broadcast_to_channel(
         &state.redis,
         channel_id,
         &ServerEvent::CallParticipantJoined {
@@ -232,7 +235,10 @@ pub async fn join_call(
             username,
         },
     )
-    .await;
+    .await
+    {
+        tracing::warn!(error = %e, %channel_id, "Failed to broadcast CallParticipantJoined event");
+    }
 
     Ok(Json(CallStateResponse {
         channel_id,
@@ -254,7 +260,7 @@ pub async fn decline_call(
     let call_state = call_service.decline_call(channel_id, auth.id).await?;
 
     // Broadcast CallDeclined to all participants
-    let _ = broadcast_to_channel(
+    if let Err(e) = broadcast_to_channel(
         &state.redis,
         channel_id,
         &ServerEvent::CallDeclined {
@@ -262,12 +268,18 @@ pub async fn decline_call(
             user_id: auth.id,
         },
     )
-    .await;
+    .await
+    {
+        tracing::warn!(error = %e, %channel_id, "Failed to broadcast CallDeclined event");
+    }
 
     // If call ended due to all declining, broadcast CallEnded
     if let CallState::Ended { reason, .. } = &call_state {
-        let reason_str = format!("{reason:?}").to_lowercase();
-        let _ = broadcast_to_channel(
+        let reason_str = serde_json::to_string(&reason)
+            .unwrap_or_default()
+            .trim_matches('"')
+            .to_string();
+        if let Err(e) = broadcast_to_channel(
             &state.redis,
             channel_id,
             &ServerEvent::CallEnded {
@@ -276,7 +288,10 @@ pub async fn decline_call(
                 duration_secs: None,
             },
         )
-        .await;
+        .await
+        {
+            tracing::warn!(error = %e, %channel_id, "Failed to broadcast CallEnded event");
+        }
     }
 
     Ok(Json(CallStateResponse {
@@ -299,7 +314,7 @@ pub async fn leave_call(
     let call_state = call_service.leave_call(channel_id, auth.id).await?;
 
     // Broadcast ParticipantLeft
-    let _ = broadcast_to_channel(
+    if let Err(e) = broadcast_to_channel(
         &state.redis,
         channel_id,
         &ServerEvent::CallParticipantLeft {
@@ -307,7 +322,10 @@ pub async fn leave_call(
             user_id: auth.id,
         },
     )
-    .await;
+    .await
+    {
+        tracing::warn!(error = %e, %channel_id, "Failed to broadcast CallParticipantLeft event");
+    }
 
     // If call ended due to last person leaving, broadcast CallEnded
     if let CallState::Ended {
@@ -316,8 +334,11 @@ pub async fn leave_call(
         ..
     } = &call_state
     {
-        let reason_str = format!("{reason:?}").to_lowercase();
-        let _ = broadcast_to_channel(
+        let reason_str = serde_json::to_string(&reason)
+            .unwrap_or_default()
+            .trim_matches('"')
+            .to_string();
+        if let Err(e) = broadcast_to_channel(
             &state.redis,
             channel_id,
             &ServerEvent::CallEnded {
@@ -326,7 +347,10 @@ pub async fn leave_call(
                 duration_secs: *duration_secs,
             },
         )
-        .await;
+        .await
+        {
+            tracing::warn!(error = %e, %channel_id, "Failed to broadcast CallEnded event");
+        }
     }
 
     Ok(Json(CallStateResponse {
