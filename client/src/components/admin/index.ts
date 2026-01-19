@@ -7,3 +7,4 @@
 export { default as AdminQuickModal } from "./AdminQuickModal";
 export { default as AdminSidebar } from "./AdminSidebar";
 export type { AdminPanel } from "./AdminSidebar";
+export { default as UsersPanel } from "./UsersPanel";
