@@ -54,6 +54,35 @@ pub struct UserKeysResponse {
     pub devices: Vec<DeviceKeys>,
 }
 
+/// Request to claim a prekey from a specific device.
+#[derive(Debug, Deserialize)]
+pub struct ClaimPrekeyRequest {
+    /// The device ID to claim a prekey from.
+    pub device_id: Uuid,
+}
+
+/// Response after claiming a prekey.
+#[derive(Debug, Serialize)]
+pub struct ClaimPrekeyResponse {
+    /// The device ID the prekey was claimed from.
+    pub device_id: Uuid,
+    /// Ed25519 signing key (base64-encoded).
+    pub identity_key_ed25519: String,
+    /// Curve25519 key exchange key (base64-encoded).
+    pub identity_key_curve25519: String,
+    /// The claimed one-time prekey (if available).
+    pub one_time_prekey: Option<ClaimedPrekey>,
+}
+
+/// A claimed one-time prekey.
+#[derive(Debug, Serialize, FromRow)]
+pub struct ClaimedPrekey {
+    /// Unique identifier for this prekey.
+    pub key_id: String,
+    /// Curve25519 public key (base64-encoded).
+    pub public_key: String,
+}
+
 /// Public keys for a single device.
 #[derive(Debug, Serialize, FromRow)]
 pub struct DeviceKeys {
@@ -244,4 +273,79 @@ pub async fn get_own_devices(
     .map_err(AuthError::Database)?;
 
     Ok(Json(UserKeysResponse { devices }))
+}
+
+/// Claim a prekey for a specific device (atomic).
+///
+/// Atomically claims one prekey from the specified device using `FOR UPDATE SKIP LOCKED`
+/// to ensure concurrent requests don't claim the same prekey. Returns the device's
+/// identity keys along with the claimed prekey.
+///
+/// POST /api/users/:id/keys/claim
+#[tracing::instrument(skip(state), fields(claimer_id = %auth_user.id, target_user_id = %target_user_id))]
+pub async fn claim_prekey(
+    State(state): State<AppState>,
+    auth_user: AuthUser,
+    Path(target_user_id): Path<Uuid>,
+    Json(req): Json<ClaimPrekeyRequest>,
+) -> Result<Json<ClaimPrekeyResponse>, AuthError> {
+    let claimer_id = auth_user.id;
+
+    // Get device info and verify it belongs to the target user
+    let device: DeviceIdentityKeys = sqlx::query_as(
+        "
+        SELECT identity_key_ed25519, identity_key_curve25519
+        FROM user_devices
+        WHERE id = $1 AND user_id = $2
+        ",
+    )
+    .bind(req.device_id)
+    .bind(target_user_id)
+    .fetch_optional(&state.db)
+    .await
+    .map_err(AuthError::Database)?
+    .ok_or_else(|| AuthError::Validation("Device not found".to_string()))?;
+
+    // Atomically claim one prekey using FOR UPDATE SKIP LOCKED
+    // This ensures concurrent requests don't claim the same prekey
+    let prekey: Option<ClaimedPrekey> = sqlx::query_as(
+        "
+        UPDATE prekeys
+        SET claimed_at = NOW(), claimed_by = $1
+        WHERE id = (
+            SELECT id FROM prekeys
+            WHERE device_id = $2 AND claimed_at IS NULL
+            ORDER BY created_at
+            LIMIT 1
+            FOR UPDATE SKIP LOCKED
+        )
+        RETURNING key_id, public_key
+        ",
+    )
+    .bind(claimer_id)
+    .bind(req.device_id)
+    .fetch_optional(&state.db)
+    .await
+    .map_err(AuthError::Database)?;
+
+    tracing::info!(
+        claimer_id = %claimer_id,
+        device_id = %req.device_id,
+        prekey_claimed = prekey.is_some(),
+        "Prekey claim attempt"
+    );
+
+    Ok(Json(ClaimPrekeyResponse {
+        device_id: req.device_id,
+        identity_key_ed25519: device.identity_key_ed25519,
+        identity_key_curve25519: device.identity_key_curve25519,
+        one_time_prekey: prekey,
+    }))
+}
+
+/// Internal struct for fetching device identity keys.
+#[derive(Debug, FromRow)]
+struct DeviceIdentityKeys {
+    identity_key_ed25519: String,
+    identity_key_curve25519: String,
 }
