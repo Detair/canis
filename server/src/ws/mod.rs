@@ -105,6 +105,11 @@ pub enum ClientEvent {
         /// Timestamp when stats were collected (Unix epoch ms).
         timestamp: i64,
     },
+
+    /// Set rich presence activity (game, music, etc).
+    SetActivity {
+        activity: Option<crate::presence::Activity>,
+    },
 }
 
 /// Participant info for voice room state.
@@ -374,6 +379,12 @@ pub enum ServerEvent {
         /// User who declined.
         user_id: Uuid,
     },
+
+    /// Rich presence activity update.
+    RichPresenceUpdate {
+        user_id: Uuid,
+        activity: Option<crate::presence::Activity>,
+    },
 }
 
 /// Redis pub/sub channels.
@@ -412,6 +423,24 @@ pub async fn broadcast_to_channel(
         .await?;
 
     Ok(())
+}
+
+/// Broadcast a presence update to all users who should see it.
+async fn broadcast_presence_update(state: &AppState, user_id: Uuid, event: &ServerEvent) {
+    let json = match serde_json::to_string(event) {
+        Ok(j) => j,
+        Err(e) => {
+            error!("Failed to serialize presence event: {}", e);
+            return;
+        }
+    };
+
+    // Broadcast on presence channel
+    let channel = format!("presence:{}", user_id);
+    let result: Result<(), RedisError> = state.redis.publish(&channel, &json).await;
+    if let Err(e) = result {
+        error!("Failed to broadcast presence update: {}", e);
+    }
 }
 
 /// WebSocket upgrade handler.
@@ -625,6 +654,20 @@ async fn handle_client_message(
                 })
                 .await?;
             }
+        }
+
+        ClientEvent::SetActivity { activity } => {
+            // Update database
+            sqlx::query("UPDATE users SET activity = $1 WHERE id = $2")
+                .bind(serde_json::to_value(&activity).ok())
+                .bind(user_id)
+                .execute(&state.db)
+                .await
+                .map_err(|e| format!("Failed to update activity: {}", e))?;
+
+            // Broadcast to user's presence subscribers
+            let event = ServerEvent::RichPresenceUpdate { user_id, activity };
+            broadcast_presence_update(state, user_id, &event).await;
         }
     }
 
