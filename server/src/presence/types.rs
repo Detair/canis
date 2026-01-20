@@ -42,8 +42,9 @@ mod tests {
             details: None,
         };
         let json = serde_json::to_string(&activity).unwrap();
-        assert!(json.contains("Minecraft"));
         assert!(json.contains("\"type\":\"game\""));
+        assert!(json.contains("\"name\":\"Minecraft\""));
+        assert!(!json.contains("\"details\"")); // Should be skipped when None
     }
 
     #[test]
@@ -55,6 +56,7 @@ mod tests {
             details: Some("Editing main.rs".to_string()),
         };
         let json = serde_json::to_string(&activity).unwrap();
+        assert!(json.contains("\"type\":\"coding\""));
         assert!(json.contains("\"details\":\"Editing main.rs\""));
     }
 
@@ -65,5 +67,41 @@ mod tests {
         assert_eq!(activity.activity_type, ActivityType::Game);
         assert_eq!(activity.name, "Valorant");
         assert!(activity.details.is_none());
+    }
+
+    #[test]
+    fn test_activity_type_serialization() {
+        assert_eq!(
+            serde_json::to_string(&ActivityType::Game).unwrap(),
+            "\"game\""
+        );
+        assert_eq!(
+            serde_json::to_string(&ActivityType::Listening).unwrap(),
+            "\"listening\""
+        );
+        assert_eq!(
+            serde_json::to_string(&ActivityType::Watching).unwrap(),
+            "\"watching\""
+        );
+        assert_eq!(
+            serde_json::to_string(&ActivityType::Coding).unwrap(),
+            "\"coding\""
+        );
+        assert_eq!(
+            serde_json::to_string(&ActivityType::Custom).unwrap(),
+            "\"custom\""
+        );
+    }
+
+    #[test]
+    fn test_activity_type_deserialization() {
+        assert_eq!(
+            serde_json::from_str::<ActivityType>("\"game\"").unwrap(),
+            ActivityType::Game
+        );
+        assert_eq!(
+            serde_json::from_str::<ActivityType>("\"listening\"").unwrap(),
+            ActivityType::Listening
+        );
     }
 }
