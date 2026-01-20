@@ -119,6 +119,7 @@ export interface VoiceParticipant {
   display_name?: string;
   muted: boolean;
   speaking: boolean;
+  screen_sharing: boolean;
 }
 
 // Auth Types

@@ -625,6 +625,7 @@ async function handleVoiceUserJoined(channelId: string, userId: string, username
           display_name: displayName,
           muted: false,
           speaking: false,
+          screen_sharing: false,
         };
       })
     );

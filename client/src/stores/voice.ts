@@ -299,6 +299,7 @@ function addParticipant(userId: string): void {
         user_id: userId,
         muted: false,
         speaking: false,
+        screen_sharing: false,
       };
     })
   );

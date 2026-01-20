@@ -57,6 +57,12 @@ export interface VoiceAdapterEvents {
   onLocalMuteChange: (muted: boolean) => void;
   onSpeakingChange: (speaking: boolean) => void;
   onIceCandidate: (candidate: string) => void;
+
+  // Screen share events
+  onScreenShareStarted?: (info: ScreenShareInfo) => void;
+  onScreenShareStopped?: (userId: string, reason: string) => void;
+  onScreenShareTrack?: (userId: string, track: MediaStreamTrack) => void;
+  onScreenShareTrackRemoved?: (userId: string) => void;
 }
 
 /**
@@ -71,6 +77,47 @@ export interface AudioDevice {
 export interface AudioDeviceList {
   inputs: AudioDevice[];   // Microphones
   outputs: AudioDevice[];  // Speakers/Headphones
+}
+
+/**
+ * Screen share quality tier
+ */
+export type ScreenShareQuality = "low" | "medium" | "high" | "premium";
+
+/**
+ * Options for starting a screen share
+ */
+export interface ScreenShareOptions {
+  quality?: ScreenShareQuality;
+  withAudio?: boolean;
+}
+
+/**
+ * Result of a screen share attempt
+ */
+export type ScreenShareResult =
+  | { approved: true; stream: MediaStream }
+  | { approved: false; reason: "user_cancelled" | "permission_denied" | "no_source" };
+
+/**
+ * Information about an active screen share
+ */
+export interface ScreenShareInfo {
+  user_id: string;
+  username: string;
+  source_label: string;
+  has_audio: boolean;
+  quality: ScreenShareQuality;
+  started_at: string;
+}
+
+/**
+ * Pre-capture permission check result
+ */
+export interface ScreenShareCheckResult {
+  allowed: boolean;
+  granted_quality: ScreenShareQuality;
+  error?: "no_permission" | "limit_reached" | "not_in_channel";
 }
 
 /**
@@ -112,6 +159,11 @@ export interface VoiceAdapter {
   getAudioDevices(): Promise<VoiceResult<AudioDeviceList>>;
   setInputDevice(deviceId: string): Promise<VoiceResult<void>>;
   setOutputDevice(deviceId: string): Promise<VoiceResult<void>>;
+
+  // Screen sharing
+  startScreenShare(options?: ScreenShareOptions): Promise<VoiceResult<void>>;
+  stopScreenShare(): Promise<VoiceResult<void>>;
+  isScreenSharing(): boolean;
 
   // Cleanup
   dispose(): void;
