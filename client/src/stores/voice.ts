@@ -5,9 +5,10 @@
  */
 
 import { createStore, produce } from "solid-js/store";
-import { createVoiceAdapter, type VoiceError } from "@/lib/webrtc";
+import { createVoiceAdapter, getVoiceAdapter, type VoiceError, type ConnectionMetrics, type ParticipantMetrics, type QualityLevel } from "@/lib/webrtc";
 import type { VoiceParticipant } from "@/lib/types";
 import { channelsState } from "@/stores/channels";
+import * as tauri from "@/lib/tauri";
 
 // Detect if running in Tauri
 const isTauri = typeof window !== "undefined" && "__TAURI__" in window;
@@ -53,6 +54,13 @@ interface VoiceStoreState {
   participants: Record<string, VoiceParticipant>;
   // Error
   error: VoiceError | null;
+  // Session tracking for metrics
+  sessionId: string | null;
+  connectedAt: number | null;
+  // Local connection metrics
+  localMetrics: ConnectionMetrics | 'unknown' | null;
+  // Per-participant metrics from server
+  participantMetrics: Map<string, ParticipantMetrics>;
 }
 
 // Create the store
@@ -64,10 +72,90 @@ const [voiceState, setVoiceState] = createStore<VoiceStoreState>({
   speaking: false,
   participants: {},
   error: null,
+  sessionId: null,
+  connectedAt: null,
+  localMetrics: null,
+  participantMetrics: new Map(),
 });
 
 // Event listeners
 let unlisteners: UnlistenFn[] = [];
+
+// Metrics collection interval
+let metricsInterval: number | null = null;
+
+/**
+ * Convert QualityLevel to numeric value for server transmission.
+ */
+function qualityToNumber(quality: QualityLevel): number {
+  switch (quality) {
+    case 'green': return 3;
+    case 'yellow': return 2;
+    case 'orange': return 1;
+    case 'red': return 0;
+  }
+}
+
+/**
+ * Convert numeric quality value to QualityLevel.
+ */
+function numberToQuality(n: number): QualityLevel {
+  switch (n) {
+    case 3: return 'green';
+    case 2: return 'yellow';
+    case 1: return 'orange';
+    default: return 'red';
+  }
+}
+
+/**
+ * Start the metrics collection loop.
+ * Collects local WebRTC stats every 3 seconds and sends to server.
+ */
+function startMetricsLoop(): void {
+  if (metricsInterval) return;
+
+  metricsInterval = window.setInterval(async () => {
+    const adapter = getVoiceAdapter();
+    if (!adapter) return;
+
+    try {
+      const metrics = await adapter.getConnectionMetrics();
+      if (metrics) {
+        setVoiceState('localMetrics', metrics);
+
+        // Send to server
+        const sessionId = voiceState.sessionId;
+        if (sessionId && voiceState.channelId) {
+          tauri.wsSend({
+            type: 'VoiceStats',
+            channel_id: voiceState.channelId,
+            session_id: sessionId,
+            latency: metrics.latency,
+            packet_loss: metrics.packetLoss,
+            jitter: metrics.jitter,
+            quality: qualityToNumber(metrics.quality),
+            timestamp: metrics.timestamp,
+          });
+        }
+      } else {
+        setVoiceState('localMetrics', 'unknown');
+      }
+    } catch (err) {
+      console.warn('Failed to collect metrics:', err);
+    }
+  }, 3000);
+}
+
+/**
+ * Stop the metrics collection loop.
+ */
+function stopMetricsLoop(): void {
+  if (metricsInterval) {
+    clearInterval(metricsInterval);
+    metricsInterval = null;
+  }
+}
 
 /**
  * Initialize voice event listeners.
@@ -150,6 +238,9 @@ export async function initVoice(): Promise<void> {
  * Cleanup voice listeners.
  */
 export async function cleanupVoice(): Promise<void> {
+  // Stop metrics collection to prevent orphaned intervals
+  stopMetricsLoop();
+
   for (const unlisten of unlisteners) {
     unlisten();
   }
@@ -197,6 +288,11 @@ export async function joinVoice(channelId: string): Promise<void> {
     setVoiceState({ state: "disconnected", channelId: null, error: result.error });
     throw new Error(getErrorMessage(result.error));
   }
+
+  // Start session tracking and metrics collection
+  setVoiceState('sessionId', crypto.randomUUID());
+  setVoiceState('connectedAt', Date.now());
+  startMetricsLoop();
 }
 
 /**
@@ -204,6 +300,9 @@ export async function joinVoice(channelId: string): Promise<void> {
  */
 export async function leaveVoice(): Promise<void> {
   if (voiceState.state === "disconnected") return;
+
+  // Stop metrics collection first
+  stopMetricsLoop();
 
   const adapter = await createVoiceAdapter();
   const result = await adapter.leave();
@@ -217,6 +316,10 @@ export async function leaveVoice(): Promise<void> {
     channelId: null,
     participants: {},
     speaking: false,
+    sessionId: null,
+    connectedAt: null,
+    localMetrics: null,
+    participantMetrics: new Map(),
   });
 }
 
@@ -374,6 +477,49 @@ export function getVoiceChannelInfo(): { id: string; name: string } | null {
   }
 
   return { id: channel.id, name: channel.name };
+}
+
+/**
+ * Get local connection metrics.
+ * Returns null if not connected, 'unknown' if metrics unavailable.
+ */
+export function getLocalMetrics(): ConnectionMetrics | 'unknown' | null {
+  return voiceState.localMetrics;
+}
+
+/**
+ * Get metrics for a specific participant.
+ */
+export function getParticipantMetrics(userId: string): ParticipantMetrics | undefined {
+  return voiceState.participantMetrics.get(userId);
+}
+
+/**
+ * Handle incoming voice_user_stats event from server.
+ * Updates participant metrics in the store.
+ */
+export function handleVoiceUserStats(data: {
+  channel_id: string;
+  user_id: string;
+  latency: number;
+  packet_loss: number;
+  jitter: number;
+  quality: number;
+}): void {
+  const { channel_id, user_id, latency, packet_loss, jitter, quality } = data;
+
+  // Only update if we're in the same channel
+  if (channel_id !== voiceState.channelId) return;
+
+  const newMetrics = new Map(voiceState.participantMetrics);
+  newMetrics.set(user_id, {
+    userId: user_id,
+    latency,
+    packetLoss: packet_loss,
+    jitter,
+    quality: numberToQuality(quality),
+  });
+  setVoiceState('participantMetrics', newMetrics);
 }
 
 // Export the store for reading and writing

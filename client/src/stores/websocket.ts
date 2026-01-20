@@ -360,6 +360,10 @@ async function handleServerEvent(event: ServerEvent): Promise<void> {
       // This event is informational for other participants
       break;
 
+    case "voice_user_stats":
+      await handleVoiceUserStatsEvent(event as any);
+      break;
+
     default:
       console.log("Unhandled server event:", event.type);
   }
@@ -688,6 +692,18 @@ async function handleVoiceRoomState(channelId: string, participants: any[]): Pro
       })
     );
   }
+}
+
+async function handleVoiceUserStatsEvent(event: {
+  channel_id: string;
+  user_id: string;
+  latency: number;
+  packet_loss: number;
+  jitter: number;
+  quality: number;
+}): Promise<void> {
+  const { handleVoiceUserStats } = await import("@/stores/voice");
+  handleVoiceUserStats(event);
 }
 
 // Export stores for reading
