@@ -496,12 +496,28 @@ async fn handle_socket(socket: WebSocket, state: AppState, user_id: Uuid) {
     // Send ready event
     let _ = tx.send(ServerEvent::Ready { user_id }).await;
 
+    // Fetch user's friends for presence subscriptions
+    let friend_ids = match get_user_friends(&state.db, user_id).await {
+        Ok(friends) => {
+            debug!(
+                "User {} has {} friends for presence subscriptions",
+                user_id,
+                friends.len()
+            );
+            friends
+        }
+        Err(e) => {
+            warn!("Failed to fetch friends for user {}: {}", user_id, e);
+            Vec::new()
+        }
+    };
+
     // Spawn task to handle Redis pub/sub
     let redis_client = state.redis.clone();
     let tx_clone = tx.clone();
     let subscribed_clone = subscribed_channels.clone();
     let pubsub_handle = tokio::spawn(async move {
-        handle_pubsub(redis_client, tx_clone, subscribed_clone).await;
+        handle_pubsub(redis_client, tx_clone, subscribed_clone, friend_ids).await;
     });
 
     // Spawn task to forward events to WebSocket
@@ -679,6 +695,7 @@ async fn handle_pubsub(
     redis: RedisClient,
     tx: mpsc::Sender<ServerEvent>,
     subscribed_channels: Arc<tokio::sync::RwLock<HashSet<Uuid>>>,
+    friend_ids: Vec<Uuid>,
 ) {
     // Create a subscriber client
     let subscriber = redis.clone_new();
@@ -700,9 +717,23 @@ async fn handle_pubsub(
         return;
     }
 
+    // Subscribe to friends' presence channels
+    for friend_id in &friend_ids {
+        let presence_channel = channels::user_presence(*friend_id);
+        if let Err(e) = subscriber.subscribe(&presence_channel).await {
+            warn!(
+                "Failed to subscribe to presence channel for friend {}: {}",
+                friend_id, e
+            );
+        } else {
+            debug!("Subscribed to presence channel: {}", presence_channel);
+        }
+    }
+
     while let Ok(message) = pubsub_stream.recv().await {
-        // Extract channel ID from the channel name (channel:{uuid})
         let channel_name = message.channel.to_string();
+
+        // Handle channel events (channel:{uuid})
         if let Some(uuid_str) = channel_name.strip_prefix("channel:") {
             if let Ok(channel_id) = Uuid::parse_str(uuid_str) {
                 // Check if we're subscribed to this channel
@@ -714,6 +745,17 @@ async fn handle_pubsub(
                                 break;
                             }
                         }
+                    }
+                }
+            }
+        }
+        // Handle presence events (presence:{uuid})
+        else if channel_name.starts_with("presence:") {
+            // Forward presence updates from friends directly
+            if let Some(payload) = message.value.as_str() {
+                if let Ok(event) = serde_json::from_str::<ServerEvent>(&payload) {
+                    if tx.send(event).await.is_err() {
+                        break;
                     }
                 }
             }
@@ -730,4 +772,24 @@ async fn update_presence(state: &AppState, user_id: Uuid, status: &str) -> Resul
         .await?;
 
     Ok(())
+}
+
+/// Get list of user's accepted friend IDs.
+async fn get_user_friends(db: &sqlx::PgPool, user_id: Uuid) -> Result<Vec<Uuid>, sqlx::Error> {
+    let friends: Vec<(Uuid,)> = sqlx::query_as(
+        r#"
+        SELECT CASE
+            WHEN user1_id = $1 THEN user2_id
+            ELSE user1_id
+        END as friend_id
+        FROM friendships
+        WHERE (user1_id = $1 OR user2_id = $1)
+        AND status = 'accepted'
+        "#,
+    )
+    .bind(user_id)
+    .fetch_all(db)
+    .await?;
+
+    Ok(friends.into_iter().map(|(id,)| id).collect())
 }
