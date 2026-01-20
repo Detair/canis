@@ -16,7 +16,7 @@ use tower_http::{
 };
 
 use crate::{
-    admin, auth, chat, connectivity,
+    admin, auth, chat, connectivity, crypto,
     chat::S3Client,
     config::Config,
     guild, pages,
@@ -98,6 +98,8 @@ pub fn create_router(state: AppState) -> Router {
         .nest("/api/dm", voice::call_handlers::call_router())
         .nest("/api/voice", voice::router())
         .nest("/api/me/connection", connectivity::router())
+        .nest("/api/keys", crypto::router())
+        .nest("/api/users/{user_id}/keys", crypto::user_keys_router())
         .layer(from_fn_with_state(state.clone(), rate_limit_by_user))
         .layer(from_fn(with_category(RateLimitCategory::Write)));
 

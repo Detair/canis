@@ -13,6 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Toast notifications for connection issues (warning at 3% loss, critical at 7%)
   - Connection History page (`/settings/connection`) with 30-day analytics
   - TimescaleDB storage with automatic compression and 7-day retention
+- E2EE key management with Olm protocol using vodozemac library
+- Recovery key generation with Base58 display format for user backup
+- Encrypted key backup with AES-256-GCM and Argon2id key derivation
+- Multi-device support with per-device identity keys
+- One-time prekey upload and atomic claiming for session establishment
 - Information Pages system for platform-wide and guild-specific content (ToS, Privacy Policy, FAQ, rules, guides)
 - Markdown editor with live preview, toolbar, and cheat sheet
 - Mermaid diagram support in markdown preview
