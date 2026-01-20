@@ -1,2 +1,3 @@
 export { default as SettingsModal } from "./SettingsModal";
 export { default as AppearanceSettings } from "./AppearanceSettings";
+export { ConnectionChart } from "./ConnectionChart";
