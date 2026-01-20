@@ -3,7 +3,7 @@
 //! This module provides functions for storing voice connection metrics
 //! in TimescaleDB for historical analysis.
 
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use sqlx::PgPool;
 use uuid::Uuid;
 
@@ -60,4 +60,71 @@ pub async fn get_guild_id(pool: &PgPool, channel_id: Uuid) -> Option<Uuid> {
         .await
         .ok()
         .flatten()
+}
+
+/// Finalize session with aggregated metrics on disconnect.
+///
+/// Creates a session record in `connection_sessions` with aggregated
+/// metrics from all connection metrics collected during the session.
+/// For very short calls with no metrics, NULL aggregates are stored.
+pub async fn finalize_session(
+    pool: &PgPool,
+    user_id: Uuid,
+    session_id: Uuid,
+    channel_id: Uuid,
+    guild_id: Option<Uuid>,
+    started_at: DateTime<Utc>,
+) -> Result<(), sqlx::Error> {
+    // Check if any metrics exist for this session
+    let has_metrics: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM connection_metrics WHERE session_id = $1)",
+    )
+    .bind(session_id)
+    .fetch_one(pool)
+    .await?;
+
+    if !has_metrics {
+        // Insert session with NULL aggregates (very short call)
+        sqlx::query(
+            r#"
+            INSERT INTO connection_sessions
+            (id, user_id, channel_id, guild_id, started_at, ended_at,
+             avg_latency, avg_loss, avg_jitter, worst_quality)
+            VALUES ($1, $2, $3, $4, $5, NOW(), NULL, NULL, NULL, NULL)
+            "#,
+        )
+        .bind(session_id)
+        .bind(user_id)
+        .bind(channel_id)
+        .bind(guild_id)
+        .bind(started_at)
+        .execute(pool)
+        .await?;
+    } else {
+        // Insert session with aggregated metrics
+        sqlx::query(
+            r#"
+            INSERT INTO connection_sessions
+            (id, user_id, channel_id, guild_id, started_at, ended_at,
+             avg_latency, avg_loss, avg_jitter, worst_quality)
+            SELECT
+                $1, $2, $3, $4, $5, NOW(),
+                AVG(latency_ms)::SMALLINT,
+                AVG(packet_loss)::REAL,
+                AVG(jitter_ms)::SMALLINT,
+                MIN(quality)::SMALLINT
+            FROM connection_metrics
+            WHERE session_id = $1
+            "#,
+        )
+        .bind(session_id)
+        .bind(user_id)
+        .bind(channel_id)
+        .bind(guild_id)
+        .bind(started_at)
+        .execute(pool)
+        .await?;
+    }
+
+    Ok(())
 }

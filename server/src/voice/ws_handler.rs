@@ -10,7 +10,7 @@ use tracing::{debug, info, warn};
 use uuid::Uuid;
 
 use super::error::VoiceError;
-use super::metrics::{get_guild_id, store_metrics};
+use super::metrics::{finalize_session, get_guild_id, store_metrics};
 use super::sfu::SfuServer;
 use super::stats::VoiceStats;
 use crate::ws::{ClientEvent, ServerEvent, VoiceParticipant};
@@ -27,7 +27,9 @@ pub async fn handle_voice_event(
         ClientEvent::VoiceJoin { channel_id } => {
             handle_join(sfu, pool, user_id, channel_id, tx).await
         }
-        ClientEvent::VoiceLeave { channel_id } => handle_leave(sfu, user_id, channel_id).await,
+        ClientEvent::VoiceLeave { channel_id } => {
+            handle_leave(sfu, pool, user_id, channel_id).await
+        }
         ClientEvent::VoiceAnswer { channel_id, sdp } => {
             handle_answer(sfu, user_id, channel_id, &sdp).await
         }
@@ -162,6 +164,7 @@ async fn handle_join(
 /// Handle a user leaving a voice channel.
 async fn handle_leave(
     sfu: &Arc<SfuServer>,
+    pool: &PgPool,
     user_id: Uuid,
     channel_id: Uuid,
 ) -> Result<(), VoiceError> {
@@ -174,6 +177,32 @@ async fn handle_leave(
 
     // Remove peer from room
     if let Some(peer) = room.remove_peer(user_id).await {
+        // Finalize session in background
+        let guild_id = get_guild_id(pool, channel_id).await;
+        let pool_clone = pool.clone();
+        let session_id = peer.session_id;
+        let connected_at = peer.connected_at;
+
+        tokio::spawn(async move {
+            if let Err(e) = finalize_session(
+                &pool_clone,
+                user_id,
+                session_id,
+                channel_id,
+                guild_id,
+                connected_at,
+            )
+            .await
+            {
+                warn!(
+                    user_id = %user_id,
+                    session_id = %session_id,
+                    "Failed to finalize session: {}",
+                    e
+                );
+            }
+        });
+
         // Close the peer connection
         if let Err(e) = peer.close().await {
             warn!(error = %e, "Error closing peer connection");
