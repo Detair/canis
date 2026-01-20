@@ -581,7 +581,7 @@ async fn handle_client_message(
         | ClientEvent::VoiceMute { .. }
         | ClientEvent::VoiceUnmute { .. } => {
             if let Err(e) = crate::voice::ws_handler::handle_voice_event(
-                &state.sfu, &state.db, user_id, event, tx,
+                &state.sfu, &state.db, &state.redis, user_id, event, tx,
             )
             .await
             {
