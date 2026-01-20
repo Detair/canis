@@ -6,6 +6,7 @@
 
 import { createStore, produce } from "solid-js/store";
 import { createVoiceAdapter, type VoiceError } from "@/lib/webrtc";
+import type { ScreenShareInfo, ScreenShareQuality } from "@/lib/webrtc/types";
 import type { VoiceParticipant } from "@/lib/types";
 import { channelsState } from "@/stores/channels";
 
@@ -53,6 +54,11 @@ interface VoiceStoreState {
   participants: Record<string, VoiceParticipant>;
   // Error
   error: VoiceError | null;
+
+  // Screen sharing
+  screenSharing: boolean;
+  screenShareInfo: ScreenShareInfo | null;
+  screenShares: ScreenShareInfo[]; // All active screen shares in channel
 }
 
 // Create the store
@@ -64,6 +70,9 @@ const [voiceState, setVoiceState] = createStore<VoiceStoreState>({
   speaking: false,
   participants: {},
   error: null,
+  screenSharing: false,
+  screenShareInfo: null,
+  screenShares: [],
 });
 
 // Event listeners
@@ -217,6 +226,9 @@ export async function leaveVoice(): Promise<void> {
     channelId: null,
     participants: {},
     speaking: false,
+    screenSharing: false,
+    screenShareInfo: null,
+    screenShares: [],
   });
 }
 
@@ -288,6 +300,52 @@ export async function setDeafen(deafened: boolean): Promise<void> {
  */
 export function setSpeaking(speaking: boolean): void {
   setVoiceState({ speaking });
+}
+
+/**
+ * Start screen sharing.
+ */
+export async function startScreenShare(
+  quality?: ScreenShareQuality
+): Promise<{ ok: boolean; error?: string }> {
+  if (voiceState.state !== "connected" || !voiceState.channelId) {
+    return { ok: false, error: "Not connected to voice channel" };
+  }
+
+  if (voiceState.screenSharing) {
+    return { ok: false, error: "Already sharing screen" };
+  }
+
+  const adapter = await createVoiceAdapter();
+
+  const result = await adapter.startScreenShare({ quality });
+
+  if (!result.ok) {
+    console.error("Failed to start screen share:", result.error);
+    return { ok: false, error: getErrorMessage(result.error) };
+  }
+
+  setVoiceState({ screenSharing: true });
+  return { ok: true };
+}
+
+/**
+ * Stop screen sharing.
+ */
+export async function stopScreenShare(): Promise<void> {
+  if (!voiceState.screenSharing) return;
+
+  const adapter = await createVoiceAdapter();
+  const result = await adapter.stopScreenShare();
+
+  if (!result.ok) {
+    console.error("Failed to stop screen share:", result.error);
+  }
+
+  setVoiceState({
+    screenSharing: false,
+    screenShareInfo: null,
+  });
 }
 
 // Participant management
