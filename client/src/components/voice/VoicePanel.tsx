@@ -1,5 +1,5 @@
 import { Component, Show, For } from "solid-js";
-import { PhoneOff, Signal } from "lucide-solid";
+import { PhoneOff, Signal, MonitorUp } from "lucide-solid";
 import { voiceState, leaveVoice, getParticipants } from "@/stores/voice";
 import { getChannel } from "@/stores/channels";
 import VoiceControls from "./VoiceControls";
@@ -57,6 +57,9 @@ const VoicePanel: Component = () => {
                   >
                     <div class="w-4 h-4 rounded-full bg-primary/50" />
                     <span class="truncate max-w-20">{participant.user_id.slice(0, 8)}</span>
+                    {participant.screen_sharing && (
+                      <MonitorUp class="w-3 h-3 text-success" />
+                    )}
                   </div>
                 )}
               </For>
