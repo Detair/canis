@@ -6,6 +6,7 @@ mod audio;
 mod commands;
 mod crypto;
 mod network;
+mod presence;
 mod webrtc;
 
 use audio::AudioHandle;
