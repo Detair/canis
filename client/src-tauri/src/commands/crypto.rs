@@ -41,6 +41,17 @@ struct UploadBackupRequest {
     version: i32,
 }
 
+/// Response from server when downloading backup.
+#[derive(Debug, Deserialize)]
+struct BackupResponse {
+    salt: String,
+    nonce: String,
+    ciphertext: String,
+    version: i32,
+    #[allow(dead_code)]
+    created_at: String,
+}
+
 /// Get server settings.
 #[command]
 pub async fn get_server_settings(state: State<'_, AppState>) -> Result<ServerSettings, String> {
@@ -168,4 +179,76 @@ pub async fn create_backup(
 
     info!("Backup uploaded successfully");
     Ok(())
+}
+
+/// Download and decrypt a backup using the recovery key.
+///
+/// Returns the decrypted backup data as a JSON string.
+#[command]
+pub async fn restore_backup(
+    state: State<'_, AppState>,
+    recovery_key: String,
+) -> Result<String, String> {
+    info!("Restoring backup from server");
+
+    // Parse recovery key (handles both formatted and raw Base58)
+    let key = RecoveryKey::from_formatted_string(&recovery_key)
+        .map_err(|e| format!("Invalid recovery key: {e}"))?;
+
+    // Download from server
+    let auth = state.auth.read().await;
+    let server_url = auth.server_url.as_ref().ok_or("Not connected")?;
+    let token = auth.access_token.as_ref().ok_or("Not authenticated")?;
+
+    let response = state
+        .http
+        .get(format!("{server_url}/api/keys/backup"))
+        .bearer_auth(token)
+        .send()
+        .await
+        .map_err(|e| format!("Download failed: {e}"))?;
+
+    if response.status().as_u16() == 404 {
+        return Err("No backup found".to_string());
+    }
+
+    if !response.status().is_success() {
+        return Err(format!("Server error: {}", response.status()));
+    }
+
+    let backup_resp: BackupResponse = response
+        .json()
+        .await
+        .map_err(|e| format!("Parse error: {e}"))?;
+
+    // Decode base64
+    let salt = STANDARD
+        .decode(&backup_resp.salt)
+        .map_err(|_| "Invalid salt encoding")?;
+    let nonce = STANDARD
+        .decode(&backup_resp.nonce)
+        .map_err(|_| "Invalid nonce encoding")?;
+    let ciphertext = STANDARD
+        .decode(&backup_resp.ciphertext)
+        .map_err(|_| "Invalid ciphertext encoding")?;
+
+    // Reconstruct encrypted backup
+    let encrypted = EncryptedBackup {
+        salt: salt.try_into().map_err(|_| "Invalid salt length")?,
+        nonce: nonce.try_into().map_err(|_| "Invalid nonce length")?,
+        ciphertext,
+        #[allow(clippy::cast_sign_loss)]
+        version: backup_resp.version as u32,
+    };
+
+    // Decrypt
+    let decrypted = encrypted
+        .decrypt(&key)
+        .map_err(|e| format!("Decryption failed: {e}"))?;
+
+    let data =
+        String::from_utf8(decrypted).map_err(|_| "Backup data is not valid UTF-8")?;
+
+    info!("Backup restored successfully");
+    Ok(data)
 }
