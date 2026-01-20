@@ -49,16 +49,14 @@ export async function initPresence(): Promise<void> {
     );
 
     // Listen for local activity changes from presence service
-    activityUnlistener = await listen<Activity | null>("presence:activity_changed", async (_event) => {
-      // Get WebSocket to send activity to server
+    activityUnlistener = await listen<Activity | null>("presence:activity_changed", async (event) => {
+      // Send activity to server via WebSocket command
       try {
-        const wsModule = await import("./websocket");
-        if (wsModule.isConnected()) {
-          // The websocket will handle sending SetActivity to server
-          // For now just emit to local - server sync handled in websocket.ts
-        }
+        const { invoke } = await import("@tauri-apps/api/core");
+        await invoke("ws_send_activity", { activity: event.payload });
+        console.log("Activity sent to server:", event.payload);
       } catch (e) {
-        console.error("Failed to get WebSocket module:", e);
+        console.error("Failed to send activity to server:", e);
       }
     });
   }

@@ -211,6 +211,7 @@ export type ServerEvent =
   | { type: "typing_start"; channel_id: string; user_id: string }
   | { type: "typing_stop"; channel_id: string; user_id: string }
   | { type: "presence_update"; user_id: string; status: UserStatus }
+  | { type: "rich_presence_update"; user_id: string; activity: Activity | null }
   | { type: "voice_offer"; channel_id: string; sdp: string }
   | { type: "voice_ice_candidate"; channel_id: string; candidate: string }
   | { type: "voice_user_joined"; channel_id: string; user_id: string; username: string; display_name: string }

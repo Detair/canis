@@ -79,6 +79,7 @@ pub fn run() {
             commands::websocket::ws_typing,
             commands::websocket::ws_stop_typing,
             commands::websocket::ws_ping,
+            commands::websocket::ws_send_activity,
             // Pages commands
             commands::pages::list_platform_pages,
             commands::pages::get_platform_page,
