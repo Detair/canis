@@ -15,6 +15,7 @@ pub mod call_service;
 pub mod error;
 mod handlers;
 mod peer;
+mod quality;
 mod rate_limit;
 pub mod sfu;
 mod signaling;
@@ -28,6 +29,7 @@ use crate::api::AppState;
 
 // Re-exports
 pub use error::VoiceError;
+pub use quality::Quality;
 pub use sfu::{ParticipantInfo, Room, SfuServer};
 pub use track_types::{TrackInfo, TrackKind, TrackSource};
 

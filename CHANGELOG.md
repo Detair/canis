@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - User feature flags system for premium feature control (PREMIUM_VIDEO)
+- Quality enum for screen share quality tiers (Low/Medium/High/Premium)
 - Information Pages system for platform-wide and guild-specific content (ToS, Privacy Policy, FAQ, rules, guides)
 - Markdown editor with live preview, toolbar, and cheat sheet
 - Mermaid diagram support in markdown preview
