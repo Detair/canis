@@ -10,7 +10,9 @@ use tracing::{debug, info, warn};
 use uuid::Uuid;
 
 use super::error::VoiceError;
+use super::metrics::{get_guild_id, store_metrics};
 use super::sfu::SfuServer;
+use super::stats::VoiceStats;
 use crate::ws::{ClientEvent, ServerEvent, VoiceParticipant};
 
 /// Handle a voice-related client event.
@@ -36,6 +38,25 @@ pub async fn handle_voice_event(
         ClientEvent::VoiceMute { channel_id } => handle_mute(sfu, user_id, channel_id, true).await,
         ClientEvent::VoiceUnmute { channel_id } => {
             handle_mute(sfu, user_id, channel_id, false).await
+        }
+        ClientEvent::VoiceStats {
+            channel_id,
+            session_id,
+            latency,
+            packet_loss,
+            jitter,
+            quality,
+            timestamp,
+        } => {
+            let stats = VoiceStats {
+                session_id,
+                latency,
+                packet_loss,
+                jitter,
+                quality,
+                timestamp,
+            };
+            handle_voice_stats(sfu, pool, user_id, channel_id, stats).await
         }
         _ => Ok(()), // Non-voice events handled elsewhere
     }
@@ -275,6 +296,47 @@ async fn handle_mute(
     };
 
     room.broadcast_except(user_id, event).await;
+
+    Ok(())
+}
+
+/// Handle voice quality statistics from a client.
+///
+/// This broadcasts the stats to other participants in the room
+/// and stores them in the database for historical analysis.
+async fn handle_voice_stats(
+    sfu: &Arc<SfuServer>,
+    pool: &PgPool,
+    user_id: Uuid,
+    channel_id: Uuid,
+    stats: VoiceStats,
+) -> Result<(), VoiceError> {
+    // Validate stats
+    if let Err(reason) = stats.validate() {
+        warn!(user_id = %user_id, "Invalid voice stats: {}", reason);
+        return Ok(());
+    }
+
+    // Broadcast to room participants
+    let broadcast = ServerEvent::VoiceUserStats {
+        channel_id,
+        user_id,
+        latency: stats.latency,
+        packet_loss: stats.packet_loss,
+        jitter: stats.jitter,
+        quality: stats.quality,
+    };
+
+    if let Some(room) = sfu.get_room(channel_id).await {
+        room.broadcast_except(user_id, broadcast).await;
+    }
+
+    // Store in database (fire-and-forget)
+    let guild_id = get_guild_id(pool, channel_id).await;
+    let pool_clone = pool.clone();
+    tokio::spawn(async move {
+        store_metrics(pool_clone, stats, user_id, channel_id, guild_id).await;
+    });
 
     Ok(())
 }

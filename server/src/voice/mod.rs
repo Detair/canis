@@ -17,6 +17,7 @@ mod handlers;
 mod peer;
 mod rate_limit;
 pub mod sfu;
+mod metrics;
 mod signaling;
 mod stats;
 mod track;
