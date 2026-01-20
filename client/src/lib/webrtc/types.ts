@@ -27,6 +27,10 @@ export type VoiceError =
   | { type: "timeout"; operation: string }
   | { type: "already_connected"; channelId: string }
   | { type: "not_connected" }
+  | { type: "cancelled"; message: string }
+  | { type: "not_found"; message: string }
+  | { type: "hardware_error"; message: string }
+  | { type: "constraint_error"; message: string }
   | { type: "unknown"; message: string };
 
 /**

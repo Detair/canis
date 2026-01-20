@@ -600,18 +600,77 @@ export class BrowserVoiceAdapter implements VoiceAdapter {
     } catch (err) {
       console.error("[BrowserVoiceAdapter] Failed to start screen share:", err);
 
-      // Handle specific errors
+      // Handle specific errors with actionable messages
       if (err instanceof DOMException) {
-        if (err.name === "NotAllowedError") {
-          return { ok: false, error: { type: "permission_denied", message: "Screen share permission denied" } };
-        }
-        if (err.name === "AbortError") {
-          // User cancelled the picker
-          return { ok: false, error: { type: "unknown", message: "Screen share cancelled by user" } };
+        switch (err.name) {
+          case "NotAllowedError":
+            return {
+              ok: false,
+              error: {
+                type: "permission_denied",
+                message: "Screen share permission denied. Please allow screen sharing in your browser.",
+              },
+            };
+          case "AbortError":
+            return {
+              ok: false,
+              error: {
+                type: "cancelled",
+                message: "Screen share cancelled",
+              },
+            };
+          case "NotFoundError":
+            return {
+              ok: false,
+              error: {
+                type: "not_found",
+                message: "No screen or window found to share",
+              },
+            };
+          case "NotReadableError":
+            return {
+              ok: false,
+              error: {
+                type: "hardware_error",
+                message: "Could not access screen. Another app may be blocking screen capture.",
+              },
+            };
+          case "OverconstrainedError":
+            return {
+              ok: false,
+              error: {
+                type: "constraint_error",
+                message: "Screen share quality settings not supported by your system",
+              },
+            };
+          default:
+            return {
+              ok: false,
+              error: {
+                type: "unknown",
+                message: `Screen share failed: ${err.message}`,
+              },
+            };
         }
       }
 
-      return { ok: false, error: { type: "unknown", message: String(err) } };
+      // Handle other error types
+      if (err instanceof Error) {
+        console.error("[BrowserVoiceAdapter] Screen share error details:", {
+          name: err.name,
+          message: err.message,
+          stack: err.stack,
+        });
+        return {
+          ok: false,
+          error: {
+            type: "unknown",
+            message: `Screen share failed: ${err.message}. Try closing other video applications.`,
+          },
+        };
+      }
+
+      return { ok: false, error: { type: "unknown", message: "Screen share failed unexpectedly" } };
     }
   }
 

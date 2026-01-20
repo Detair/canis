@@ -23,6 +23,10 @@ function getErrorMessage(error: VoiceError): string {
     case "device_not_found":
     case "device_in_use":
     case "ice_failed":
+    case "cancelled":
+    case "not_found":
+    case "hardware_error":
+    case "constraint_error":
     case "unknown":
       return error.message;
     case "server_rejected":

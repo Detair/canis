@@ -1,6 +1,6 @@
-import { Component, Show, createEffect, onCleanup } from "solid-js";
+import { Component, Show, createEffect, createSignal, onCleanup } from "solid-js";
 import { Portal } from "solid-js/web";
-import { X, Minimize2, Maximize2, Volume2, VolumeX } from "lucide-solid";
+import { X, Minimize2, Maximize2, Volume2, VolumeX, Play } from "lucide-solid";
 import {
   viewerState,
   stopViewing,
@@ -16,6 +16,7 @@ import { voiceState } from "@/stores/voice";
  */
 const ScreenShareViewer: Component = () => {
   let videoRef: HTMLVideoElement | undefined;
+  const [autoplayBlocked, setAutoplayBlocked] = createSignal(false);
 
   // Attach video track to video element when it changes
   createEffect(() => {
@@ -23,9 +24,22 @@ const ScreenShareViewer: Component = () => {
     if (track && videoRef) {
       const stream = new MediaStream([track]);
       videoRef.srcObject = stream;
-      videoRef.play().catch(console.error);
+      setAutoplayBlocked(false);
+      videoRef.play().catch((err) => {
+        console.warn("[ScreenShareViewer] Autoplay blocked:", err);
+        setAutoplayBlocked(true);
+      });
     }
   });
+
+  // Handle manual play when autoplay is blocked
+  const handleClickToPlay = () => {
+    if (videoRef) {
+      videoRef.play().then(() => {
+        setAutoplayBlocked(false);
+      }).catch(console.error);
+    }
+  };
 
   // Apply volume to video element when it changes
   createEffect(() => {
@@ -68,6 +82,8 @@ const ScreenShareViewer: Component = () => {
             sharerName={sharerName()}
             onClose={handleClose}
             onCycleMode={cycleViewMode}
+            autoplayBlocked={autoplayBlocked()}
+            onClickToPlay={handleClickToPlay}
           />
         </Show>
         <Show when={viewerState.viewMode === "pip"}>
@@ -76,6 +92,8 @@ const ScreenShareViewer: Component = () => {
             sharerName={sharerName()}
             onClose={handleClose}
             onCycleMode={cycleViewMode}
+            autoplayBlocked={autoplayBlocked()}
+            onClickToPlay={handleClickToPlay}
           />
         </Show>
         <Show when={viewerState.viewMode === "theater"}>
@@ -84,6 +102,8 @@ const ScreenShareViewer: Component = () => {
             sharerName={sharerName()}
             onClose={handleClose}
             onCycleMode={cycleViewMode}
+            autoplayBlocked={autoplayBlocked()}
+            onClickToPlay={handleClickToPlay}
           />
         </Show>
       </Portal>
@@ -91,12 +111,31 @@ const ScreenShareViewer: Component = () => {
   );
 };
 
+/** Click-to-play overlay for autoplay blocked videos */
+const ClickToPlayOverlay: Component<{
+  onClickToPlay: () => void;
+}> = (props) => (
+  <div
+    class="absolute inset-0 flex items-center justify-center bg-black/60 cursor-pointer z-10"
+    onClick={props.onClickToPlay}
+  >
+    <div class="flex flex-col items-center gap-2 text-white">
+      <div class="p-4 rounded-full bg-white/20 hover:bg-white/30 transition-colors">
+        <Play class="w-12 h-12" />
+      </div>
+      <span class="text-sm">Click to play</span>
+    </div>
+  </div>
+);
+
 /** Spotlight mode - full screen overlay */
 const SpotlightView: Component<{
   videoRef: (el: HTMLVideoElement) => void;
   sharerName: string;
   onClose: () => void;
   onCycleMode: () => void;
+  autoplayBlocked: boolean;
+  onClickToPlay: () => void;
 }> = (props) => {
   return (
     <div class="fixed inset-0 z-50 bg-black flex flex-col">
@@ -125,13 +164,16 @@ const SpotlightView: Component<{
       </div>
 
       {/* Video container */}
-      <div class="flex-1 flex items-center justify-center p-4">
+      <div class="flex-1 flex items-center justify-center p-4 relative">
         <video
           ref={props.videoRef}
           autoplay
           playsinline
           class="max-w-full max-h-full object-contain"
         />
+        <Show when={props.autoplayBlocked}>
+          <ClickToPlayOverlay onClickToPlay={props.onClickToPlay} />
+        </Show>
       </div>
     </div>
   );
@@ -143,6 +185,8 @@ const PipView: Component<{
   sharerName: string;
   onClose: () => void;
   onCycleMode: () => void;
+  autoplayBlocked: boolean;
+  onClickToPlay: () => void;
 }> = (props) => {
   return (
     <div
@@ -155,7 +199,7 @@ const PipView: Component<{
       }}
     >
       {/* Header */}
-      <div class="absolute top-0 left-0 right-0 flex items-center justify-between p-2 bg-gradient-to-b from-black/80 to-transparent z-10">
+      <div class="absolute top-0 left-0 right-0 flex items-center justify-between p-2 bg-gradient-to-b from-black/80 to-transparent z-20">
         <span class="text-white text-xs truncate">{props.sharerName}</span>
         <div class="flex items-center gap-1">
           <button
@@ -182,6 +226,9 @@ const PipView: Component<{
         playsinline
         class="w-full h-full object-contain"
       />
+      <Show when={props.autoplayBlocked}>
+        <ClickToPlayOverlay onClickToPlay={props.onClickToPlay} />
+      </Show>
     </div>
   );
 };
@@ -192,6 +239,8 @@ const TheaterView: Component<{
   sharerName: string;
   onClose: () => void;
   onCycleMode: () => void;
+  autoplayBlocked: boolean;
+  onClickToPlay: () => void;
 }> = (props) => {
   return (
     <div class="fixed top-0 left-[312px] right-0 bottom-0 z-40 bg-black/95 flex flex-col">
@@ -218,13 +267,16 @@ const TheaterView: Component<{
       </div>
 
       {/* Video container */}
-      <div class="flex-1 flex items-center justify-center p-2">
+      <div class="flex-1 flex items-center justify-center p-2 relative">
         <video
           ref={props.videoRef}
           autoplay
           playsinline
           class="max-w-full max-h-full object-contain"
         />
+        <Show when={props.autoplayBlocked}>
+          <ClickToPlayOverlay onClickToPlay={props.onClickToPlay} />
+        </Show>
       </div>
     </div>
   );
