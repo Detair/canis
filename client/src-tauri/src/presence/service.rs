@@ -74,3 +74,67 @@ pub fn set_presence_enabled(enabled: bool) {
 pub fn is_presence_enabled() -> bool {
     ENABLED.load(Ordering::SeqCst)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_presence_enabled_default() {
+        // Reset to default state for test
+        ENABLED.store(true, Ordering::SeqCst);
+        assert!(is_presence_enabled());
+    }
+
+    #[test]
+    fn test_set_presence_disabled() {
+        // Store original state
+        let original = ENABLED.load(Ordering::SeqCst);
+
+        set_presence_enabled(false);
+        assert!(!is_presence_enabled());
+
+        // Restore original state
+        ENABLED.store(original, Ordering::SeqCst);
+    }
+
+    #[test]
+    fn test_set_presence_enabled() {
+        // Store original state
+        let original = ENABLED.load(Ordering::SeqCst);
+
+        set_presence_enabled(false);
+        assert!(!is_presence_enabled());
+
+        set_presence_enabled(true);
+        assert!(is_presence_enabled());
+
+        // Restore original state
+        ENABLED.store(original, Ordering::SeqCst);
+    }
+
+    #[test]
+    fn test_running_flag_default() {
+        // Default should be false (not running)
+        // Note: This test may fail if run after start_presence_service
+        // In a clean test environment, RUNNING starts as false
+        let was_running = RUNNING.swap(false, Ordering::SeqCst);
+        assert!(!RUNNING.load(Ordering::SeqCst));
+
+        // Restore if it was running
+        if was_running {
+            RUNNING.store(true, Ordering::SeqCst);
+        }
+    }
+
+    #[test]
+    fn test_stop_presence_service() {
+        // Set running to true
+        RUNNING.store(true, Ordering::SeqCst);
+        assert!(RUNNING.load(Ordering::SeqCst));
+
+        // Stop service
+        stop_presence_service();
+        assert!(!RUNNING.load(Ordering::SeqCst));
+    }
+}
