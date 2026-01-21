@@ -1,6 +1,6 @@
 # VoiceChat Platform - Lizenz-Compliance
 
-Dieses Dokument dokumentiert die LizenzprÃ¼fung aller verwendeten Dependencies, um sicherzustellen, dass das Projekt als Open Source (MIT OR Apache-2.0) verÃ¶ffentlicht werden kann.
+Dieses Dokument dokumentiert die Lizenzprüfung aller verwendeten Dependencies, um sicherzustellen, dass das Projekt als Open Source (MIT OR Apache-2.0) veröffentlicht werden kann.
 
 ---
 
@@ -10,213 +10,213 @@ Dieses Dokument dokumentiert die LizenzprÃ¼fung aller verwendeten Dependencies
 SPDX-License-Identifier: MIT OR Apache-2.0
 ```
 
-**Dual-Lizenzierung:** Nutzer kÃ¶nnen zwischen MIT und Apache 2.0 wÃ¤hlen.
+**Dual-Lizenzierung:** Nutzer können zwischen MIT und Apache 2.0 wählen.
 
-### BegrÃ¼ndung fÃ¼r Dual-Lizenz
+### Begründung für Dual-Lizenz
 
 | Aspekt | MIT | Apache 2.0 |
 |--------|-----|------------|
-| Einfachheit | âœ… Sehr kurz und einfach | âš ï¸ LÃ¤nger, komplexer |
-| Patent-Schutz | âŒ Keiner | âœ… Expliziter Patent-Grant |
-| Attribution | âœ… Nur Copyright Notice | âœ… Copyright + NOTICE File |
-| KompatibilitÃ¤t | âœ… Fast alles | âœ… Fast alles |
-| Unternehmensfreundlich | âœ… Ja | âœ… Ja (bevorzugt) |
+| Einfachheit | ✅ Sehr kurz und einfach | ⚠️ Länger, komplexer |
+| Patent-Schutz | ❌ Keiner | ✅ Expliziter Patent-Grant |
+| Attribution | ✅ Nur Copyright Notice | ✅ Copyright + NOTICE File |
+| Kompatibilität | ✅ Fast alles | ✅ Fast alles |
+| Unternehmensfreundlich | ✅ Ja | ✅ Ja (bevorzugt) |
 
-Die Dual-Lizenzierung ist Standard im Rust-Ã–kosystem und bietet maximale FlexibilitÃ¤t.
-
----
-
-## Lizenz-KompatibilitÃ¤t
-
-### KompatibilitÃ¤tsmatrix
-
-```
-â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
-â”‚              LIZENZ-KOMPATIBILITÃ„T MIT MIT/Apache 2.0           â”‚
-â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
-â”‚                                                                  â”‚
-â”‚  âœ… KOMPATIBEL (kÃ¶nnen verwendet werden)                        â”‚
-â”‚  â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€                          â”‚
-â”‚  â€¢ MIT                    - Permissive                          â”‚
-â”‚  â€¢ Apache 2.0             - Permissive + Patent                 â”‚
-â”‚  â€¢ BSD-2-Clause           - Permissive                          â”‚
-â”‚  â€¢ BSD-3-Clause           - Permissive                          â”‚
-â”‚  â€¢ ISC                    - Permissive (wie MIT)                â”‚
-â”‚  â€¢ Zlib                   - Permissive                          â”‚
-â”‚  â€¢ CC0-1.0                - Public Domain                       â”‚
-â”‚  â€¢ Unlicense              - Public Domain                       â”‚
-â”‚  â€¢ Unicode-DFS-2016       - Permissive (Unicode Data)           â”‚
-â”‚                                                                  â”‚
-â”‚  âš ï¸ EINGESCHRÃ„NKT KOMPATIBEL                                    â”‚
-â”‚  â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€                                    â”‚
-â”‚  â€¢ MPL 2.0                - File-Level Copyleft                 â”‚
-â”‚                             (Ã„nderungen an MPL-Dateien mÃ¼ssen   â”‚
-â”‚                              unter MPL bleiben, Rest ist frei)  â”‚
-â”‚                                                                  â”‚
-â”‚  âŒ NICHT KOMPATIBEL (dÃ¼rfen NICHT verwendet werden)            â”‚
-â”‚  â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€             â”‚
-â”‚  â€¢ GPL 2.0/3.0            - Starkes Copyleft                    â”‚
-â”‚  â€¢ LGPL 2.1/3.0           - Library Copyleft (bei static link) â”‚
-â”‚  â€¢ AGPL 3.0               - Network Copyleft                    â”‚
-â”‚  â€¢ Proprietary            - Closed Source                       â”‚
-â”‚  â€¢ SSPL                   - Server-Side Public License          â”‚
-â”‚                                                                  â”‚
-â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
-```
+Die Dual-Lizenzierung ist Standard im Rust-Ökosystem und bietet maximale Flexibilität.
 
 ---
 
-## Server Dependencies PrÃ¼fung
+## Lizenz-Kompatibilität
+
+### Kompatibilitätsmatrix
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│              LIZENZ-KOMPATIBILITÄT MIT MIT/Apache 2.0           │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ✅ KOMPATIBEL (können verwendet werden)                        │
+│  ─────────────────────────────────────                          │
+│  • MIT                    - Permissive                          │
+│  • Apache 2.0             - Permissive + Patent                 │
+│  • BSD-2-Clause           - Permissive                          │
+│  • BSD-3-Clause           - Permissive                          │
+│  • ISC                    - Permissive (wie MIT)                │
+│  • Zlib                   - Permissive                          │
+│  • CC0-1.0                - Public Domain                       │
+│  • Unlicense              - Public Domain                       │
+│  • Unicode-DFS-2016       - Permissive (Unicode Data)           │
+│                                                                  │
+│  ⚠️ EINGESCHRÄNKT KOMPATIBEL                                    │
+│  ───────────────────────────                                    │
+│  • MPL 2.0                - File-Level Copyleft                 │
+│                             (Änderungen an MPL-Dateien müssen   │
+│                              unter MPL bleiben, Rest ist frei)  │
+│                                                                  │
+│  ❌ NICHT KOMPATIBEL (dürfen NICHT verwendet werden)            │
+│  ──────────────────────────────────────────────────             │
+│  • GPL 2.0/3.0            - Starkes Copyleft                    │
+│  • LGPL 2.1/3.0           - Library Copyleft (bei static link) │
+│  • AGPL 3.0               - Network Copyleft                    │
+│  • Proprietary            - Closed Source                       │
+│  • SSPL                   - Server-Side Public License          │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Server Dependencies Prüfung
 
 ### Web Framework & Runtime
 
 | Crate | Version | Lizenz | Status | SPDX |
 |-------|---------|--------|--------|------|
-| axum | 0.7 | MIT | âœ… | MIT |
-| tokio | 1.x | MIT | âœ… | MIT |
-| tower | 0.4 | MIT | âœ… | MIT |
-| tower-http | 0.5 | MIT | âœ… | MIT |
-| hyper | 1.x | MIT | âœ… | MIT |
+| axum | 0.7 | MIT | ✅ | MIT |
+| tokio | 1.x | MIT | ✅ | MIT |
+| tower | 0.4 | MIT | ✅ | MIT |
+| tower-http | 0.5 | MIT | ✅ | MIT |
+| hyper | 1.x | MIT | ✅ | MIT |
 
 ### WebSocket & Real-Time
 
 | Crate | Version | Lizenz | Status | SPDX |
 |-------|---------|--------|--------|------|
-| tokio-tungstenite | 0.21 | MIT | âœ… | MIT |
-| tungstenite | 0.21 | MIT/Apache 2.0 | âœ… | MIT OR Apache-2.0 |
+| tokio-tungstenite | 0.21 | MIT | ✅ | MIT |
+| tungstenite | 0.21 | MIT/Apache 2.0 | ✅ | MIT OR Apache-2.0 |
 
 ### WebRTC
 
 | Crate | Version | Lizenz | Status | SPDX |
 |-------|---------|--------|--------|------|
-| webrtc | 0.11 | MIT/Apache 2.0 | âœ… | MIT OR Apache-2.0 |
-| webrtc-data | 0.9 | MIT/Apache 2.0 | âœ… | MIT OR Apache-2.0 |
-| webrtc-dtls | 0.9 | MIT/Apache 2.0 | âœ… | MIT OR Apache-2.0 |
-| webrtc-ice | 0.11 | MIT/Apache 2.0 | âœ… | MIT OR Apache-2.0 |
-| webrtc-media | 0.8 | MIT/Apache 2.0 | âœ… | MIT OR Apache-2.0 |
-| webrtc-sctp | 0.10 | MIT/Apache 2.0 | âœ… | MIT OR Apache-2.0 |
-| webrtc-srtp | 0.13 | MIT/Apache 2.0 | âœ… | MIT OR Apache-2.0 |
-| webrtc-util | 0.9 | MIT/Apache 2.0 | âœ… | MIT OR Apache-2.0 |
+| webrtc | 0.11 | MIT/Apache 2.0 | ✅ | MIT OR Apache-2.0 |
+| webrtc-data | 0.9 | MIT/Apache 2.0 | ✅ | MIT OR Apache-2.0 |
+| webrtc-dtls | 0.9 | MIT/Apache 2.0 | ✅ | MIT OR Apache-2.0 |
+| webrtc-ice | 0.11 | MIT/Apache 2.0 | ✅ | MIT OR Apache-2.0 |
+| webrtc-media | 0.8 | MIT/Apache 2.0 | ✅ | MIT OR Apache-2.0 |
+| webrtc-sctp | 0.10 | MIT/Apache 2.0 | ✅ | MIT OR Apache-2.0 |
+| webrtc-srtp | 0.13 | MIT/Apache 2.0 | ✅ | MIT OR Apache-2.0 |
+| webrtc-util | 0.9 | MIT/Apache 2.0 | ✅ | MIT OR Apache-2.0 |
 
 ### Datenbank
 
 | Crate | Version | Lizenz | Status | SPDX |
 |-------|---------|--------|--------|------|
-| sqlx | 0.7 | MIT/Apache 2.0 | âœ… | MIT OR Apache-2.0 |
-| sqlx-core | 0.7 | MIT/Apache 2.0 | âœ… | MIT OR Apache-2.0 |
-| sqlx-postgres | 0.7 | MIT/Apache 2.0 | âœ… | MIT OR Apache-2.0 |
+| sqlx | 0.7 | MIT/Apache 2.0 | ✅ | MIT OR Apache-2.0 |
+| sqlx-core | 0.7 | MIT/Apache 2.0 | ✅ | MIT OR Apache-2.0 |
+| sqlx-postgres | 0.7 | MIT/Apache 2.0 | ✅ | MIT OR Apache-2.0 |
 
 ### Redis
 
 | Crate | Version | Lizenz | Status | SPDX |
 |-------|---------|--------|--------|------|
-| fred | 8.x | MIT | âœ… | MIT |
+| fred | 8.x | MIT | ✅ | MIT |
 
 ### Authentifizierung
 
 | Crate | Version | Lizenz | Status | SPDX |
 |-------|---------|--------|--------|------|
-| jsonwebtoken | 9.x | MIT | âœ… | MIT |
-| argon2 | 0.5 | MIT/Apache 2.0 | âœ… | MIT OR Apache-2.0 |
-| totp-rs | 5.x | MIT | âœ… | MIT |
-| openidconnect | 3.x | MIT/Apache 2.0 | âœ… | MIT OR Apache-2.0 |
-| oauth2 | 4.x | MIT/Apache 2.0 | âœ… | MIT OR Apache-2.0 |
+| jsonwebtoken | 9.x | MIT | ✅ | MIT |
+| argon2 | 0.5 | MIT/Apache 2.0 | ✅ | MIT OR Apache-2.0 |
+| totp-rs | 5.x | MIT | ✅ | MIT |
+| openidconnect | 3.x | MIT/Apache 2.0 | ✅ | MIT OR Apache-2.0 |
+| oauth2 | 4.x | MIT/Apache 2.0 | ✅ | MIT OR Apache-2.0 |
 
 ### Kryptografie
 
 | Crate | Version | Lizenz | Status | SPDX |
 |-------|---------|--------|--------|------|
-| rustls | 0.22 | MIT/Apache 2.0/ISC | âœ… | MIT OR Apache-2.0 OR ISC |
-| ring | 0.17 | MIT + ISC + OpenSSL | âœ… | Siehe NotizÂ¹ |
-| x25519-dalek | 2.x | BSD-3-Clause | âœ… | BSD-3-Clause |
-| ed25519-dalek | 2.x | BSD-3-Clause | âœ… | BSD-3-Clause |
-| curve25519-dalek | 4.x | BSD-3-Clause | âœ… | BSD-3-Clause |
-| aes-gcm | 0.10 | MIT/Apache 2.0 | âœ… | MIT OR Apache-2.0 |
-| aes | 0.8 | MIT/Apache 2.0 | âœ… | MIT OR Apache-2.0 |
-| hkdf | 0.12 | MIT/Apache 2.0 | âœ… | MIT OR Apache-2.0 |
-| sha2 | 0.10 | MIT/Apache 2.0 | âœ… | MIT OR Apache-2.0 |
-| hmac | 0.12 | MIT/Apache 2.0 | âœ… | MIT OR Apache-2.0 |
-| rand | 0.8 | MIT/Apache 2.0 | âœ… | MIT OR Apache-2.0 |
+| rustls | 0.22 | MIT/Apache 2.0/ISC | ✅ | MIT OR Apache-2.0 OR ISC |
+| ring | 0.17 | MIT + ISC + OpenSSL | ✅ | Siehe Notiz¹ |
+| x25519-dalek | 2.x | BSD-3-Clause | ✅ | BSD-3-Clause |
+| ed25519-dalek | 2.x | BSD-3-Clause | ✅ | BSD-3-Clause |
+| curve25519-dalek | 4.x | BSD-3-Clause | ✅ | BSD-3-Clause |
+| aes-gcm | 0.10 | MIT/Apache 2.0 | ✅ | MIT OR Apache-2.0 |
+| aes | 0.8 | MIT/Apache 2.0 | ✅ | MIT OR Apache-2.0 |
+| hkdf | 0.12 | MIT/Apache 2.0 | ✅ | MIT OR Apache-2.0 |
+| sha2 | 0.10 | MIT/Apache 2.0 | ✅ | MIT OR Apache-2.0 |
+| hmac | 0.12 | MIT/Apache 2.0 | ✅ | MIT OR Apache-2.0 |
+| rand | 0.8 | MIT/Apache 2.0 | ✅ | MIT OR Apache-2.0 |
 
-Â¹ **ring Lizenz-Notiz:** ring verwendet Code unter MIT, ISC und OpenSSL-Lizenzen. Alle sind permissive und kompatibel.
+¹ **ring Lizenz-Notiz:** ring verwendet Code unter MIT, ISC und OpenSSL-Lizenzen. Alle sind permissive und kompatibel.
 
 ### E2EE (Text)
 
 | Crate | Version | Lizenz | Status | SPDX |
 |-------|---------|--------|--------|------|
-| vodozemac | 0.5 | Apache 2.0 | âœ… | Apache-2.0 |
+| vodozemac | 0.5 | Apache 2.0 | ✅ | Apache-2.0 |
 
 **Wichtig:** Wir verwenden bewusst `vodozemac` statt `libsignal`:
 
 | Library | Lizenz | Kompatibel? |
 |---------|--------|-------------|
-| vodozemac | Apache 2.0 | âœ… Ja |
-| libsignal-protocol | AGPL 3.0 | âŒ Nein |
+| vodozemac | Apache 2.0 | ✅ Ja |
+| libsignal-protocol | AGPL 3.0 | ❌ Nein |
 
 ### Serialisierung
 
 | Crate | Version | Lizenz | Status | SPDX |
 |-------|---------|--------|--------|------|
-| serde | 1.x | MIT/Apache 2.0 | âœ… | MIT OR Apache-2.0 |
-| serde_json | 1.x | MIT/Apache 2.0 | âœ… | MIT OR Apache-2.0 |
-| serde_derive | 1.x | MIT/Apache 2.0 | âœ… | MIT OR Apache-2.0 |
+| serde | 1.x | MIT/Apache 2.0 | ✅ | MIT OR Apache-2.0 |
+| serde_json | 1.x | MIT/Apache 2.0 | ✅ | MIT OR Apache-2.0 |
+| serde_derive | 1.x | MIT/Apache 2.0 | ✅ | MIT OR Apache-2.0 |
 
 ### Utilities
 
 | Crate | Version | Lizenz | Status | SPDX |
 |-------|---------|--------|--------|------|
-| uuid | 1.x | MIT/Apache 2.0 | âœ… | MIT OR Apache-2.0 |
-| chrono | 0.4 | MIT/Apache 2.0 | âœ… | MIT OR Apache-2.0 |
-| tracing | 0.1 | MIT | âœ… | MIT |
-| tracing-subscriber | 0.3 | MIT | âœ… | MIT |
-| thiserror | 1.x | MIT/Apache 2.0 | âœ… | MIT OR Apache-2.0 |
-| anyhow | 1.x | MIT/Apache 2.0 | âœ… | MIT OR Apache-2.0 |
-| bytes | 1.x | MIT | âœ… | MIT |
-| futures | 0.3 | MIT/Apache 2.0 | âœ… | MIT OR Apache-2.0 |
+| uuid | 1.x | MIT/Apache 2.0 | ✅ | MIT OR Apache-2.0 |
+| chrono | 0.4 | MIT/Apache 2.0 | ✅ | MIT OR Apache-2.0 |
+| tracing | 0.1 | MIT | ✅ | MIT |
+| tracing-subscriber | 0.3 | MIT | ✅ | MIT |
+| thiserror | 1.x | MIT/Apache 2.0 | ✅ | MIT OR Apache-2.0 |
+| anyhow | 1.x | MIT/Apache 2.0 | ✅ | MIT OR Apache-2.0 |
+| bytes | 1.x | MIT | ✅ | MIT |
+| futures | 0.3 | MIT/Apache 2.0 | ✅ | MIT OR Apache-2.0 |
 
 ### S3 Storage
 
 | Crate | Version | Lizenz | Status | SPDX |
 |-------|---------|--------|--------|------|
-| aws-sdk-s3 | 1.x | Apache 2.0 | âœ… | Apache-2.0 |
-| aws-config | 1.x | Apache 2.0 | âœ… | Apache-2.0 |
-| aws-smithy-runtime | 1.x | Apache 2.0 | âœ… | Apache-2.0 |
+| aws-sdk-s3 | 1.x | Apache 2.0 | ✅ | Apache-2.0 |
+| aws-config | 1.x | Apache 2.0 | ✅ | Apache-2.0 |
+| aws-smithy-runtime | 1.x | Apache 2.0 | ✅ | Apache-2.0 |
 
 ### API Dokumentation
 
 | Crate | Version | Lizenz | Status | SPDX |
 |-------|---------|--------|--------|------|
-| utoipa | 4.x | MIT/Apache 2.0 | âœ… | MIT OR Apache-2.0 |
-| utoipa-swagger-ui | 6.x | MIT/Apache 2.0 | âœ… | MIT OR Apache-2.0 |
+| utoipa | 4.x | MIT/Apache 2.0 | ✅ | MIT OR Apache-2.0 |
+| utoipa-swagger-ui | 6.x | MIT/Apache 2.0 | ✅ | MIT OR Apache-2.0 |
 
 ### Markdown
 
 | Crate | Version | Lizenz | Status | SPDX |
 |-------|---------|--------|--------|------|
-| pulldown-cmark | 0.10 | MIT | âœ… | MIT |
+| pulldown-cmark | 0.10 | MIT | ✅ | MIT |
 
 ---
 
-## Client Dependencies PrÃ¼fung
+## Client Dependencies Prüfung
 
 ### Tauri
 
 | Crate | Version | Lizenz | Status | SPDX |
 |-------|---------|--------|--------|------|
-| tauri | 2.x | MIT/Apache 2.0 | âœ… | MIT OR Apache-2.0 |
-| tauri-build | 2.x | MIT/Apache 2.0 | âœ… | MIT OR Apache-2.0 |
-| tauri-runtime | 2.x | MIT/Apache 2.0 | âœ… | MIT OR Apache-2.0 |
-| tauri-runtime-wry | 2.x | MIT/Apache 2.0 | âœ… | MIT OR Apache-2.0 |
-| wry | 0.35 | MIT/Apache 2.0 | âœ… | MIT OR Apache-2.0 |
-| tao | 0.25 | MIT/Apache 2.0 | âœ… | MIT OR Apache-2.0 |
+| tauri | 2.x | MIT/Apache 2.0 | ✅ | MIT OR Apache-2.0 |
+| tauri-build | 2.x | MIT/Apache 2.0 | ✅ | MIT OR Apache-2.0 |
+| tauri-runtime | 2.x | MIT/Apache 2.0 | ✅ | MIT OR Apache-2.0 |
+| tauri-runtime-wry | 2.x | MIT/Apache 2.0 | ✅ | MIT OR Apache-2.0 |
+| wry | 0.35 | MIT/Apache 2.0 | ✅ | MIT OR Apache-2.0 |
+| tao | 0.25 | MIT/Apache 2.0 | ✅ | MIT OR Apache-2.0 |
 
 ### Audio
 
 | Crate | Version | Lizenz | Status | SPDX |
 |-------|---------|--------|--------|------|
-| cpal | 0.15 | Apache 2.0 | âœ… | Apache-2.0 |
-| opus | 0.3 | MIT | âœ… | MIT |
-| nnnoiseless | 0.5 | BSD-3-Clause | âœ… | BSD-3-Clause |
+| cpal | 0.15 | Apache 2.0 | ✅ | Apache-2.0 |
+| opus | 0.3 | MIT | ✅ | MIT |
+| nnnoiseless | 0.5 | BSD-3-Clause | ✅ | BSD-3-Clause |
 
 **Notiz zu libopus:** Die native `libopus` Library ist BSD-3-Clause lizenziert.
 
@@ -224,59 +224,59 @@ Die Dual-Lizenzierung ist Standard im Rust-Ã–kosystem und bietet maximale Fle
 
 | Crate | Version | Lizenz | Status | SPDX |
 |-------|---------|--------|--------|------|
-| keyring | 2.x | MIT/Apache 2.0 | âœ… | MIT OR Apache-2.0 |
+| keyring | 2.x | MIT/Apache 2.0 | ✅ | MIT OR Apache-2.0 |
 
 ### HTTP Client
 
 | Crate | Version | Lizenz | Status | SPDX |
 |-------|---------|--------|--------|------|
-| reqwest | 0.11 | MIT/Apache 2.0 | âœ… | MIT OR Apache-2.0 |
+| reqwest | 0.11 | MIT/Apache 2.0 | ✅ | MIT OR Apache-2.0 |
 
 ---
 
-## Frontend Dependencies PrÃ¼fung
+## Frontend Dependencies Prüfung
 
 ### Frameworks
 
 | Package | Version | Lizenz | Status | SPDX |
 |---------|---------|--------|--------|------|
-| solid-js | 1.8 | MIT | âœ… | MIT |
-| @solidjs/router | 0.10 | MIT | âœ… | MIT |
+| solid-js | 1.8 | MIT | ✅ | MIT |
+| @solidjs/router | 0.10 | MIT | ✅ | MIT |
 
 ### Build Tools
 
 | Package | Version | Lizenz | Status | SPDX |
 |---------|---------|--------|--------|------|
-| vite | 5.x | MIT | âœ… | MIT |
-| vite-plugin-solid | 2.8 | MIT | âœ… | MIT |
-| typescript | 5.x | Apache 2.0 | âœ… | Apache-2.0 |
-| @tauri-apps/cli | 2.x | MIT/Apache 2.0 | âœ… | MIT OR Apache-2.0 |
+| vite | 5.x | MIT | ✅ | MIT |
+| vite-plugin-solid | 2.8 | MIT | ✅ | MIT |
+| typescript | 5.x | Apache 2.0 | ✅ | Apache-2.0 |
+| @tauri-apps/cli | 2.x | MIT/Apache 2.0 | ✅ | MIT OR Apache-2.0 |
 
 ### Styling
 
 | Package | Version | Lizenz | Status | SPDX |
 |---------|---------|--------|--------|------|
-| unocss | 0.58 | MIT | âœ… | MIT |
-| @unocss/preset-uno | 0.58 | MIT | âœ… | MIT |
+| unocss | 0.58 | MIT | ✅ | MIT |
+| @unocss/preset-uno | 0.58 | MIT | ✅ | MIT |
 
 ### Icons
 
 | Package | Version | Lizenz | Status | SPDX |
 |---------|---------|--------|--------|------|
-| lucide-solid | 0.300 | ISC | âœ… | ISC |
+| lucide-solid | 0.300 | ISC | ✅ | ISC |
 
 ---
 
 ## Abgelehnte Dependencies
 
-Diese Libraries wurden geprÃ¼ft und **bewusst nicht verwendet**:
+Diese Libraries wurden geprüft und **bewusst nicht verwendet**:
 
-| Library | Lizenz | Grund fÃ¼r Ablehnung |
+| Library | Lizenz | Grund für Ablehnung |
 |---------|--------|---------------------|
-| libsignal-protocol | AGPL 3.0 | WÃ¼rde AGPL fÃ¼r gesamtes Projekt erzwingen |
+| libsignal-protocol | AGPL 3.0 | Würde AGPL für gesamtes Projekt erzwingen |
 | ffmpeg | GPL/LGPL | GPL-Komponenten, komplizierte Lizenz |
 | openssl (native) | Apache 2.0 | Okay, aber rustls bevorzugt (pure Rust) |
-| Matrix SDK | Apache 2.0 | Zu komplex, nur vodozemac fÃ¼r Crypto genutzt |
+| Matrix SDK | Apache 2.0 | Zu komplex, nur vodozemac für Crypto genutzt |
 
 ---
 
@@ -317,7 +317,7 @@ SOFTWARE.
                         Version 2.0, January 2004
                      http://www.apache.org/licenses/
 
-[VollstÃ¤ndiger Apache 2.0 Text]
+[Vollständiger Apache 2.0 Text]
 ```
 
 ### Cargo.toml
@@ -357,7 +357,7 @@ dual licensed as above, without any additional terms or conditions.
 
 ---
 
-## Automatisierte Compliance-PrÃ¼fung
+## Automatisierte Compliance-Prüfung
 
 ### cargo-deny Konfiguration
 
@@ -476,7 +476,7 @@ jobs:
 
 ## Third-Party Notices
 
-Bei Distribution mÃ¼ssen folgende Attributions enthalten sein:
+Bei Distribution müssen folgende Attributions enthalten sein:
 
 ### THIRD_PARTY_NOTICES.md
 
@@ -523,48 +523,48 @@ Licensed under ISC
 
 ### Vor jedem Release
 
-- [ ] `cargo deny check` lÃ¤uft erfolgreich
+- [ ] `cargo deny check` läuft erfolgreich
 - [ ] Keine neuen GPL/AGPL Dependencies
 - [ ] THIRD_PARTY_NOTICES.md aktualisiert
 - [ ] LICENSE-MIT und LICENSE-APACHE vorhanden
-- [ ] Cargo.toml enthÃ¤lt korrekte `license` Angabe
+- [ ] Cargo.toml enthält korrekte `license` Angabe
 
 ### Bei neuen Dependencies
 
-- [ ] Lizenz geprÃ¼ft (muss auf Allow-Liste sein)
-- [ ] Transitive Dependencies geprÃ¼ft
+- [ ] Lizenz geprüft (muss auf Allow-Liste sein)
+- [ ] Transitive Dependencies geprüft
 - [ ] In diesem Dokument dokumentiert
-- [ ] THIRD_PARTY_NOTICES.md aktualisiert (falls nÃ¶tig)
+- [ ] THIRD_PARTY_NOTICES.md aktualisiert (falls nötig)
 
 ---
 
 ## Zusammenfassung
 
 ```
-â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
-â”‚                    LIZENZ-COMPLIANCE STATUS                      â”‚
-â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
-â”‚                                                                  â”‚
-â”‚  âœ… VOLLSTÃ„NDIG KOMPATIBEL                                      â”‚
-â”‚                                                                  â”‚
-â”‚  Server Dependencies:      45+ Crates  âœ… Alle geprÃ¼ft          â”‚
-â”‚  Client Dependencies:      25+ Crates  âœ… Alle geprÃ¼ft          â”‚
-â”‚  Frontend Dependencies:    10+ Packages âœ… Alle geprÃ¼ft         â”‚
-â”‚                                                                  â”‚
-â”‚  Lizenzen im Einsatz:                                           â”‚
-â”‚  â€¢ MIT                     ~60%                                 â”‚
-â”‚  â€¢ MIT/Apache 2.0 Dual     ~30%                                 â”‚
-â”‚  â€¢ Apache 2.0              ~5%                                  â”‚
-â”‚  â€¢ BSD-3-Clause            ~3%                                  â”‚
-â”‚  â€¢ ISC                     ~2%                                  â”‚
-â”‚                                                                  â”‚
-â”‚  Projekt-Lizenz:           MIT OR Apache-2.0                    â”‚
-â”‚                                                                  â”‚
-â”‚  Automatisierung:          cargo-deny in CI/CD                  â”‚
-â”‚                                                                  â”‚
-â”‚  Letzte PrÃ¼fung:           [Datum einfÃ¼gen]                     â”‚
-â”‚                                                                  â”‚
-â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
+┌─────────────────────────────────────────────────────────────────┐
+│                    LIZENZ-COMPLIANCE STATUS                      │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ✅ VOLLSTÄNDIG KOMPATIBEL                                      │
+│                                                                  │
+│  Server Dependencies:      45+ Crates  ✅ Alle geprüft          │
+│  Client Dependencies:      25+ Crates  ✅ Alle geprüft          │
+│  Frontend Dependencies:    10+ Packages ✅ Alle geprüft         │
+│                                                                  │
+│  Lizenzen im Einsatz:                                           │
+│  • MIT                     ~60%                                 │
+│  • MIT/Apache 2.0 Dual     ~30%                                 │
+│  • Apache 2.0              ~5%                                  │
+│  • BSD-3-Clause            ~3%                                  │
+│  • ISC                     ~2%                                  │
+│                                                                  │
+│  Projekt-Lizenz:           MIT OR Apache-2.0                    │
+│                                                                  │
+│  Automatisierung:          cargo-deny in CI/CD                  │
+│                                                                  │
+│  Letzte Prüfung:           [Datum einfügen]                     │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ---
