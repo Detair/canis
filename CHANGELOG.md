@@ -8,6 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Home View Overhaul with "Friends First" design
+  - Unified `HomeSidebar` replacing the legacy double-sidebar layout
+  - Default "Friends" landing view with filter search (Online/All/Pending/Blocked)
+  - "Active Now" panel showing real-time friend activity (games, voice, etc.)
+  - Information section for server-wide pages (Rules, Announcements)
+  - Collapsible Direct Messages list sorted by recent activity
+- Custom Avatars system
+  - `POST /auth/me/avatar` endpoint with S3/MinIO storage backend
+  - "My Account" settings tab with avatar upload and preview
+  - Client-side validation for image type and size (5MB limit)
+  - Instant profile update propagation across the UI
+- Status Picker in User Panel (Online, Away, Do Not Disturb, Invisible)
 - Rich Presence (Game Activity) showing "Playing X" status in member lists
   - Automatic game detection via process scanning (sysinfo crate)
   - 15+ pre-configured games (Minecraft, Valorant, League of Legends, CS2, Fortnite, etc.)
@@ -54,6 +66,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Click-to-view screen shares from participant indicators
 
 ### Changed
+- Improved UI contrast and accessibility
+  - Fixed unreadable text in selected Settings tabs (high contrast text)
+  - Updated error banners to use semantic theme tokens for better visibility
+  - Added clearer separator lines in sidebars for visual hierarchy
+  - Increased border visibility to `border-white/10` for main layout framing
 
 ### Deprecated
 
