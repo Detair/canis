@@ -407,6 +407,15 @@ pub enum ServerEvent {
         user_id: Uuid,
     },
 
+    // DM read sync events
+    /// DM read position updated (sent to other sessions of the same user)
+    DmRead {
+        /// DM channel ID.
+        channel_id: Uuid,
+        /// Last read message ID (None if no messages read).
+        last_read_message_id: Option<Uuid>,
+    },
+
     /// Rich presence activity update.
     RichPresenceUpdate {
         user_id: Uuid,
@@ -957,6 +966,17 @@ async fn handle_pubsub(
         // Handle presence events (presence:{uuid})
         else if channel_name.starts_with("presence:") {
             // Forward presence updates from friends directly
+            if let Some(payload) = message.value.as_str() {
+                if let Ok(event) = serde_json::from_str::<ServerEvent>(&payload) {
+                    if tx.send(event).await.is_err() {
+                        break;
+                    }
+                }
+            }
+        }
+        // Handle user events (user:{uuid}) for cross-device sync
+        else if channel_name.starts_with("user:") {
+            // Forward all user-targeted events (read sync, etc.)
             if let Some(payload) = message.value.as_str() {
                 if let Ok(event) = serde_json::from_str::<ServerEvent>(&payload) {
                     if tx.send(event).await.is_err() {

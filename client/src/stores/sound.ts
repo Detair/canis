@@ -12,6 +12,7 @@ import {
   setChannelNotificationLevel as setChannelNotifLevel,
   isInQuietHours,
 } from "./preferences";
+import { currentUser } from "./auth";
 
 // ============================================================================
 // Types
@@ -20,6 +21,15 @@ import {
 export type SoundOption = "default" | "subtle" | "ping" | "chime" | "bell";
 export type NotificationLevel = "all" | "mentions" | "none";
 
+export interface QuietHoursSettings {
+  /** Whether quiet hours are enabled */
+  enabled: boolean;
+  /** Start time in 24h format (e.g., "22:00") */
+  startTime: string;
+  /** End time in 24h format (e.g., "08:00") */
+  endTime: string;
+}
+
 export interface SoundSettings {
   /** Master on/off for notification sounds */
   enabled: boolean;
@@ -27,6 +37,8 @@ export interface SoundSettings {
   volume: number;
   /** Selected notification sound */
   selectedSound: SoundOption;
+  /** Quiet hours / Do Not Disturb settings */
+  quietHours: QuietHoursSettings;
 }
 
 export interface ChannelNotificationSettings {
@@ -47,6 +59,7 @@ export const soundSettings = (): SoundSettings => {
     enabled: sound.enabled,
     volume: sound.volume,
     selectedSound: sound.soundType,
+    quietHours: sound.quietHours,
   };
 };
 
@@ -101,6 +114,9 @@ export function setSelectedSound(sound: SoundOption): void {
 
 export { isInQuietHours };
 
+// Alias for backwards compatibility
+export const isWithinQuietHours = isInQuietHours;
+
 export function getQuietHoursEnabled(): boolean {
   return preferences().sound.quietHours.enabled;
 }
@@ -125,6 +141,26 @@ export function setQuietHoursSchedule(startTime: string, endTime: string): void 
     startTime,
     endTime,
   });
+}
+
+export function getQuietHours(): QuietHoursSettings {
+  return soundSettings().quietHours;
+}
+
+export function setQuietHoursTime(startTime: string, endTime: string): void {
+  setQuietHoursSchedule(startTime, endTime);
+}
+
+/**
+ * Check if Do Not Disturb is active.
+ * DND is active when:
+ * - User status is "busy"
+ * - Quiet hours are currently active
+ */
+export function isDndActive(): boolean {
+  const user = currentUser();
+  if (user?.status === "busy") return true;
+  return isInQuietHours();
 }
 
 // ============================================================================
