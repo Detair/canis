@@ -259,10 +259,7 @@ impl ClipboardGuard {
             },
         );
 
-        debug!(
-            ?sensitivity,
-            timeout_secs, "Clipboard copy with protection"
-        );
+        debug!(?sensitivity, timeout_secs, "Clipboard copy with protection");
 
         Ok(CopyResult {
             success: true,
@@ -476,9 +473,7 @@ pub async fn secure_copy(
 
 /// Paste from clipboard with tamper detection.
 #[tauri::command]
-pub async fn secure_paste(
-    guard: State<'_, Arc<ClipboardGuard>>,
-) -> Result<PasteResult, String> {
+pub async fn secure_paste(guard: State<'_, Arc<ClipboardGuard>>) -> Result<PasteResult, String> {
     guard.paste().await.map_err(|e| e.to_string())
 }
 
@@ -556,10 +551,7 @@ mod tests {
             classify_context(&CopyContext::MessageContent),
             Sensitivity::Normal
         );
-        assert_eq!(
-            classify_context(&CopyContext::UserId),
-            Sensitivity::Normal
-        );
+        assert_eq!(classify_context(&CopyContext::UserId), Sensitivity::Normal);
         assert_eq!(
             classify_context(&CopyContext::Other("test".to_string())),
             Sensitivity::Normal
