@@ -110,8 +110,24 @@ This forces the encoder to send a keyframe, so the new viewer doesn't see a blac
 
 ## Summary Checklist
 
-- [ ] `TrackRouter` supports multiple tracks per user
-- [ ] Redis limit enforcement implemented
-- [ ] REST API endpoints created and registered
-- [ ] WebSocket events defined and broadcast
-- [ ] PLI requested for new subscribers
+- [x] `TrackRouter` supports multiple tracks per user
+- [x] Redis limit enforcement implemented
+- [x] REST API endpoints created and registered
+- [x] WebSocket events defined and broadcast
+- [x] PLI requested for new subscribers
+- [x] Unit tests added for screen_share.rs and track.rs (PR #38)
+
+## Implementation Status
+
+**Completed:** 2026-01-23
+
+All Phase 2 tasks have been implemented:
+- `TrackRouter` in `server/src/voice/track.rs` uses `(Uuid, TrackSource)` keying
+- Redis limits in `server/src/voice/screen_share.rs` with `try_start_screen_share` and `stop_screen_share`
+- REST endpoints in `server/src/chat/screenshare.rs` (check, start, stop)
+- WebSocket events in `server/src/ws/events.rs` (ScreenShareStarted, ScreenShareStopped, ScreenShareQualityChanged)
+- PLI in `server/src/voice/ws_handler.rs` via `request_keyframe`
+
+**Test Coverage (PR #38):**
+- 20 tests for screen_share.rs (types, validation, serialization)
+- 9 tests for track.rs (construction, empty router, concurrent access)
