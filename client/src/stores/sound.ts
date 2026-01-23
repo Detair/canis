@@ -1,10 +1,17 @@
 /**
  * Sound Settings Store
  *
- * Manages notification sound preferences with localStorage persistence.
+ * Manages notification sound preferences through the unified preferences store.
+ * Sound settings are synced across devices through the preferences system.
  */
 
-import { createSignal } from "solid-js";
+import {
+  preferences,
+  updateNestedPreference,
+  getChannelNotificationLevel as getChannelNotifLevel,
+  setChannelNotificationLevel as setChannelNotifLevel,
+  isInQuietHours,
+} from "./preferences";
 
 // ============================================================================
 // Types
@@ -27,92 +34,97 @@ export interface ChannelNotificationSettings {
 }
 
 // ============================================================================
-// Storage Keys
+// Derived Signals
 // ============================================================================
 
-const SOUND_SETTINGS_KEY = "canis:sound:settings";
-const CHANNEL_SETTINGS_KEY = "canis:sound:channels";
-
-// ============================================================================
-// Defaults
-// ============================================================================
-
-const defaultSoundSettings: SoundSettings = {
-  enabled: true,
-  volume: 80,
-  selectedSound: "default",
+/**
+ * Get sound settings from preferences.
+ * Maps preferences sound structure to the SoundSettings interface.
+ */
+export const soundSettings = (): SoundSettings => {
+  const sound = preferences().sound;
+  return {
+    enabled: sound.enabled,
+    volume: sound.volume,
+    selectedSound: sound.soundType,
+  };
 };
 
-// ============================================================================
-// Load Functions
-// ============================================================================
+/**
+ * Get channel notification settings from preferences.
+ * Maps "muted" to "none" for backwards compatibility.
+ */
+export const channelNotificationSettings = (): ChannelNotificationSettings => {
+  const channelNotifs = preferences().channelNotifications;
+  const result: ChannelNotificationSettings = {};
 
-function loadSoundSettings(): SoundSettings {
-  if (typeof localStorage === "undefined") return defaultSoundSettings;
-  const stored = localStorage.getItem(SOUND_SETTINGS_KEY);
-  if (!stored) return defaultSoundSettings;
-  try {
-    return { ...defaultSoundSettings, ...JSON.parse(stored) };
-  } catch {
-    return defaultSoundSettings;
+  for (const [channelId, level] of Object.entries(channelNotifs)) {
+    // Map "muted" from preferences to "none" for this store's interface
+    result[channelId] = level === "muted" ? "none" : level;
   }
-}
 
-function loadChannelSettings(): ChannelNotificationSettings {
-  if (typeof localStorage === "undefined") return {};
-  const stored = localStorage.getItem(CHANNEL_SETTINGS_KEY);
-  if (!stored) return {};
-  try {
-    return JSON.parse(stored);
-  } catch {
-    return {};
-  }
-}
-
-// ============================================================================
-// Signals
-// ============================================================================
-
-const [soundSettings, setSoundSettings] = createSignal<SoundSettings>(
-  loadSoundSettings()
-);
-
-const [channelNotificationSettings, setChannelNotificationSettings] =
-  createSignal<ChannelNotificationSettings>(loadChannelSettings());
+  return result;
+};
 
 // ============================================================================
 // Sound Settings Functions
 // ============================================================================
 
 export function getSoundEnabled(): boolean {
-  return soundSettings().enabled;
+  return preferences().sound.enabled;
 }
 
 export function setSoundEnabled(enabled: boolean): void {
-  const updated = { ...soundSettings(), enabled };
-  setSoundSettings(updated);
-  localStorage.setItem(SOUND_SETTINGS_KEY, JSON.stringify(updated));
+  updateNestedPreference("sound", "enabled", enabled);
 }
 
 export function getSoundVolume(): number {
-  return soundSettings().volume;
+  return preferences().sound.volume;
 }
 
 export function setSoundVolume(volume: number): void {
   const clamped = Math.max(0, Math.min(100, volume));
-  const updated = { ...soundSettings(), volume: clamped };
-  setSoundSettings(updated);
-  localStorage.setItem(SOUND_SETTINGS_KEY, JSON.stringify(updated));
+  updateNestedPreference("sound", "volume", clamped);
 }
 
 export function getSelectedSound(): SoundOption {
-  return soundSettings().selectedSound;
+  return preferences().sound.soundType;
 }
 
 export function setSelectedSound(sound: SoundOption): void {
-  const updated = { ...soundSettings(), selectedSound: sound };
-  setSoundSettings(updated);
-  localStorage.setItem(SOUND_SETTINGS_KEY, JSON.stringify(updated));
+  updateNestedPreference("sound", "soundType", sound);
+}
+
+// ============================================================================
+// Quiet Hours Functions
+// ============================================================================
+
+export { isInQuietHours };
+
+export function getQuietHoursEnabled(): boolean {
+  return preferences().sound.quietHours.enabled;
+}
+
+export function setQuietHoursEnabled(enabled: boolean): void {
+  const currentQuietHours = preferences().sound.quietHours;
+  updateNestedPreference("sound", "quietHours", {
+    ...currentQuietHours,
+    enabled,
+  });
+}
+
+export function getQuietHoursSchedule(): { startTime: string; endTime: string } {
+  const { startTime, endTime } = preferences().sound.quietHours;
+  return { startTime, endTime };
+}
+
+export function setQuietHoursSchedule(startTime: string, endTime: string): void {
+  const currentQuietHours = preferences().sound.quietHours;
+  updateNestedPreference("sound", "quietHours", {
+    ...currentQuietHours,
+    startTime,
+    endTime,
+  });
 }
 
 // ============================================================================
@@ -122,22 +134,37 @@ export function setSelectedSound(sound: SoundOption): void {
 /**
  * Get notification level for a channel.
  * Default is "mentions" for channels, "all" for DMs.
+ *
+ * Note: This maps "muted" from preferences to "none" for backwards compatibility.
  */
 export function getChannelNotificationLevel(
   channelId: string,
   isDm: boolean = false
 ): NotificationLevel {
-  const settings = channelNotificationSettings();
-  return settings[channelId] ?? (isDm ? "all" : "mentions");
+  const level = getChannelNotifLevel(channelId);
+  // Map "muted" to "none" for this store's interface
+  if (level === "muted") return "none";
+  // Handle DM default
+  if (level === "mentions" && isDm) {
+    // Check if there's actually a stored value or if it's the default
+    const stored = preferences().channelNotifications[channelId];
+    if (!stored) return "all"; // DM default
+  }
+  return level;
 }
 
+/**
+ * Set notification level for a channel.
+ *
+ * Note: This maps "none" to "muted" for the preferences store.
+ */
 export function setChannelNotificationLevel(
   channelId: string,
   level: NotificationLevel
 ): void {
-  const updated = { ...channelNotificationSettings(), [channelId]: level };
-  setChannelNotificationSettings(updated);
-  localStorage.setItem(CHANNEL_SETTINGS_KEY, JSON.stringify(updated));
+  // Map "none" to "muted" for the preferences store
+  const prefsLevel = level === "none" ? "muted" : level;
+  setChannelNotifLevel(channelId, prefsLevel);
 }
 
 /**
@@ -148,7 +175,22 @@ export function isChannelMuted(channelId: string): boolean {
 }
 
 // ============================================================================
-// Exports
+// Sound Playback Helpers (not persisted, just utilities)
 // ============================================================================
 
-export { soundSettings, channelNotificationSettings };
+/**
+ * Check if sound should play based on current settings.
+ * Considers enabled state, quiet hours, and channel muting.
+ */
+export function shouldPlaySound(channelId?: string): boolean {
+  // Check if sounds are globally enabled
+  if (!getSoundEnabled()) return false;
+
+  // Check quiet hours
+  if (isInQuietHours()) return false;
+
+  // Check channel-specific muting
+  if (channelId && isChannelMuted(channelId)) return false;
+
+  return true;
+}
