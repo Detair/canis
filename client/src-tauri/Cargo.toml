@@ -46,6 +46,7 @@ url = "2"
 
 # Secure Storage
 keyring = "2"
+rusqlite = { version = "0.29", features = ["bundled"] }
 
 # Process scanning
 sysinfo = "0.30"
