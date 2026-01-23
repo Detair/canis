@@ -406,6 +406,15 @@ pub enum ServerEvent {
         user_id: Uuid,
     },
 
+    // DM read sync events
+    /// DM read position updated (sent to other sessions of the same user)
+    DmRead {
+        /// DM channel ID.
+        channel_id: Uuid,
+        /// Last read message ID (None if no messages read).
+        last_read_message_id: Option<Uuid>,
+    },
+
     /// Rich presence activity update.
     RichPresenceUpdate {
         user_id: Uuid,
