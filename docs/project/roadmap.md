@@ -209,9 +209,12 @@ This roadmap outlines the development path from the current prototype to a produ
   - Sync read position across all user's devices/tabs.
   - Clear unread badges and highlights when read on any client.
   - Required for proper notification deduplication.
-- [ ] **[Settings] Server-Synced User Preferences** `Planned`
-  - Persist user settings (sound, theme, etc.) on server.
-  - Sync preferences across devices.
+- [x] **[Settings] Server-Synced User Preferences** ✅
+  - Theme, sound settings, quiet hours, and per-channel notifications sync across all devices
+  - Real-time updates via WebSocket when preferences change on another device
+  - Last-write-wins conflict resolution with timestamps
+  - Migration from legacy localStorage keys
+  - **Design:** `docs/plans/2026-01-23-server-synced-preferences-design.md`
 - [ ] **[UX] Do Not Disturb Mode** `Planned`
   - App-level DND toggle to silence all sounds.
   - Integration with OS-level focus/DND modes.

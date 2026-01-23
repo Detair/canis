@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Server-synced user preferences
+  - Theme, sound settings, quiet hours, and per-channel notifications sync across all devices
+  - Real-time updates via WebSocket when preferences change on another device
+  - Offline support with automatic sync on reconnect
+  - Migration from legacy localStorage keys
 - DM voice calls client integration
   - Voice connection wiring: WebRTC starts after accepting/starting calls
   - Tauri commands for call lifecycle (start, join, decline, leave)
