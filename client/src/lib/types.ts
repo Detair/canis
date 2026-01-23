@@ -266,7 +266,9 @@ export type ServerEvent =
   | { type: "admin_user_banned"; user_id: string; username: string }
   | { type: "admin_user_unbanned"; user_id: string; username: string }
   | { type: "admin_guild_suspended"; guild_id: string; guild_name: string }
-  | { type: "admin_guild_unsuspended"; guild_id: string; guild_name: string };
+  | { type: "admin_guild_unsuspended"; guild_id: string; guild_name: string }
+  // Preferences events
+  | { type: "preferences_updated"; preferences: Partial<UserPreferences>; updated_at: string };
 
 // Settings Types
 
@@ -291,6 +293,43 @@ export interface AppSettings {
   voice: VoiceSettings;
   theme: "dark" | "light";
   notifications_enabled: boolean;
+}
+
+// User Preferences (synced across devices)
+export interface UserPreferences {
+  // Theme
+  theme: "focused-hybrid" | "solarized-dark" | "solarized-light";
+
+  // Sound settings
+  sound: {
+    enabled: boolean;
+    volume: number; // 0-100
+    soundType: "default" | "subtle" | "ping" | "chime" | "bell";
+    quietHours: {
+      enabled: boolean;
+      startTime: string; // "HH:MM" format
+      endTime: string;
+    };
+  };
+
+  // Connection display
+  connection: {
+    displayMode: "circle" | "number";
+    showNotifications: boolean;
+  };
+
+  // Per-channel notification levels
+  channelNotifications: Record<string, "all" | "mentions" | "muted">;
+}
+
+export interface PreferencesResponse {
+  preferences: Partial<UserPreferences>;
+  updated_at: string; // ISO timestamp
+}
+
+export interface StoredPreferences {
+  data: UserPreferences;
+  updated_at: string;
 }
 
 // Friends Types
