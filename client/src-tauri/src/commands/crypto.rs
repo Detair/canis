@@ -1,11 +1,18 @@
 //! E2EE Key Management Commands
 
+use std::collections::HashMap;
+use std::path::PathBuf;
+
 use base64::{engine::general_purpose::STANDARD, Engine};
 use serde::{Deserialize, Serialize};
-use tauri::{command, State};
+use sha2::{Digest, Sha256};
+use tauri::{command, Manager, State};
 use tracing::{error, info};
+use uuid::Uuid;
+use vc_crypto::olm::EncryptedMessage;
 use vc_crypto::{EncryptedBackup, RecoveryKey};
 
+use crate::crypto::{ClaimedPrekey, CryptoManager, PrekeyForUpload, PrekeyInfo};
 use crate::AppState;
 
 /// Recovery key formatted for display (4-char chunks).
@@ -50,6 +57,129 @@ struct BackupResponse {
     version: i32,
     #[allow(dead_code)]
     created_at: String,
+}
+
+// =============================================================================
+// E2EE Commands
+// =============================================================================
+
+/// E2EE initialization status.
+#[derive(Debug, Serialize)]
+pub struct E2EEStatus {
+    /// Whether E2EE is initialized.
+    pub initialized: bool,
+    /// Device ID if initialized.
+    pub device_id: Option<String>,
+    /// Whether identity keys are available.
+    pub has_identity_keys: bool,
+}
+
+/// Response from E2EE initialization.
+#[derive(Debug, Serialize)]
+pub struct InitE2EEResponse {
+    /// This device's ID.
+    pub device_id: String,
+    /// Ed25519 identity key (base64).
+    pub identity_key_ed25519: String,
+    /// Curve25519 identity key (base64).
+    pub identity_key_curve25519: String,
+    /// One-time prekeys for upload to server.
+    pub prekeys: Vec<PrekeyData>,
+}
+
+/// Prekey data for upload to server.
+#[derive(Debug, Serialize)]
+pub struct PrekeyData {
+    /// Key ID (base64).
+    pub key_id: String,
+    /// Public key (base64).
+    pub public_key: String,
+}
+
+impl From<PrekeyForUpload> for PrekeyData {
+    fn from(p: PrekeyForUpload) -> Self {
+        Self {
+            key_id: p.key_id,
+            public_key: p.public_key,
+        }
+    }
+}
+
+/// Input for a claimed prekey from the server.
+#[derive(Debug, Deserialize)]
+pub struct ClaimedPrekeyInput {
+    /// Recipient's user ID.
+    pub user_id: String,
+    /// Recipient's device ID.
+    pub device_id: String,
+    /// Ed25519 identity key (base64).
+    pub identity_key_ed25519: String,
+    /// Curve25519 identity key (base64).
+    pub identity_key_curve25519: String,
+    /// One-time prekey (if available).
+    pub one_time_prekey: Option<PrekeyInput>,
+}
+
+/// One-time prekey input.
+#[derive(Debug, Deserialize)]
+pub struct PrekeyInput {
+    /// Key ID (base64).
+    pub key_id: String,
+    /// Public key (base64).
+    pub public_key: String,
+}
+
+/// Encrypted message output for the frontend.
+#[derive(Debug, Serialize)]
+pub struct EncryptedMessageOutput {
+    /// Message type: 0 = prekey, 1 = normal.
+    pub message_type: u8,
+    /// Base64-encoded ciphertext.
+    pub ciphertext: String,
+}
+
+impl From<EncryptedMessage> for EncryptedMessageOutput {
+    fn from(m: EncryptedMessage) -> Self {
+        Self {
+            message_type: m.message_type,
+            ciphertext: m.ciphertext,
+        }
+    }
+}
+
+/// E2EE content output for the frontend.
+#[derive(Debug, Serialize)]
+pub struct E2EEContentOutput {
+    /// Sender's Curve25519 public key (base64).
+    pub sender_key: String,
+    /// Encrypted content for each recipient: user_id -> device_id -> ciphertext.
+    pub recipients: HashMap<String, HashMap<String, EncryptedMessageOutput>>,
+}
+
+/// Derive a 32-byte encryption key from a string using SHA-256.
+fn derive_encryption_key(input: &str) -> [u8; 32] {
+    let mut hasher = Sha256::new();
+    hasher.update(input.as_bytes());
+    let result = hasher.finalize();
+    let mut key = [0u8; 32];
+    key.copy_from_slice(&result);
+    key
+}
+
+/// Get the E2EE data directory for the current user.
+fn get_e2ee_data_dir(app_handle: &tauri::AppHandle, user_id: &str) -> Result<PathBuf, String> {
+    let app_data_dir = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to get app data dir: {e}"))?;
+
+    let e2ee_dir = app_data_dir.join("e2ee").join(user_id);
+
+    // Create directory if it doesn't exist
+    std::fs::create_dir_all(&e2ee_dir)
+        .map_err(|e| format!("Failed to create E2EE directory: {e}"))?;
+
+    Ok(e2ee_dir)
 }
 
 /// Get server settings.
@@ -250,6 +380,261 @@ pub async fn restore_backup(
 
     info!("Backup restored successfully");
     Ok(data)
+}
+
+// =============================================================================
+// E2EE Commands
+// =============================================================================
+
+/// Get E2EE initialization status.
+///
+/// Returns information about whether E2EE is initialized for the current user.
+#[command]
+pub async fn get_e2ee_status(state: State<'_, AppState>) -> Result<E2EEStatus, String> {
+    let crypto = state.crypto.lock().await;
+
+    match crypto.as_ref() {
+        Some(manager) => {
+            // Check if we can get identity keys
+            let has_identity_keys = manager.get_identity_keys().is_ok();
+
+            Ok(E2EEStatus {
+                initialized: true,
+                device_id: Some(manager.device_id().to_string()),
+                has_identity_keys,
+            })
+        }
+        None => Ok(E2EEStatus {
+            initialized: false,
+            device_id: None,
+            has_identity_keys: false,
+        }),
+    }
+}
+
+/// Initialize E2EE for the current user.
+///
+/// Creates a new Olm account if one doesn't exist, or loads an existing one.
+/// Returns identity keys and prekeys for upload to the server.
+///
+/// # Arguments
+///
+/// * `encryption_key` - A string to derive the encryption key from (e.g., recovery key)
+#[command]
+pub async fn init_e2ee(
+    app_handle: tauri::AppHandle,
+    state: State<'_, AppState>,
+    encryption_key: String,
+) -> Result<InitE2EEResponse, String> {
+    info!("Initializing E2EE");
+
+    // Get user_id from auth state
+    let auth = state.auth.read().await;
+    let user = auth.user.as_ref().ok_or("Not authenticated")?;
+    let user_id_str = user.id.clone();
+    drop(auth);
+
+    let user_id =
+        Uuid::parse_str(&user_id_str).map_err(|e| format!("Invalid user ID format: {e}"))?;
+
+    // Get data directory
+    let data_dir = get_e2ee_data_dir(&app_handle, &user_id_str)?;
+
+    // Derive encryption key from input
+    let key = derive_encryption_key(&encryption_key);
+
+    // Initialize crypto manager
+    let manager =
+        CryptoManager::init(data_dir, user_id, key).map_err(|e| format!("Init failed: {e}"))?;
+
+    // Get identity keys
+    let identity = manager
+        .get_identity_keys()
+        .map_err(|e| format!("Failed to get identity keys: {e}"))?;
+
+    // Get unpublished prekeys
+    let prekeys: Vec<PrekeyData> = manager
+        .get_unpublished_keys()
+        .map_err(|e| format!("Failed to get prekeys: {e}"))?
+        .into_iter()
+        .map(PrekeyData::from)
+        .collect();
+
+    let device_id = manager.device_id().to_string();
+
+    // Store manager in state
+    let mut crypto = state.crypto.lock().await;
+    *crypto = Some(manager);
+
+    info!(
+        device_id = %device_id,
+        prekey_count = prekeys.len(),
+        "E2EE initialized successfully"
+    );
+
+    Ok(InitE2EEResponse {
+        device_id,
+        identity_key_ed25519: identity.ed25519,
+        identity_key_curve25519: identity.curve25519,
+        prekeys,
+    })
+}
+
+/// Encrypt a message for multiple recipients.
+///
+/// # Arguments
+///
+/// * `plaintext` - The message to encrypt
+/// * `recipients` - List of recipients with their claimed prekeys
+#[command]
+pub async fn encrypt_message(
+    state: State<'_, AppState>,
+    plaintext: String,
+    recipients: Vec<ClaimedPrekeyInput>,
+) -> Result<E2EEContentOutput, String> {
+    let crypto = state.crypto.lock().await;
+    let manager = crypto.as_ref().ok_or("E2EE not initialized")?;
+
+    // Get our sender key
+    let sender_key = manager
+        .our_curve25519_key()
+        .map_err(|e| format!("Failed to get sender key: {e}"))?;
+
+    let mut result_recipients: HashMap<String, HashMap<String, EncryptedMessageOutput>> =
+        HashMap::new();
+
+    for recipient in recipients {
+        let user_id = Uuid::parse_str(&recipient.user_id)
+            .map_err(|e| format!("Invalid recipient user ID: {e}"))?;
+
+        let device_id = Uuid::parse_str(&recipient.device_id)
+            .map_err(|e| format!("Invalid recipient device ID: {e}"))?;
+
+        // Convert input to ClaimedPrekey
+        let claimed = ClaimedPrekey {
+            device_id,
+            identity_key_ed25519: recipient.identity_key_ed25519,
+            identity_key_curve25519: recipient.identity_key_curve25519,
+            one_time_prekey: recipient.one_time_prekey.map(|p| PrekeyInfo {
+                key_id: p.key_id,
+                public_key: p.public_key,
+            }),
+        };
+
+        // Encrypt for this device
+        let ciphertext = manager
+            .encrypt_for_device(user_id, &claimed, &plaintext)
+            .map_err(|e| format!("Encryption failed for {}: {e}", recipient.user_id))?;
+
+        // Add to result map
+        let user_devices = result_recipients
+            .entry(recipient.user_id)
+            .or_insert_with(HashMap::new);
+        user_devices.insert(recipient.device_id, ciphertext.into());
+    }
+
+    Ok(E2EEContentOutput {
+        sender_key,
+        recipients: result_recipients,
+    })
+}
+
+/// Decrypt a received message.
+///
+/// # Arguments
+///
+/// * `sender_user_id` - The sender's user ID
+/// * `sender_key` - The sender's Curve25519 public key (base64)
+/// * `message_type` - Message type: 0 = prekey, 1 = normal
+/// * `ciphertext` - Base64-encoded ciphertext
+#[command]
+pub async fn decrypt_message(
+    state: State<'_, AppState>,
+    sender_user_id: String,
+    sender_key: String,
+    message_type: u8,
+    ciphertext: String,
+) -> Result<String, String> {
+    let crypto = state.crypto.lock().await;
+    let manager = crypto.as_ref().ok_or("E2EE not initialized")?;
+
+    let sender_uuid =
+        Uuid::parse_str(&sender_user_id).map_err(|e| format!("Invalid sender user ID: {e}"))?;
+
+    // Construct EncryptedMessage
+    let message = EncryptedMessage {
+        message_type,
+        ciphertext,
+    };
+
+    // Decrypt
+    let plaintext = manager
+        .decrypt_message(sender_uuid, &sender_key, &message)
+        .map_err(|e| format!("Decryption failed: {e}"))?;
+
+    Ok(plaintext)
+}
+
+/// Mark prekeys as published after successful upload to server.
+#[command]
+pub async fn mark_prekeys_published(state: State<'_, AppState>) -> Result<(), String> {
+    let crypto = state.crypto.lock().await;
+    let manager = crypto.as_ref().ok_or("E2EE not initialized")?;
+
+    manager
+        .mark_keys_published()
+        .map_err(|e| format!("Failed to mark keys published: {e}"))?;
+
+    info!("Prekeys marked as published");
+    Ok(())
+}
+
+/// Generate additional prekeys for upload to server.
+///
+/// # Arguments
+///
+/// * `count` - Number of prekeys to generate
+#[command]
+pub async fn generate_prekeys(
+    state: State<'_, AppState>,
+    count: usize,
+) -> Result<Vec<PrekeyData>, String> {
+    let crypto = state.crypto.lock().await;
+    let manager = crypto.as_ref().ok_or("E2EE not initialized")?;
+
+    let prekeys: Vec<PrekeyData> = manager
+        .generate_prekeys(count)
+        .map_err(|e| format!("Failed to generate prekeys: {e}"))?
+        .into_iter()
+        .map(PrekeyData::from)
+        .collect();
+
+    info!(count = prekeys.len(), "Generated new prekeys");
+    Ok(prekeys)
+}
+
+/// Check if we need to upload more prekeys.
+#[command]
+pub async fn needs_prekey_upload(state: State<'_, AppState>) -> Result<bool, String> {
+    let crypto = state.crypto.lock().await;
+    let manager = crypto.as_ref().ok_or("E2EE not initialized")?;
+
+    manager
+        .needs_key_upload()
+        .map_err(|e| format!("Failed to check key upload status: {e}"))
+}
+
+/// Get our Curve25519 public key (base64).
+///
+/// This is needed for looking up our ciphertext in encrypted messages.
+#[command]
+pub async fn get_our_curve25519_key(state: State<'_, AppState>) -> Result<String, String> {
+    let crypto = state.crypto.lock().await;
+    let manager = crypto.as_ref().ok_or("E2EE not initialized")?;
+
+    manager
+        .our_curve25519_key()
+        .map_err(|e| format!("Failed to get Curve25519 key: {e}"))
 }
 
 #[cfg(test)]

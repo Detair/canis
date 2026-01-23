@@ -5,7 +5,8 @@
  */
 
 import { Component, Show, onCleanup, createEffect, createSignal } from "solid-js";
-import { Phone } from "lucide-solid";
+import { Phone, Lock, Unlock } from "lucide-solid";
+import { e2eeStatus } from "@/stores/e2ee";
 import { getSelectedDM, markDMAsRead } from "@/stores/dms";
 import MessageList from "@/components/messages/MessageList";
 import MessageInput from "@/components/messages/MessageInput";
@@ -17,6 +18,10 @@ import { startDMCall, joinVoice } from "@/lib/tauri";
 const DMConversation: Component = () => {
   const dm = () => getSelectedDM();
   const [isStartingCall, setIsStartingCall] = createSignal(false);
+  const [showEncryptionTooltip, setShowEncryptionTooltip] = createSignal(false);
+
+  // E2EE status for encryption indicator
+  const isEncrypted = () => e2eeStatus().initialized;
 
   const handleStartCall = async () => {
     const currentDM = dm();
@@ -100,6 +105,55 @@ const DMConversation: Component = () => {
             </div>
           </Show>
           <span class="font-semibold text-text-primary">{displayName()}</span>
+
+          {/* Encryption Indicator */}
+          <div
+            class="relative"
+            onMouseEnter={() => setShowEncryptionTooltip(true)}
+            onMouseLeave={() => setShowEncryptionTooltip(false)}
+          >
+            <Show
+              when={isEncrypted()}
+              fallback={
+                <Unlock
+                  class="w-4 h-4 text-text-muted cursor-help"
+                  aria-label="End-to-end encryption not active"
+                />
+              }
+            >
+              <Lock
+                class="w-4 h-4 text-accent-primary cursor-help"
+                aria-label="End-to-end encryption active"
+              />
+            </Show>
+
+            {/* Encryption Status Tooltip */}
+            <Show when={showEncryptionTooltip()}>
+              <div class="absolute left-1/2 -translate-x-1/2 top-full mt-2 z-50 px-3 py-2 bg-surface-base border border-white/10 rounded-lg shadow-xl min-w-[200px] text-center">
+                <Show
+                  when={isEncrypted()}
+                  fallback={
+                    <>
+                      <p class="text-sm font-medium text-text-secondary">
+                        Not Encrypted
+                      </p>
+                      <p class="text-xs text-text-muted mt-1">
+                        E2EE is not set up. Messages are not end-to-end encrypted.
+                      </p>
+                    </>
+                  }
+                >
+                  <p class="text-sm font-medium text-accent-primary">
+                    End-to-End Encrypted
+                  </p>
+                  <p class="text-xs text-text-muted mt-1">
+                    Messages are secured with end-to-end encryption. Only you and the recipient can read them.
+                  </p>
+                </Show>
+              </div>
+            </Show>
+          </div>
+
           <Show when={isGroupDM()}>
             <span class="text-sm text-text-secondary">
               {dm()?.participants.length} members

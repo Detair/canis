@@ -4,7 +4,7 @@ This roadmap outlines the development path from the current prototype to a produ
 
 **Current Phase:** Phase 4 (Advanced Features) - In Progress
 
-**Last Updated:** 2026-01-21
+**Last Updated:** 2026-01-23
 
 ## Quick Status Overview
 
@@ -14,7 +14,7 @@ This roadmap outlines the development path from the current prototype to a produ
 | **Phase 1** | ✅ Complete | 100% | Voice state sync, audio device selection |
 | **Phase 2** | ✅ Complete | 100% | Voice Island, VAD, Speaking Indicators, Command Palette, File Attachments, Theme System, Code Highlighting |
 | **Phase 3** | ✅ Complete | 100% | Guild system, Friends, DMs, Home View, Rate Limiting, Permission System + UI, Information Pages, DM Voice Calls |
-| **Phase 4** | 🔄 In Progress | 40% | E2EE Key Backup foundation (PR #22), User Connectivity Monitor (PR #23), E2EE Key Backup UI (PR #29) |
+| **Phase 4** | 🔄 In Progress | 50% | E2EE Key Backup (PR #22, #29), User Connectivity Monitor (PR #23), E2EE DM Messaging (PR #41) |
 | **Phase 5** | 📋 Planned | 0% | - |
 
 **Production Ready Features:**
@@ -186,6 +186,14 @@ This roadmap outlines the development path from the current prototype to a produ
   - Backup reminder banner for users without backup.
   - Server configuration option `REQUIRE_E2EE_SETUP` for mandatory setup.
   - **Plan:** `docs/plans/2026-01-19-e2ee-implementation-phase-1.md`
+- [x] **[Security] E2EE DM Messaging** ✅ (PR #41)
+  - End-to-end encryption for DM messages using vodozemac (Olm).
+  - LocalKeyStore with encrypted SQLite storage for Olm sessions.
+  - CryptoManager for session management and encrypt/decrypt operations.
+  - E2EE setup modal with recovery key generation.
+  - Encryption indicator in DM headers.
+  - Graceful fallback to unencrypted when E2EE not available.
+  - **Plan:** `docs/plans/2026-01-23-e2ee-messages-implementation.md`
 - [ ] **[UX] Sound Pack (Notification Sounds)** `Next`
   - Chat message notification sounds (DMs + mentions).
   - 5 built-in sound options with volume control.
@@ -241,6 +249,10 @@ This roadmap outlines the development path from the current prototype to a produ
 ---
 
 ## Recent Changes
+
+### 2026-01-23
+- Added E2EE DM Messaging (PR #41) - End-to-end encryption for DM conversations using vodozemac.
+- Updated encryption architecture docs with implementation details.
 
 ### 2026-01-21
 - Added Sound Pack (Notification Sounds) design to Phase 4.

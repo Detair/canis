@@ -69,6 +69,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Post-login E2EE setup prompt (skippable or mandatory via server config)
   - Backup reminder banner for users without backup
   - Server configuration option `REQUIRE_E2EE_SETUP` for mandatory setup
+- End-to-End Encrypted DM messaging
+  - LocalKeyStore with encrypted SQLite storage for Olm accounts and sessions
+  - CryptoManager for session management and encrypt/decrypt operations
+  - Tauri commands for E2EE initialization, encryption, and decryption
+  - E2EE store for frontend state management with Solid.js signals
+  - E2EE setup modal with recovery key generation and secure clipboard integration
+  - Encryption indicator (lock/unlock icon) in DM conversation headers
+  - Graceful fallback to unencrypted messaging when E2EE not available
+  - Automatic decryption of incoming encrypted messages
 - Information Pages system for platform-wide and guild-specific content (ToS, Privacy Policy, FAQ, rules, guides)
 - Markdown editor with live preview, toolbar, and cheat sheet
 - Mermaid diagram support in markdown preview

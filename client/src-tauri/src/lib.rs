@@ -15,7 +15,7 @@ use reqwest::Client as HttpClient;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tauri::Manager;
-use tokio::sync::{mpsc, RwLock};
+use tokio::sync::{mpsc, Mutex, RwLock};
 use webrtc::WebRtcClient;
 
 use network::WebSocketManager;
@@ -128,6 +128,15 @@ pub fn run() {
             commands::crypto::generate_recovery_key,
             commands::crypto::create_backup,
             commands::crypto::restore_backup,
+            // E2EE commands
+            commands::crypto::get_e2ee_status,
+            commands::crypto::init_e2ee,
+            commands::crypto::encrypt_message,
+            commands::crypto::decrypt_message,
+            commands::crypto::mark_prekeys_published,
+            commands::crypto::generate_prekeys,
+            commands::crypto::needs_prekey_upload,
+            commands::crypto::get_our_curve25519_key,
             // Presence commands
             commands::presence::scan_processes,
             commands::presence::scan_all_processes,
@@ -223,6 +232,9 @@ pub struct AppState {
     pub websocket: Arc<RwLock<Option<WebSocketManager>>>,
     /// Voice state.
     pub voice: Arc<RwLock<Option<VoiceState>>>,
+    /// E2EE crypto manager.
+    /// Uses Mutex instead of RwLock because rusqlite::Connection is Send but not Sync.
+    pub crypto: Arc<Mutex<Option<crypto::CryptoManager>>>,
 }
 
 impl AppState {
@@ -237,6 +249,7 @@ impl AppState {
             auth: Arc::new(RwLock::new(AuthState::default())),
             websocket: Arc::new(RwLock::new(None)),
             voice: Arc::new(RwLock::new(None)),
+            crypto: Arc::new(Mutex::new(None)),
         }
     }
 
