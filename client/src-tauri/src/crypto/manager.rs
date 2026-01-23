@@ -4,7 +4,7 @@
 
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, Mutex};
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -95,8 +95,11 @@ pub struct PrekeyForUpload {
 }
 
 /// Manages E2EE cryptographic operations.
+///
+/// Uses `Mutex` instead of `RwLock` because `rusqlite::Connection` is `Send` but not `Sync`.
+/// This allows `CryptoManager` to be `Send + Sync` for use in async contexts.
 pub struct CryptoManager {
-    store: Arc<RwLock<LocalKeyStore>>,
+    store: Arc<Mutex<LocalKeyStore>>,
     user_id: Uuid,
     device_id: Uuid,
 }
@@ -147,7 +150,7 @@ impl CryptoManager {
         };
 
         Ok(Self {
-            store: Arc::new(RwLock::new(store)),
+            store: Arc::new(Mutex::new(store)),
             user_id,
             device_id,
         })
@@ -163,9 +166,9 @@ impl CryptoManager {
     ///
     /// # Panics
     ///
-    /// Panics if the RwLock is poisoned.
+    /// Panics if the Mutex is poisoned.
     pub fn needs_key_upload(&self) -> Result<bool> {
-        let store = self.store.read().expect("RwLock poisoned");
+        let store = self.store.lock().expect("Mutex poisoned");
         let account = store.load_account()?;
         Ok(!account.one_time_keys().is_empty())
     }
@@ -178,9 +181,9 @@ impl CryptoManager {
     ///
     /// # Panics
     ///
-    /// Panics if the RwLock is poisoned.
+    /// Panics if the Mutex is poisoned.
     pub fn get_identity_keys(&self) -> Result<IdentityKeyPair> {
-        let store = self.store.read().expect("RwLock poisoned");
+        let store = self.store.lock().expect("Mutex poisoned");
         let account = store.load_account()?;
         Ok(account.identity_keys())
     }
@@ -205,9 +208,9 @@ impl CryptoManager {
     ///
     /// # Panics
     ///
-    /// Panics if the RwLock is poisoned.
+    /// Panics if the Mutex is poisoned.
     pub fn our_curve25519_key(&self) -> Result<String> {
-        let store = self.store.read().expect("RwLock poisoned");
+        let store = self.store.lock().expect("Mutex poisoned");
         let account = store.load_account()?;
         Ok(account.curve25519_key().to_base64())
     }
@@ -226,9 +229,9 @@ impl CryptoManager {
     ///
     /// # Panics
     ///
-    /// Panics if the RwLock is poisoned.
+    /// Panics if the Mutex is poisoned.
     pub fn generate_prekeys(&self, count: usize) -> Result<Vec<PrekeyForUpload>> {
-        let store = self.store.write().expect("RwLock poisoned");
+        let store = self.store.lock().expect("Mutex poisoned");
         let mut account = store.load_account()?;
 
         // Generate new one-time keys
@@ -258,9 +261,9 @@ impl CryptoManager {
     ///
     /// # Panics
     ///
-    /// Panics if the RwLock is poisoned.
+    /// Panics if the Mutex is poisoned.
     pub fn mark_keys_published(&self) -> Result<()> {
-        let store = self.store.write().expect("RwLock poisoned");
+        let store = self.store.lock().expect("Mutex poisoned");
         let mut account = store.load_account()?;
         account.mark_keys_as_published();
         store.save_account(&account)?;
@@ -275,9 +278,9 @@ impl CryptoManager {
     ///
     /// # Panics
     ///
-    /// Panics if the RwLock is poisoned.
+    /// Panics if the Mutex is poisoned.
     pub fn get_unpublished_keys(&self) -> Result<Vec<PrekeyForUpload>> {
-        let store = self.store.read().expect("RwLock poisoned");
+        let store = self.store.lock().expect("Mutex poisoned");
         let account = store.load_account()?;
 
         let prekeys: Vec<PrekeyForUpload> = account
@@ -308,14 +311,14 @@ impl CryptoManager {
     ///
     /// # Panics
     ///
-    /// Panics if the RwLock is poisoned.
+    /// Panics if the Mutex is poisoned.
     pub fn encrypt_for_device(
         &self,
         recipient_user_id: Uuid,
         claimed: &ClaimedPrekey,
         plaintext: &str,
     ) -> Result<EncryptedMessage> {
-        let store = self.store.write().expect("RwLock poisoned");
+        let store = self.store.lock().expect("Mutex poisoned");
 
         // Parse the recipient's identity key
         let recipient_identity_key =
@@ -377,14 +380,14 @@ impl CryptoManager {
     ///
     /// # Panics
     ///
-    /// Panics if the RwLock is poisoned.
+    /// Panics if the Mutex is poisoned.
     pub fn decrypt_message(
         &self,
         sender_user_id: Uuid,
         sender_key: &str,
         message: &EncryptedMessage,
     ) -> Result<String> {
-        let store = self.store.write().expect("RwLock poisoned");
+        let store = self.store.lock().expect("Mutex poisoned");
 
         let sender_identity_key = Curve25519PublicKey::from_base64(sender_key)
             .map_err(|e| CryptoManagerError::InvalidKey(e.to_string()))?;
@@ -438,9 +441,9 @@ impl CryptoManager {
     ///
     /// # Panics
     ///
-    /// Panics if the RwLock is poisoned.
+    /// Panics if the Mutex is poisoned.
     pub fn has_session(&self, user_id: Uuid, device_curve25519: &str) -> Result<bool> {
-        let store = self.store.read().expect("RwLock poisoned");
+        let store = self.store.lock().expect("Mutex poisoned");
         let session_key = SessionKey {
             user_id,
             device_curve25519: device_curve25519.to_string(),
