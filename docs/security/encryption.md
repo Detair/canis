@@ -24,17 +24,25 @@ Voice data is transmitted peer-to-peer (or via SFU) using standard WebRTC encryp
 
 ## Layer 3: Text Message E2EE (End-to-End Encryption)
 
-Text messages use the **Olm** and **Megolm** cryptographic ratchets, ensuring that the server cannot read message content.
+Text messages use the **Olm** and **Megolm** cryptographic ratchets via the `vodozemac` library (Apache 2.0), ensuring that the server cannot read message content.
+
+> **Implementation Status:** ✅ DM messages (1:1 and Group DMs) are E2EE enabled. Guild channel encryption is planned.
 
 ### 1:1 Direct Messages (Olm)
 - **Algorithm:** Double Ratchet Algorithm (Olm).
+- **Library:** `vodozemac` (Rust implementation of Olm/Megolm)
 - **Key Agreement:** X3DH (Extended Triple Diffie-Hellman) using pre-keys stored on the server.
 - **Properties:**
     - **Confidentiality:** Only the recipient can decrypt.
     - **Forward Secrecy:** Compromising current keys does not compromise past messages.
     - **Post-Compromise Security:** New keys heal the session after a compromise.
 
-### Group Channels (Megolm)
+### Group DMs (Olm per-recipient)
+- **Current Implementation:** Each message is encrypted separately for each recipient using Olm sessions.
+- **Message Format:** `E2EEContent` JSON containing per-device ciphertexts with sender's Curve25519 key.
+- **Future:** Megolm group sessions for efficiency with larger groups.
+
+### Group Channels (Megolm) - Planned
 - **Algorithm:** Megolm (Outbound group sessions).
 - **Mechanism:**
     - Sender creates an outbound Megolm session.
@@ -46,7 +54,11 @@ Text messages use the **Olm** and **Megolm** cryptographic ratchets, ensuring th
 ### Key Management
 - **Identity Keys:** Long-term Curve25519 keys identifying a user/device.
 - **One-Time Keys:** Uploaded to server for initial session establishment (X3DH).
-- **Storage:** Keys are stored in the client's secure storage (OS Keychain).
+- **Storage:**
+    - **Tauri Client:** Encrypted SQLite database (`LocalKeyStore`) with AES-256-GCM encryption.
+    - **Key Derivation:** Recovery key → SHA-256 → encryption key for SQLite storage.
+    - **Recovery Key:** 128-bit random value displayed as Base58-encoded chunks for user backup.
+- **Session Persistence:** Olm sessions serialized and stored encrypted, survive app restarts.
 
 ## Layer 4: Data at Rest
 
