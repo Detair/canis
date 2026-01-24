@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Cross-server favorites: pin channels from different guilds into a unified Favorites section
+  - Star icon on channels to toggle favorites (appears on hover, filled when favorited)
+  - Expandable Favorites section in Sidebar grouped by guild
+  - Click favorites to navigate directly to that guild and channel
+  - Maximum 25 favorites per user
+  - Automatic cleanup when last channel from a guild is unfavorited
 - Modular Home Sidebar with collapsible modules:
   - Active Now module shows friends currently playing games
   - Pending module with quick accept/decline for friend requests
