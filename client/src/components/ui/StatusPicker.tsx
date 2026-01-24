@@ -1,6 +1,7 @@
 import { Component, For, Show } from "solid-js";
 import { UserStatus } from "@/lib/types";
 import * as tauri from "@/lib/tauri";
+import { markManualStatusChange } from "@/stores/presence";
 
 interface StatusPickerProps {
   currentStatus: UserStatus;
@@ -17,6 +18,7 @@ const STATUS_OPTIONS: { value: UserStatus; label: string; color: string }[] = [
 const StatusPicker: Component<StatusPickerProps> = (props) => {
   const handleSelect = async (status: UserStatus) => {
     try {
+      markManualStatusChange(status);
       await tauri.updateStatus(status);
       props.onClose();
     } catch (err) {
