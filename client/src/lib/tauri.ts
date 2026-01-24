@@ -260,9 +260,9 @@ export async function login(
 }
 
 /**
- * Update the user's presence status (online, away, busy, offline).
+ * Update the user's presence status (online, idle, dnd, invisible, offline).
  */
-export async function updateStatus(status: "online" | "away" | "busy" | "offline"): Promise<void> {
+export async function updateStatus(status: "online" | "idle" | "dnd" | "invisible" | "offline"): Promise<void> {
   if (isTauri) {
     const { invoke } = await import("@tauri-apps/api/core");
     return invoke("update_status", { status });

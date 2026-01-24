@@ -6,7 +6,7 @@
 
 // User Types
 
-export type UserStatus = "online" | "away" | "busy" | "offline";
+export type UserStatus = "online" | "idle" | "dnd" | "invisible" | "offline";
 
 // Quality and Status Indicator Types (for accessibility shapes)
 
@@ -44,10 +44,22 @@ export interface Activity {
   details?: string;
 }
 
+/** Custom status set by the user. */
+export interface CustomStatus {
+  /** Display text for the custom status. */
+  text: string;
+  /** Optional emoji to show with the status. */
+  emoji?: string;
+  /** ISO timestamp when the custom status expires. */
+  expiresAt?: string;
+}
+
 /** Extended presence data with activity. */
 export interface UserPresence {
   /** Current user status. */
   status: UserStatus;
+  /** Custom status set by the user, if any. */
+  customStatus?: CustomStatus | null;
   /** Current activity, if any. */
   activity?: Activity | null;
   /** ISO timestamp of when the user was last seen (for offline users). */

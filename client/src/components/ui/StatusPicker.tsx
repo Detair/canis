@@ -9,9 +9,9 @@ interface StatusPickerProps {
 
 const STATUS_OPTIONS: { value: UserStatus; label: string; color: string }[] = [
   { value: "online", label: "Online", color: "bg-green-500" },
-  { value: "away", label: "Away", color: "bg-yellow-500" },
-  { value: "busy", label: "Do Not Disturb", color: "bg-red-500" },
-  { value: "offline", label: "Invisible", color: "bg-gray-500" },
+  { value: "idle", label: "Idle", color: "bg-yellow-500" },
+  { value: "dnd", label: "Do Not Disturb", color: "bg-red-500" },
+  { value: "invisible", label: "Invisible", color: "bg-gray-500" },
 ];
 
 const StatusPicker: Component<StatusPickerProps> = (props) => {
