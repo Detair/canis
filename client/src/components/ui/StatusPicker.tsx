@@ -6,6 +6,7 @@ import { markManualStatusChange } from "@/stores/presence";
 interface StatusPickerProps {
   currentStatus: UserStatus;
   onClose: () => void;
+  onCustomStatusClick?: () => void;
 }
 
 const STATUS_OPTIONS: { value: UserStatus; label: string; color: string }[] = [
@@ -48,6 +49,20 @@ const StatusPicker: Component<StatusPickerProps> = (props) => {
             </button>
           )}
         </For>
+        <Show when={props.onCustomStatusClick}>
+          <div class="border-t border-white/10 mt-2 pt-2">
+            <button
+              class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-text-secondary hover:bg-white/5 transition-colors"
+              onClick={() => {
+                props.onCustomStatusClick?.();
+                props.onClose();
+              }}
+            >
+              <span>💬</span>
+              <span>Set Custom Status...</span>
+            </button>
+          </div>
+        </Show>
       </div>
     </div>
   );
