@@ -157,6 +157,23 @@ export interface Attachment {
   url: string;
 }
 
+export interface Reaction {
+  emoji: string;
+  count: number;
+  users: string[];  // User IDs (for tooltip)
+  me: boolean;      // Did current user react
+}
+
+export interface GuildEmoji {
+  id: string;
+  name: string;
+  guildId: string;
+  imageUrl: string;
+  animated: boolean;
+  uploadedBy: string;
+  createdAt: string;
+}
+
 export interface Message {
   id: string;
   channel_id: string;
@@ -168,6 +185,7 @@ export interface Message {
   edited_at: string | null;
   created_at: string;
   mention_type: "direct" | "everyone" | "here" | null;
+  reactions?: Reaction[];
 }
 
 // Voice Types
