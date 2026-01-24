@@ -8,6 +8,27 @@
 
 export type UserStatus = "online" | "away" | "busy" | "offline";
 
+// Quality and Status Indicator Types (for accessibility shapes)
+
+export type QualityLevel = "good" | "warning" | "poor" | "unknown";
+
+export type StatusShape = "circle" | "triangle" | "hexagon" | "empty-circle";
+
+export const STATUS_SHAPES: Record<QualityLevel, StatusShape> = {
+  good: "circle",
+  warning: "triangle",
+  poor: "hexagon",
+  unknown: "empty-circle",
+};
+
+export const STATUS_COLORS = {
+  good: "#23a55a",
+  warning: "#f0b232",
+  poor: "#f23f43",
+  unknown: "#80848e",
+  streaming: "#593695",
+} as const;
+
 /** Type of activity the user is engaged in. */
 export type ActivityType = "game" | "listening" | "watching" | "coding" | "custom";
 
