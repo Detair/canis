@@ -8,12 +8,13 @@
  * - Connection: Pulsing green dot + channel name + elapsed timer
  * - Mic Active: Small green activity dot (visible when unmuted)
  * - Speaking: Border glow + shadow effect + ring around mute button
+ * - Screen Sharing: Highlighted button when active
  *
  * Controls:
  * - Mute/Unmute (Ctrl+Shift+M)
  * - Deafen/Undeafen (Ctrl+Shift+D)
  * - Audio Settings (opens AudioDeviceSettings modal)
- * - Screen Share (@phase4 - currently disabled)
+ * - Screen Share (opens quality picker, toggles when active)
  * - Disconnect (red button)
  *
  * Features:
@@ -24,9 +25,10 @@
 
 import { Component, createSignal, createEffect, onMount, onCleanup, Show } from "solid-js";
 import { Mic, MicOff, Headphones, Monitor, PhoneOff, Settings, GripVertical } from "lucide-solid";
-import { voiceState, setMute, setDeafen, leaveVoice, getVoiceChannelInfo, getLocalMetrics } from "@/stores/voice";
+import { voiceState, setMute, setDeafen, leaveVoice, getVoiceChannelInfo, getLocalMetrics, stopScreenShare } from "@/stores/voice";
 import { formatElapsedTime } from "@/lib/utils";
 import AudioDeviceSettings from "@/components/voice/AudioDeviceSettings";
+import ScreenShareQualityPicker from "@/components/voice/ScreenShareQualityPicker";
 import { QualityIndicator } from "@/components/voice/QualityIndicator";
 import { QualityTooltip } from "@/components/voice/QualityTooltip";
 import type { ConnectionMetrics } from "@/lib/webrtc/types";
@@ -35,6 +37,7 @@ const VoiceIsland: Component = () => {
   const [elapsedTime, setElapsedTime] = createSignal<string>("00:00");
   const [showSettings, setShowSettings] = createSignal(false);
   const [showQualityTooltip, setShowQualityTooltip] = createSignal(false);
+  const [showScreenSharePicker, setShowScreenSharePicker] = createSignal(false);
 
   // Draggable state - default to top-center
   const getInitialPosition = () => {
@@ -115,6 +118,15 @@ const VoiceIsland: Component = () => {
   // Disconnect from voice
   const disconnect = async () => {
     await leaveVoice();
+  };
+
+  // Toggle screen share
+  const toggleScreenShare = async () => {
+    if (voiceState.screenSharing) {
+      await stopScreenShare();
+    } else {
+      setShowScreenSharePicker(true);
+    }
   };
 
   // Keyboard shortcuts (only when in voice)
@@ -315,13 +327,17 @@ const VoiceIsland: Component = () => {
           <Headphones class="w-5 h-5" classList={{ "opacity-50": voiceState.deafened }} />
         </button>
 
-        {/* Screen Share - @phase4 */}
+        {/* Screen Share */}
         <button
-          class="w-10 h-10 flex items-center justify-center rounded-full transition-all duration-200 hover:bg-white/10 text-text-primary opacity-50 cursor-not-allowed"
-          title="Screen Share (Phase 4)"
-          disabled
+          class="w-10 h-10 flex items-center justify-center rounded-full transition-all duration-200 hover:bg-white/10"
+          classList={{
+            "text-accent-primary bg-accent-primary/20": voiceState.screenSharing,
+            "text-text-primary": !voiceState.screenSharing,
+          }}
+          onClick={toggleScreenShare}
+          title={voiceState.screenSharing ? "Stop Screen Share" : "Share Screen"}
         >
-          <Monitor class="w-5 h-5" />
+          <Monitor class="w-5 h-5" classList={{ "drop-shadow-[0_0_8px_rgba(136,192,208,0.8)]": voiceState.screenSharing }} />
         </button>
 
         {/* Settings */}
@@ -351,6 +367,13 @@ const VoiceIsland: Component = () => {
         <AudioDeviceSettings
           onClose={() => setShowSettings(false)}
           parentPosition={position()}
+        />
+      </Show>
+
+      {/* Screen Share Quality Picker */}
+      <Show when={showScreenSharePicker()}>
+        <ScreenShareQualityPicker
+          onClose={() => setShowScreenSharePicker(false)}
         />
       </Show>
     </div>

@@ -1,5 +1,5 @@
 import { Component, For, Show, createSignal } from "solid-js";
-import { User, MicOff, Volume2 } from "lucide-solid";
+import { User, MicOff, Volume2, Monitor } from "lucide-solid";
 import { voiceState, getLocalMetrics, getParticipantMetrics } from "@/stores/voice";
 import { authState } from "@/stores/auth";
 import { QualityIndicator } from "./QualityIndicator";
@@ -66,6 +66,11 @@ const VoiceParticipants: Component<Props> = (props) => {
             </Show>
           </div>
 
+          <Show when={voiceState.screenSharing}>
+            <div title="Screen Sharing">
+              <Monitor class="w-3 h-3 text-accent-primary" />
+            </div>
+          </Show>
           <Show when={voiceState.muted}>
             <div title="Muted">
               <MicOff class="w-3 h-3 text-accent-danger" />
@@ -120,6 +125,11 @@ const VoiceParticipants: Component<Props> = (props) => {
                   </Show>
                 </div>
 
+                <Show when={participant.screen_sharing}>
+                  <div title="Screen Sharing">
+                    <Monitor class="w-3 h-3 text-accent-primary" />
+                  </div>
+                </Show>
                 <Show when={participant.muted}>
                   <div title="Muted">
                     <MicOff class="w-3 h-3 text-accent-danger" />
