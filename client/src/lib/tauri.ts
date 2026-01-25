@@ -2235,7 +2235,8 @@ export async function addReaction(
 
   await httpRequest<void>(
     "PUT",
-    `/api/messages/${messageId}/reactions/${encodeURIComponent(emoji)}`
+    `/api/channels/${channelId}/messages/${messageId}/reactions`,
+    { emoji }
   );
 }
 
@@ -2254,6 +2255,6 @@ export async function removeReaction(
 
   await httpRequest<void>(
     "DELETE",
-    `/api/messages/${messageId}/reactions/${encodeURIComponent(emoji)}`
+    `/api/channels/${channelId}/messages/${messageId}/reactions/${encodeURIComponent(emoji)}`
   );
 }

@@ -321,7 +321,10 @@ export type ServerEvent =
   // DM read sync event
   | { type: "dm_read"; channel_id: string }
   // Preferences events
-  | { type: "preferences_updated"; preferences: Partial<UserPreferences>; updated_at: string };
+  | { type: "preferences_updated"; preferences: Partial<UserPreferences>; updated_at: string }
+  // Reaction events
+  | { type: "reaction_add"; channel_id: string; message_id: string; user_id: string; emoji: string }
+  | { type: "reaction_remove"; channel_id: string; message_id: string; user_id: string; emoji: string };
 
 // Settings Types
 
