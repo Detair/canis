@@ -95,6 +95,10 @@ async fn main() -> Result<()> {
     // Initialize SFU server for voice
     // Pass config and rate limiter
     let sfu = voice::SfuServer::new(std::sync::Arc::new(config.clone()), rate_limiter.clone())?;
+
+    // Start background cleanup task for voice stats rate limiter to prevent memory leaks
+    let _cleanup_handle = sfu.start_cleanup_task();
+
     info!("Voice SFU server initialized");
 
 

@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
+use tracing::debug;
 use uuid::Uuid;
 
 use super::error::VoiceError;
@@ -14,6 +15,8 @@ pub struct VoiceStatsLimiter {
     last_stats: Arc<RwLock<HashMap<Uuid, Instant>>>,
     /// Minimum time between stats reports.
     min_stats_interval: Duration,
+    /// Cleanup interval for periodic cleanup task.
+    cleanup_interval: Duration,
 }
 
 impl VoiceStatsLimiter {
@@ -22,13 +25,37 @@ impl VoiceStatsLimiter {
         Self {
             last_stats: Arc::new(RwLock::new(HashMap::new())),
             min_stats_interval,
+            cleanup_interval: Duration::from_secs(60), // Default cleanup every 60 seconds
         }
     }
 
     /// Create a rate limiter with default settings.
     /// - 1 stats report per second
+    /// - Cleanup every 60 seconds
     pub fn default() -> Self {
         Self::new(Duration::from_secs(1))
+    }
+
+    /// Start a background task that periodically cleans up stale entries.
+    /// Returns a handle to the spawned task.
+    pub fn start_cleanup_task(self: &Arc<Self>) -> tokio::task::JoinHandle<()> {
+        let limiter = Arc::clone(self);
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(limiter.cleanup_interval);
+            loop {
+                interval.tick().await;
+                let before = limiter.last_stats.read().await.len();
+                limiter.cleanup().await;
+                let after = limiter.last_stats.read().await.len();
+                if before > after {
+                    debug!(
+                        removed = before - after,
+                        remaining = after,
+                        "VoiceStatsLimiter cleanup complete"
+                    );
+                }
+            }
+        })
     }
 
     /// Check if a user can report voice stats (rate limit check).

@@ -367,6 +367,13 @@ impl SfuServer {
         })
     }
 
+    /// Start background cleanup task for voice stats rate limiter.
+    /// This should be called once after server initialization to prevent memory leaks.
+    /// Returns a handle to the spawned task.
+    pub fn start_cleanup_task(&self) -> tokio::task::JoinHandle<()> {
+        self.stats_limiter.start_cleanup_task()
+    }
+
     /// Get `RTCConfiguration` with ICE servers from config.
     #[must_use]
     pub fn rtc_config(&self) -> RTCConfiguration {
