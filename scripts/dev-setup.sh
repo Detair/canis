@@ -5,11 +5,16 @@
 # This script sets up the complete development environment:
 # - Checks for required tools
 # - Creates .env file with secure defaults
-# - Starts Docker services (PostgreSQL, Valkey, MinIO, MailHog)
+# - Starts Docker/Podman services (PostgreSQL, Valkey, MinIO, MailHog)
 # - Runs database migrations
 # - Installs frontend dependencies
 #
+# Supports: Debian/Ubuntu, Fedora, Fedora Atomic (Silverblue/Kinoite)
+#
 # Usage: ./scripts/dev-setup.sh [--clean] [--no-docker] [--no-client]
+#
+# Note: On Fedora Atomic, run ./setup-dev.sh first to set up your development
+# container via Distrobox. Then run this script inside the container.
 #
 
 set -euo pipefail
@@ -159,22 +164,37 @@ else
     log_warn "Node.js not found (optional, needed for Playwright tests)"
 fi
 
-# Check Docker
+# Check Docker or Podman
 if ! $NO_DOCKER; then
+    CONTAINER_ENGINE=""
+    COMPOSE_CMD=""  # Will be set below; empty means not found
     if check_command docker; then
+        CONTAINER_ENGINE="docker"
         log_success "Docker $(docker --version | grep -oP '\d+\.\d+\.\d+' | head -1)"
+    elif check_command podman; then
+        CONTAINER_ENGINE="podman"
+        log_success "Podman $(podman --version | grep -oP '\d+\.\d+\.\d+' | head -1)"
     else
-        MISSING_TOOLS+=("docker (https://docs.docker.com/get-docker/)")
+        # Check if we're on Fedora Atomic
+        if [[ -f /run/ostree-booted ]]; then
+            log_warn "On Fedora Atomic, Podman is pre-installed. Make sure you're in a Distrobox."
+            log_info "Run ./setup-dev.sh first to create a development container."
+        fi
+        MISSING_TOOLS+=("docker or podman (https://docs.docker.com/get-docker/ or https://podman.io)")
     fi
 
-    # Check Docker Compose
-    if docker compose version &> /dev/null; then
+    # Check Docker/Podman Compose
+    if [[ "$CONTAINER_ENGINE" == "docker" ]] && docker compose version &> /dev/null; then
         log_success "Docker Compose $(docker compose version | grep -oP '\d+\.\d+\.\d+' | head -1)"
+        COMPOSE_CMD="docker compose"
+    elif [[ "$CONTAINER_ENGINE" == "podman" ]] && check_command podman-compose; then
+        log_success "Podman Compose $(podman-compose --version 2>/dev/null | grep -oP '\d+\.\d+\.\d+' | head -1 || echo "available")"
+        COMPOSE_CMD="podman-compose"
     elif check_command docker-compose; then
         log_success "Docker Compose (standalone)"
-        DOCKER_COMPOSE="docker-compose"
+        COMPOSE_CMD="docker-compose"
     else
-        MISSING_TOOLS+=("docker compose")
+        MISSING_TOOLS+=("docker compose or podman-compose")
     fi
 fi
 
@@ -220,11 +240,11 @@ if $CLEAN; then
         log_success "Removed .env"
     fi
 
-    # Stop and remove Docker volumes
+    # Stop and remove Docker/Podman volumes
     if ! $NO_DOCKER; then
         cd "${PROJECT_ROOT}"
-        docker compose -f docker-compose.dev.yml down -v 2>/dev/null || true
-        log_success "Removed Docker volumes"
+        ${COMPOSE_CMD:-docker compose} -f docker-compose.dev.yml down -v 2>/dev/null || true
+        log_success "Removed container volumes"
     fi
 
     echo ""
@@ -314,28 +334,24 @@ fi
 echo ""
 
 # =============================================================================
-# Step 4: Start Docker Services
+# Step 4: Start Container Services
 # =============================================================================
 if ! $NO_DOCKER; then
-    log_info "Starting Docker services..."
+    log_info "Starting container services..."
 
     cd "${PROJECT_ROOT}"
 
-    # Use docker compose (v2) or docker-compose
-    if docker compose version &> /dev/null; then
-        DOCKER_COMPOSE="docker compose"
-    else
-        DOCKER_COMPOSE="docker-compose"
-    fi
-
-    $DOCKER_COMPOSE -f docker-compose.dev.yml up -d
+    ${COMPOSE_CMD:-docker compose} -f docker-compose.dev.yml up -d
 
     log_info "Waiting for services to be healthy..."
+
+    # Determine exec command (docker exec or podman exec)
+    EXEC_CMD="${CONTAINER_ENGINE:-docker} exec"
 
     # Wait for PostgreSQL
     echo -n "  PostgreSQL: "
     for i in {1..30}; do
-        if docker exec voicechat-dev-postgres pg_isready -U voicechat &> /dev/null; then
+        if $EXEC_CMD voicechat-dev-postgres pg_isready -U voicechat &> /dev/null; then
             echo -e "${GREEN}ready${NC}"
             break
         fi
@@ -351,7 +367,7 @@ if ! $NO_DOCKER; then
     # Wait for Valkey
     echo -n "  Valkey: "
     for i in {1..30}; do
-        if docker exec canis-dev-valkey valkey-cli ping &> /dev/null; then
+        if $EXEC_CMD canis-dev-valkey valkey-cli ping &> /dev/null; then
             echo -e "${GREEN}ready${NC}"
             break
         fi
@@ -364,7 +380,7 @@ if ! $NO_DOCKER; then
         echo -n "."
     done
 
-    log_success "All Docker services are running"
+    log_success "All container services are running"
     echo ""
     echo "  Services:"
     echo "    - PostgreSQL: localhost:5432 (user: voicechat, pass: devpassword)"
