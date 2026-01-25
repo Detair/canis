@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Fedora Atomic (Silverblue/Kinoite) support in development setup scripts
+  - Automatic detection of immutable Fedora systems
+  - Distrobox-based development container with all dependencies
+  - Optional rpm-ostree layering fallback (with reboot requirement)
+  - Export of development tools (cargo, bun, sqlx) to host `~/.local/bin`
+  - Podman support alongside Docker for container orchestration
+
 ### Changed
 - Replaced Redis with Valkey as key-value store
   - Valkey is a BSD-3-Clause licensed fork of Redis, fully API-compatible
