@@ -63,7 +63,6 @@ export async function initPresence(): Promise<void> {
       try {
         const { invoke } = await import("@tauri-apps/api/core");
         await invoke("ws_send_activity", { activity: event.payload });
-        console.log("Activity sent to server:", event.payload);
       } catch (e) {
         console.error("Failed to send activity to server:", e);
       }
@@ -222,15 +221,11 @@ export function initIdleDetection(): void {
       previousStatus = "online";
       wasManuallySetIdle = false;
       setMyStatus("idle");
-      console.log("[Presence] User went idle, setting status to idle");
     } else if (!isIdle && currentStatus === "idle" && !wasManuallySetIdle) {
       // User became active while auto-idle - restore previous status
       setMyStatus(previousStatus);
-      console.log("[Presence] User became active, restoring status to", previousStatus);
     }
   }, timeout);
-
-  console.log("[Presence] Idle detection initialized with", timeout, "minute timeout");
 }
 
 /**
@@ -238,7 +233,6 @@ export function initIdleDetection(): void {
  */
 export function stopIdleDetectionCleanup(): void {
   stopIdleDetection();
-  console.log("[Presence] Idle detection stopped");
 }
 
 /**
@@ -247,7 +241,6 @@ export function stopIdleDetectionCleanup(): void {
  */
 export function updateIdleTimeout(minutes: number): void {
   setIdleTimeout(minutes);
-  console.log("[Presence] Idle timeout updated to", minutes, "minutes");
 }
 
 /**

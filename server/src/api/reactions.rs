@@ -129,7 +129,7 @@ pub async fn add_reaction(
     .await?;
 
     // Broadcast reaction_added event to channel subscribers
-    let _ = broadcast_to_channel(
+    if let Err(e) = broadcast_to_channel(
         &state.redis,
         channel_id,
         &ServerEvent::ReactionAdd {
@@ -139,7 +139,10 @@ pub async fn add_reaction(
             emoji: req.emoji.clone(),
         },
     )
-    .await;
+    .await
+    {
+        tracing::warn!("Failed to broadcast reaction_add event: {}", e);
+    }
 
     Ok((
         StatusCode::CREATED,
@@ -185,7 +188,7 @@ pub async fn remove_reaction(
     .await?;
 
     // Broadcast reaction_removed event to channel subscribers
-    let _ = broadcast_to_channel(
+    if let Err(e) = broadcast_to_channel(
         &state.redis,
         channel_id,
         &ServerEvent::ReactionRemove {
@@ -195,7 +198,10 @@ pub async fn remove_reaction(
             emoji,
         },
     )
-    .await;
+    .await
+    {
+        tracing::warn!("Failed to broadcast reaction_remove event: {}", e);
+    }
 
     Ok(StatusCode::NO_CONTENT)
 }

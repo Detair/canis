@@ -37,19 +37,125 @@ export const EMOJI_CATEGORIES: EmojiCategory[] = [
   },
 ];
 
-export function searchEmojis(query: string): string[] {
-  if (!query.trim()) return [];
-  // TODO: Implement proper emoji name/keyword search using query.toLowerCase()
-  const results: string[] = [];
+// Emoji name/keyword mapping for search
+const EMOJI_NAMES: Record<string, string[]> = {
+  "😀": ["grinning", "smile", "happy"],
+  "😃": ["smiley", "smile", "happy"],
+  "😄": ["smile", "happy", "joy"],
+  "😁": ["grin", "happy", "smile"],
+  "😆": ["laughing", "satisfied", "happy"],
+  "😅": ["sweat", "smile", "nervous"],
+  "🤣": ["rofl", "laugh", "rolling"],
+  "😂": ["joy", "tears", "laugh", "crying"],
+  "🙂": ["slightly", "smile"],
+  "😉": ["wink"],
+  "😊": ["blush", "smile", "happy"],
+  "😇": ["innocent", "angel", "halo"],
+  "🥰": ["love", "hearts", "smiling"],
+  "😍": ["heart", "eyes", "love"],
+  "🤩": ["star", "struck", "excited"],
+  "😘": ["kiss", "love", "heart"],
+  "😗": ["kiss", "whistle"],
+  "😚": ["kiss", "blush"],
+  "😋": ["yum", "delicious", "tongue"],
+  "😛": ["tongue", "playful"],
+  "😜": ["wink", "tongue", "playful"],
+  "🤪": ["crazy", "zany", "wild"],
+  "😝": ["squint", "tongue"],
+  "🤔": ["thinking", "hmm", "consider"],
+  "🤗": ["hug", "hugging"],
+  "😐": ["neutral", "meh"],
+  "😑": ["expressionless"],
+  "😶": ["mute", "silent", "no mouth"],
+  "😏": ["smirk"],
+  "🙄": ["eye", "roll", "whatever"],
+  "😴": ["sleep", "zzz", "tired"],
+  "😷": ["mask", "sick"],
+  "👍": ["thumbs", "up", "yes", "good", "ok"],
+  "👎": ["thumbs", "down", "no", "bad"],
+  "👌": ["ok", "perfect", "fine"],
+  "✌️": ["peace", "victory"],
+  "👋": ["wave", "hello", "bye"],
+  "👏": ["clap", "applause"],
+  "🙌": ["celebrate", "raise", "hands"],
+  "🙏": ["pray", "please", "thanks"],
+  "💪": ["muscle", "strong", "flex"],
+  "❤️": ["heart", "love", "red"],
+  "🧡": ["heart", "orange"],
+  "💛": ["heart", "yellow"],
+  "💚": ["heart", "green"],
+  "💙": ["heart", "blue"],
+  "💜": ["heart", "purple"],
+  "🖤": ["heart", "black"],
+  "🤍": ["heart", "white"],
+  "💔": ["broken", "heart"],
+  "🎉": ["party", "tada", "celebrate"],
+  "🎊": ["confetti", "party"],
+  "🎁": ["gift", "present"],
+  "🔥": ["fire", "hot", "lit"],
+  "⭐": ["star"],
+  "✨": ["sparkles", "magic"],
+  "🎮": ["game", "controller", "gaming"],
+  "🎯": ["target", "bullseye"],
+  "🎵": ["music", "note"],
+  "🎶": ["music", "notes"],
+  "💻": ["laptop", "computer"],
+  "📱": ["phone", "mobile"],
+  "🐶": ["dog", "puppy"],
+  "🐱": ["cat", "kitty"],
+  "🐭": ["mouse"],
+  "🐰": ["rabbit", "bunny"],
+  "🦊": ["fox"],
+  "🐻": ["bear"],
+  "🐼": ["panda"],
+  "🦁": ["lion"],
+  "🐯": ["tiger"],
+  "🐮": ["cow"],
+  "🐷": ["pig"],
+  "🐸": ["frog"],
+  "🍎": ["apple", "red"],
+  "🍌": ["banana"],
+  "🍕": ["pizza"],
+  "🍔": ["burger", "hamburger"],
+  "☕": ["coffee", "hot"],
+  "🍺": ["beer"],
+  "🍷": ["wine"],
+};
 
-  for (const category of EMOJI_CATEGORIES) {
-    for (const emoji of category.emojis) {
-      // Simple search - in production would use emoji names/keywords
-      if (results.length >= 50) break;
-      results.push(emoji);
+export function searchEmojis(query: string): string[] {
+  const normalizedQuery = query.toLowerCase().trim();
+  if (!normalizedQuery) return [];
+
+  const results: string[] = [];
+  const seen = new Set<string>();
+
+  // Search by emoji names/keywords
+  for (const [emoji, keywords] of Object.entries(EMOJI_NAMES)) {
+    if (keywords.some((kw) => kw.includes(normalizedQuery))) {
+      if (!seen.has(emoji)) {
+        results.push(emoji);
+        seen.add(emoji);
+      }
     }
     if (results.length >= 50) break;
   }
 
-  return results.slice(0, 50);
+  // If no results from name search, fall back to showing first emojis from matching category
+  if (results.length === 0) {
+    for (const category of EMOJI_CATEGORIES) {
+      if (category.name.toLowerCase().includes(normalizedQuery) ||
+          category.id.toLowerCase().includes(normalizedQuery)) {
+        for (const emoji of category.emojis) {
+          if (!seen.has(emoji)) {
+            results.push(emoji);
+            seen.add(emoji);
+          }
+          if (results.length >= 50) break;
+        }
+      }
+      if (results.length >= 50) break;
+    }
+  }
+
+  return results;
 }
