@@ -281,11 +281,48 @@ pub async fn login(
     }
 
     // Check MFA if enabled
-    if user.mfa_secret.is_some() && body.mfa_code.is_none() {
-        return Err(AuthError::MfaRequired);
+    if let Some(ref encrypted_secret) = user.mfa_secret {
+        // MFA is enabled - code is required
+        let mfa_code = body.mfa_code.as_ref().ok_or(AuthError::MfaRequired)?;
+
+        // Get encryption key from config
+        let encryption_key = state
+            .config
+            .mfa_encryption_key
+            .as_ref()
+            .ok_or_else(|| AuthError::Internal("MFA encryption not configured".to_string()))?;
+
+        // Decode encryption key from hex
+        let key_bytes = hex::decode(encryption_key)
+            .map_err(|_| AuthError::Internal("Invalid MFA encryption key".to_string()))?;
+
+        // Decrypt the secret
+        let secret_str = decrypt_mfa_secret(encrypted_secret, &key_bytes)
+            .map_err(|e| AuthError::Internal(format!("Failed to decrypt MFA secret: {e}")))?;
+
+        // Parse the secret and create TOTP instance
+        let secret = Secret::Encoded(secret_str);
+        let totp = TOTP::new(
+            Algorithm::SHA1,
+            6,
+            1,
+            30,
+            secret.to_bytes().unwrap(),
+            Some("VoiceChat".to_string()),
+            user.username.clone(),
+        )
+        .map_err(|e| AuthError::Internal(format!("Failed to create TOTP: {e}")))?;
+
+        // Verify the code
+        let is_valid = totp
+            .check_current(mfa_code)
+            .map_err(|e| AuthError::Internal(format!("Failed to verify TOTP code: {e}")))?;
+
+        if !is_valid {
+            record_failed_auth!();
+            return Err(AuthError::InvalidMfaCode);
+        }
     }
-    // TODO: Verify MFA code (Phase 2)
-    // For now, MFA verification is not implemented
 
     // Generate tokens
     let tokens = generate_token_pair(
