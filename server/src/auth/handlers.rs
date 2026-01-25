@@ -205,7 +205,7 @@ pub async fn register(
     // Generate tokens
     let tokens = generate_token_pair(
         user.id,
-        &state.config.jwt_secret,
+        &state.config.jwt_private_key,
         state.config.jwt_access_expiry,
         state.config.jwt_refresh_expiry,
     )?;
@@ -327,7 +327,7 @@ pub async fn login(
     // Generate tokens
     let tokens = generate_token_pair(
         user.id,
-        &state.config.jwt_secret,
+        &state.config.jwt_private_key,
         state.config.jwt_access_expiry,
         state.config.jwt_refresh_expiry,
     )?;
@@ -373,7 +373,7 @@ pub async fn refresh_token(
     Json(body): Json<RefreshRequest>,
 ) -> AuthResult<Json<AuthResponse>> {
     // Validate the refresh token (JWT validation)
-    let claims = validate_refresh_token(&body.refresh_token, &state.config.jwt_secret)?;
+    let claims = validate_refresh_token(&body.refresh_token, &state.config.jwt_public_key)?;
 
     // Check if session exists in database (not revoked)
     let token_hash = hash_token(&body.refresh_token);
@@ -400,7 +400,7 @@ pub async fn refresh_token(
     // Generate new token pair
     let new_tokens = generate_token_pair(
         user_id,
-        &state.config.jwt_secret,
+        &state.config.jwt_private_key,
         state.config.jwt_access_expiry,
         state.config.jwt_refresh_expiry,
     )?;

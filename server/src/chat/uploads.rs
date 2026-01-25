@@ -629,7 +629,7 @@ pub async fn download(
         user.id
     } else if let Some(token) = query.token {
         // Validate token from query parameter
-        let claims = validate_access_token(&token, &state.config.jwt_secret)
+        let claims = validate_access_token(&token, &state.config.jwt_public_key)
             .map_err(|_| UploadError::Forbidden)?;
         claims
             .sub

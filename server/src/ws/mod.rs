@@ -603,7 +603,7 @@ pub async fn handler(
     Query(query): Query<WsQuery>,
 ) -> Response {
     // Validate token before upgrade
-    let claims = match jwt::validate_access_token(&query.token, &state.config.jwt_secret) {
+    let claims = match jwt::validate_access_token(&query.token, &state.config.jwt_public_key) {
         Ok(claims) => claims,
         Err(_) => {
             return Response::builder()

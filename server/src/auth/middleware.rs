@@ -78,7 +78,7 @@ pub async fn require_auth(
         .ok_or(AuthError::InvalidAuthHeader)?;
 
     // Validate JWT
-    let claims = validate_access_token(token, &state.config.jwt_secret)?;
+    let claims = validate_access_token(token, &state.config.jwt_public_key)?;
 
     // Parse user ID from claims
     let user_id: Uuid = claims.sub.parse().map_err(|_| AuthError::InvalidToken)?;
