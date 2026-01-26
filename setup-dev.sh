@@ -440,100 +440,8 @@ setup_node() {
     fi
 }
 
-setup_project_deps() {
-    log_info "Installing Frontend dependencies..."
+# Project setup is handled by scripts/dev-setup.sh
 
-    if [ -d "client" ]; then
-        cd client
-        bun install
-
-        log_info "Installing Playwright browsers..."
-        bunx playwright install --with-deps
-
-        cd ..
-        log_success "Frontend dependencies installed."
-    else
-        log_error "Directory 'client' not found. Are you in the project root?"
-        exit 1
-    fi
-}
-
-setup_database() {
-    echo ""
-    read -p "Do you want to start the database via Docker/Podman now? (y/n) " -n 1 -r
-    echo ""
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        log_info "Starting infrastructure..."
-
-        # Detect compose command
-        if docker compose version &> /dev/null 2>&1; then
-            COMPOSE_CMD="docker compose"
-        elif command -v podman-compose &> /dev/null; then
-            COMPOSE_CMD="podman-compose"
-        elif command -v docker-compose &> /dev/null; then
-            COMPOSE_CMD="docker-compose"
-        else
-            log_error "No compose command found."
-            return 1
-        fi
-
-        $COMPOSE_CMD -f docker-compose.dev.yml up -d
-
-        log_info "Waiting for database to be ready..."
-        sleep 5
-
-        log_info "Running migrations..."
-        # Ensure DATABASE_URL is set (from .env.example if .env missing)
-        if [ ! -f .env ]; then
-            cp .env.example .env
-            log_info "Created .env from .env.example"
-        fi
-
-        # Run migrations using sqlx
-        set -a
-        source .env
-        set +a
-        sqlx database create
-        sqlx migrate run --source server/migrations
-
-        log_success "Database setup complete."
-    fi
-}
-
-print_final_instructions() {
-    echo ""
-    echo "----------------------------------------------------------------"
-    log_success "Development Environment Setup Complete!"
-    echo "----------------------------------------------------------------"
-    echo ""
-
-    if $USE_DISTROBOX; then
-        echo "Your development container '${CONTAINER_NAME}' is ready."
-        echo ""
-        echo "To enter the development container:"
-        echo "  distrobox enter ${CONTAINER_NAME}"
-        echo ""
-        echo "Inside the container, you can run:"
-        echo "  cd $(pwd)"
-        echo "  cargo run -p vc-server    # Start the backend"
-        echo "  cd client && bun run dev  # Start the frontend"
-        echo ""
-        echo "Exported tools in ~/.local/bin can be used directly from the host."
-        echo ""
-    else
-        echo "To start the backend:"
-        echo "  cd server && cargo run"
-        echo ""
-        echo "To start the frontend:"
-        echo "  cd client && bun run dev"
-        echo ""
-    fi
-
-    echo "To run E2E tests:"
-    echo "  cd client && bunx playwright test"
-    echo ""
-    echo "Happy Coding!"
-}
 
 # ==============================================================================
 # Main Execution
@@ -596,31 +504,29 @@ else
 fi
 
 # Project-specific setup (works the same for all methods)
+# Project-specific setup (delegated)
 if ! $USE_DISTROBOX; then
-    log_section "Project Dependencies"
-    setup_project_deps
+    log_section "Project Setup"
+    log_info "Delegating to scripts/dev-setup.sh..."
+    
+    chmod +x "${SCRIPT_DIR}/scripts/dev-setup.sh"
+    "${SCRIPT_DIR}/scripts/dev-setup.sh"
 
-    log_section "Database Setup"
-    setup_database
 else
-    # For Distrobox, project deps are installed inside container
-    log_section "Project Dependencies (in container)"
+    # For Distrobox, run the script inside the container
+    log_section "Project Setup (in container)"
+    log_info "Delegating to scripts/dev-setup.sh inside container..."
 
     distrobox enter "${CONTAINER_NAME}" -- bash -c "
         cd '${SCRIPT_DIR}'
-        if [ -d 'client' ]; then
-            cd client
-            export BUN_INSTALL=\"\$HOME/.bun\"
-            export PATH=\"\$BUN_INSTALL/bin:\$PATH\"
-            bun install
-            echo 'Frontend dependencies installed.'
-        fi
+        chmod +x scripts/dev-setup.sh
+        ./scripts/dev-setup.sh
     "
-
-    log_section "Database Setup"
-    # Docker/Podman should be accessible from host
-    setup_docker
-    setup_database
 fi
 
-print_final_instructions
+echo ""
+echo "----------------------------------------------------------------"
+log_success "System Provisioning Complete!"
+echo "----------------------------------------------------------------"
+echo "Project setup has been delegated to the inner script."
+
