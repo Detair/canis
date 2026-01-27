@@ -175,6 +175,18 @@ pub async fn update_user_profile(
     q.fetch_one(pool).await
 }
 
+/// Get list of guild IDs the user is a member of.
+pub async fn get_user_guild_ids(pool: &PgPool, user_id: Uuid) -> sqlx::Result<Vec<Uuid>> {
+    let guild_ids = sqlx::query_scalar::<_, Uuid>(
+        "SELECT guild_id FROM guild_members WHERE user_id = $1",
+    )
+    .bind(user_id)
+    .fetch_all(pool)
+    .await?;
+
+    Ok(guild_ids)
+}
+
 /// Update user's MFA secret.
 pub async fn set_mfa_secret(
     pool: &PgPool,

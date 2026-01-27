@@ -10,15 +10,20 @@ import type { GuildMember } from "@/lib/types";
 
 /**
  * Apply a partial patch to a member's data.
- * The entity_id format is "guild_id:user_id".
+ * Server sends: entity_id = user_id (UUID), diff = { guild_id, updates }
  */
 export function patchMember(entityId: string, diff: Record<string, unknown>): void {
-  // Parse the entity ID - expected format: "guild_id:user_id"
-  const [guildId, userId] = entityId.split(":");
-  if (!guildId || !userId) {
-    console.warn("[Members] Invalid member entity ID format:", entityId);
+  // Extract guild_id from diff (server wraps member patches with guild context)
+  const guildId = diff.guild_id as string | undefined;
+  const updates = diff.updates as Record<string, unknown> | undefined;
+
+  if (!guildId || !updates) {
+    console.warn("[Members] Invalid member patch format, expected { guild_id, updates }:", diff);
     return;
   }
+
+  // entityId is the user's UUID
+  const userId = entityId;
 
   const members = guildsState.members[guildId];
   if (!members) {
@@ -36,15 +41,15 @@ export function patchMember(entityId: string, diff: Record<string, unknown>): vo
   const validFields: (keyof GuildMember)[] = [
     "username", "display_name", "avatar_url", "nickname", "status", "last_seen_at"
   ];
-  const updates: Partial<GuildMember> = {};
+  const fieldUpdates: Partial<GuildMember> = {};
   for (const field of validFields) {
-    if (field in diff) {
-      (updates as Record<string, unknown>)[field] = diff[field];
+    if (field in updates) {
+      (fieldUpdates as Record<string, unknown>)[field] = updates[field];
     }
   }
 
-  if (Object.keys(updates).length > 0) {
-    setGuildsState("members", guildId, memberIndex, (prev) => ({ ...prev, ...updates }));
+  if (Object.keys(fieldUpdates).length > 0) {
+    setGuildsState("members", guildId, memberIndex, (prev) => ({ ...prev, ...fieldUpdates }));
   }
 }
 

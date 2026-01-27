@@ -822,13 +822,29 @@ async fn handle_socket(socket: WebSocket, state: AppState, user_id: Uuid) {
         }
     };
 
+    // Fetch user's guild IDs for guild event subscriptions
+    let guild_ids = match db::get_user_guild_ids(&state.db, user_id).await {
+        Ok(guilds) => {
+            debug!(
+                "User {} is member of {} guilds for event subscriptions",
+                user_id,
+                guilds.len()
+            );
+            guilds
+        }
+        Err(e) => {
+            warn!("Failed to fetch guilds for user {}: {}", user_id, e);
+            Vec::new()
+        }
+    };
+
     // Spawn task to handle Redis pub/sub
     let redis_client = state.redis.clone();
     let tx_clone = tx.clone();
     let subscribed_clone = subscribed_channels.clone();
     let admin_subscribed_clone = admin_subscribed.clone();
     let pubsub_handle = tokio::spawn(async move {
-        handle_pubsub(redis_client, tx_clone, subscribed_clone, admin_subscribed_clone, user_id, friend_ids).await;
+        handle_pubsub(redis_client, tx_clone, subscribed_clone, admin_subscribed_clone, user_id, friend_ids, guild_ids).await;
     });
 
     // Spawn task to forward events to WebSocket
@@ -1065,6 +1081,7 @@ async fn handle_pubsub(
     admin_subscribed: Arc<tokio::sync::RwLock<bool>>,
     user_id: Uuid,
     friend_ids: Vec<Uuid>,
+    guild_ids: Vec<Uuid>,
 ) {
     // Create a subscriber client
     let subscriber = redis.clone_new();
@@ -1111,6 +1128,19 @@ async fn handle_pubsub(
             );
         } else {
             debug!("Subscribed to presence channel: {}", presence_channel);
+        }
+    }
+
+    // Subscribe to guild event channels for state sync
+    for guild_id in &guild_ids {
+        let guild_channel = channels::guild_events(*guild_id);
+        if let Err(e) = subscriber.subscribe(&guild_channel).await {
+            warn!(
+                "Failed to subscribe to guild events channel for guild {}: {}",
+                guild_id, e
+            );
+        } else {
+            debug!("Subscribed to guild events channel: {}", guild_channel);
         }
     }
 
@@ -1170,6 +1200,17 @@ async fn handle_pubsub(
         // Handle user events (user:{uuid}) for cross-device sync
         else if channel_name.starts_with("user:") {
             // Forward all user-targeted events (read sync, etc.)
+            if let Some(payload) = message.value.as_str() {
+                if let Ok(event) = serde_json::from_str::<ServerEvent>(&payload) {
+                    if tx.send(event).await.is_err() {
+                        break;
+                    }
+                }
+            }
+        }
+        // Handle guild events (guild:{uuid}) for state sync
+        else if channel_name.starts_with("guild:") {
+            // Forward guild/member patch events to all guild members
             if let Some(payload) = message.value.as_str() {
                 if let Ok(event) = serde_json::from_str::<ServerEvent>(&payload) {
                     if tx.send(event).await.is_err() {
