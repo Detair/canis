@@ -1,17 +1,17 @@
 /**
  * Channels Store
  *
- * Manages channel list and selection state.
+ * Manages channel list and selection state, including unread tracking.
  */
 
 import { createStore } from "solid-js/store";
-import type { Channel } from "@/lib/types";
+import type { ChannelWithUnread } from "@/lib/types";
 import * as tauri from "@/lib/tauri";
 import { subscribeChannel } from "@/stores/websocket";
 
 // Channels state interface
 interface ChannelsState {
-  channels: Channel[];
+  channels: ChannelWithUnread[];
   selectedChannelId: string | null;
   isLoading: boolean;
   error: string | null;
@@ -191,8 +191,63 @@ export function clearSelection(): void {
 /**
  * Find a channel by ID.
  */
-export function getChannel(channelId: string): Channel | undefined {
+export function getChannel(channelId: string): ChannelWithUnread | undefined {
   return channelsState.channels.find((c) => c.id === channelId);
+}
+
+/**
+ * Get unread count for a specific channel.
+ */
+export function getUnreadCount(channelId: string): number {
+  const channel = channelsState.channels.find((c) => c.id === channelId);
+  return channel?.unread_count ?? 0;
+}
+
+/**
+ * Get total unread count across all text channels.
+ */
+export function getTotalUnreadCount(): number {
+  return channelsState.channels
+    .filter((c) => c.channel_type === "text")
+    .reduce((sum, c) => sum + (c.unread_count ?? 0), 0);
+}
+
+/**
+ * Increment unread count for a channel (called when new message arrives).
+ */
+export function incrementUnreadCount(channelId: string): void {
+  const idx = channelsState.channels.findIndex((c) => c.id === channelId);
+  if (idx !== -1) {
+    setChannelsState("channels", idx, "unread_count", (count) => (count ?? 0) + 1);
+  }
+}
+
+/**
+ * Mark a channel as read (reset unread count to 0).
+ */
+export async function markChannelAsRead(channelId: string): Promise<void> {
+  const idx = channelsState.channels.findIndex((c) => c.id === channelId);
+  if (idx !== -1 && channelsState.channels[idx].unread_count > 0) {
+    // Optimistic update
+    setChannelsState("channels", idx, "unread_count", 0);
+
+    try {
+      await tauri.markChannelAsRead(channelId);
+    } catch (err) {
+      console.error("[Channels] Failed to mark channel as read:", err);
+      // Could revert here, but the server state is source of truth
+    }
+  }
+}
+
+/**
+ * Handle channel_read event from WebSocket (cross-device sync).
+ */
+export function handleChannelReadEvent(channelId: string): void {
+  const idx = channelsState.channels.findIndex((c) => c.id === channelId);
+  if (idx !== -1) {
+    setChannelsState("channels", idx, "unread_count", 0);
+  }
 }
 
 /**
@@ -204,10 +259,11 @@ export async function createChannel(
   guildId?: string,
   topic?: string,
   categoryId?: string
-): Promise<Channel> {
+): Promise<ChannelWithUnread> {
   const channel = await tauri.createChannel(name, channelType, guildId, topic, categoryId);
-  setChannelsState("channels", (prev) => [...prev, channel]);
-  return channel;
+  const channelWithUnread: ChannelWithUnread = { ...channel, unread_count: 0 };
+  setChannelsState("channels", (prev) => [...prev, channelWithUnread]);
+  return channelWithUnread;
 }
 
 /**
