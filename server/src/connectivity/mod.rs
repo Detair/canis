@@ -18,5 +18,5 @@ pub fn router() -> Router<AppState> {
     Router::new()
         .route("/summary", get(handlers::get_summary))
         .route("/sessions", get(handlers::get_sessions))
-        .route("/sessions/{session_id}", get(handlers::get_session_detail))
+        .route("/sessions/:session_id", get(handlers::get_session_detail))
 }

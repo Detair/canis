@@ -151,20 +151,20 @@ pub fn create_router(state: AppState) -> Router {
         .nest("/api/me/preferences", preferences::router())
         .route("/api/me/pins", get(pins::list_pins).post(pins::create_pin))
         .route("/api/me/pins/reorder", put(pins::reorder_pins))
-        .route("/api/me/pins/{id}", put(pins::update_pin).delete(pins::delete_pin))
+        .route("/api/me/pins/:id", put(pins::update_pin).delete(pins::delete_pin))
         .route("/api/me/favorites", get(favorites::list_favorites))
         .route("/api/me/favorites/reorder", put(favorites::reorder_channels))
         .route("/api/me/favorites/reorder-guilds", put(favorites::reorder_guilds))
-        .route("/api/me/favorites/{channel_id}", post(favorites::add_favorite).delete(favorites::remove_favorite))
+        .route("/api/me/favorites/:channel_id", post(favorites::add_favorite).delete(favorites::remove_favorite))
         .nest("/api/keys", crypto::router())
-        .nest("/api/users/{user_id}/keys", crypto::user_keys_router())
+        .nest("/api/users/:user_id/keys", crypto::user_keys_router())
         // Message reactions
         .route(
-            "/api/channels/{channel_id}/messages/{message_id}/reactions",
+            "/api/channels/:channel_id/messages/:message_id/reactions",
             get(reactions::get_reactions).put(reactions::add_reaction),
         )
         .route(
-            "/api/channels/{channel_id}/messages/{message_id}/reactions/{emoji}",
+            "/api/channels/:channel_id/messages/:message_id/reactions/:emoji",
             delete(reactions::remove_reaction),
         )
         .layer(from_fn_with_state(state.clone(), rate_limit_by_user))

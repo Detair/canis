@@ -25,10 +25,10 @@ pub fn platform_pages_router() -> Router<AppState> {
         .route("/", post(handlers::create_platform_page))
         .route("/pending-acceptance", get(handlers::get_pending_acceptance))
         .route("/reorder", post(handlers::reorder_platform_pages))
-        .route("/by-slug/{slug}", get(handlers::get_platform_page))
-        .route("/{id}", patch(handlers::update_platform_page))
-        .route("/{id}", delete(handlers::delete_platform_page))
-        .route("/{id}/accept", post(handlers::accept_page))
+        .route("/by-slug/:slug", get(handlers::get_platform_page))
+        .route("/:id", patch(handlers::update_platform_page))
+        .route("/:id", delete(handlers::delete_platform_page))
+        .route("/:id/accept", post(handlers::accept_page))
 }
 
 /// Router for guild pages (mounted at /api/guilds/:guild_id/pages).
@@ -45,7 +45,7 @@ pub fn guild_pages_router() -> Router<AppState> {
         .route("/", get(handlers::list_guild_pages))
         .route("/", post(handlers::create_guild_page))
         .route("/reorder", post(handlers::reorder_guild_pages))
-        .route("/by-slug/{slug}", get(handlers::get_guild_page))
-        .route("/{id}", patch(handlers::update_guild_page))
-        .route("/{id}", delete(handlers::delete_guild_page))
+        .route("/by-slug/:slug", get(handlers::get_guild_page))
+        .route("/:id", patch(handlers::update_guild_page))
+        .route("/:id", delete(handlers::delete_guild_page))
 }
