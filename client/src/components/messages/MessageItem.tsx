@@ -1,7 +1,7 @@
 import { Component, Show, createMemo, For, createSignal } from "solid-js";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
-import { File, Download, SmilePlus } from "lucide-solid";
+import { File, Download, SmilePlus, Copy, Link, Hash, Trash2 } from "lucide-solid";
 import type { Message, Attachment } from "@/lib/types";
 import { formatTimestamp } from "@/lib/utils";
 import Avatar from "@/components/ui/Avatar";
@@ -9,6 +9,8 @@ import CodeBlock from "@/components/ui/CodeBlock";
 import ReactionBar from "./ReactionBar";
 import EmojiPicker from "@/components/emoji/EmojiPicker";
 import { getServerUrl, getAccessToken, addReaction, removeReaction } from "@/lib/tauri";
+import { showContextMenu, type ContextMenuEntry } from "@/components/ui/ContextMenu";
+import { currentUser } from "@/stores/auth";
 
 interface MessageItemProps {
   message: Message;
@@ -132,8 +134,50 @@ const MessageItem: Component<MessageItemProps> = (props) => {
     return blocks;
   });
 
+  const handleContextMenu = (e: MouseEvent) => {
+    const msg = props.message;
+    const me = currentUser();
+    const isOwn = me?.id === msg.author.id;
+
+    const items: ContextMenuEntry[] = [
+      {
+        label: "Copy Text",
+        icon: Copy,
+        action: () => navigator.clipboard.writeText(msg.content),
+      },
+      {
+        label: "Copy Message Link",
+        icon: Link,
+        action: () => navigator.clipboard.writeText(`${window.location.origin}/channels/${msg.channel_id}/${msg.id}`),
+      },
+      {
+        label: "Copy ID",
+        icon: Hash,
+        action: () => navigator.clipboard.writeText(msg.id),
+      },
+    ];
+
+    if (isOwn) {
+      items.push(
+        { separator: true },
+        {
+          label: "Delete Message",
+          icon: Trash2,
+          danger: true,
+          action: () => {
+            // TODO: trigger delete confirmation
+            console.log("Delete message:", msg.id);
+          },
+        },
+      );
+    }
+
+    showContextMenu(e, items);
+  };
+
   return (
     <div
+      onContextMenu={handleContextMenu}
       class={`group flex gap-4 px-4 py-0.5 hover:bg-white/3 transition-colors ${
         props.compact ? "mt-0" : "mt-4"
       }`}
