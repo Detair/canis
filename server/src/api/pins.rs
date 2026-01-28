@@ -309,15 +309,26 @@ pub async fn reorder_pins(
     auth_user: AuthUser,
     Json(request): Json<ReorderPinsRequest>,
 ) -> Result<StatusCode, PinsError> {
+    // Start transaction for atomic reorder
+    let mut tx = state.db.begin().await?;
+
     // Update positions based on order in request
     for (position, pin_id) in request.pin_ids.iter().enumerate() {
-        sqlx::query("UPDATE user_pins SET position = $3 WHERE id = $1 AND user_id = $2")
+        // Verify pin belongs to user and update position
+        let result = sqlx::query("UPDATE user_pins SET position = $3 WHERE id = $1 AND user_id = $2")
             .bind(pin_id)
             .bind(auth_user.id)
             .bind(position as i32)
-            .execute(&state.db)
+            .execute(&mut *tx)
             .await?;
+        
+        // Optional: fail if any pin is not found/owned?
+        // Current behavior allows partial updates if we don't check, but transaction ensures all or nothing for the DB.
+        // If a pin ID is invalid/not owned, rows_affected will be 0.
+        // We might want to ensure we are reordering what we expect, but loose reorder is often acceptable.
     }
+
+    tx.commit().await?;
 
     Ok(StatusCode::NO_CONTENT)
 }

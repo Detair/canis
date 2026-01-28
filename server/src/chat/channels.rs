@@ -80,6 +80,7 @@ impl From<db::Channel> for ChannelResponse {
             category_id: ch.category_id,
             guild_id: ch.guild_id,
             topic: ch.topic,
+            icon_url: ch.icon_url.map(|_| format!("/api/dm/{}/icon", ch.id)),
             user_limit: ch.user_limit,
             position: ch.position,
             max_screen_shares: ch.max_screen_shares,
@@ -163,6 +164,7 @@ pub async fn create(
         body.category_id,
         body.guild_id,
         body.topic.as_deref(),
+        None, // icon_url
         body.user_limit,
     )
     .await?;
@@ -205,6 +207,7 @@ pub async fn update(
         id,
         body.name.as_deref(),
         body.topic.as_deref(),
+        None, // icon_url
         body.user_limit,
         body.position,
     )

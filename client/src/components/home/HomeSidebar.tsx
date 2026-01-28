@@ -4,9 +4,11 @@ import { dmsState, loadDMs, selectFriendsTab } from "@/stores/dms";
 import DMItem from "./DMItem";
 import NewMessageModal from "./NewMessageModal";
 import UserPanel from "@/components/layout/UserPanel";
+import AddFriend from "@/components/social/AddFriend";
 
 const HomeSidebar: Component = () => {
   const [showNewMessage, setShowNewMessage] = createSignal(false);
+  const [showAddFriendModal, setShowAddFriendModal] = createSignal(false);
   const [showDMs, setShowDMs] = createSignal(true);
 
   // Mock server pages for now - in a real app these might come from a store
@@ -44,7 +46,7 @@ const HomeSidebar: Component = () => {
       <div class="mx-3 my-1 border-t border-white/10" />
 
       {/* Friends Tab */}
-      <div class="relative group mx-2 mt-1">
+      <div class="relative group mx-2 mt-1 flex items-center gap-1">
         {/* Active Pill */}
         <div
           class="absolute -left-2 top-1/2 -translate-y-1/2 w-1 bg-white rounded-r-full transition-all duration-200"
@@ -52,7 +54,7 @@ const HomeSidebar: Component = () => {
         />
         <button
           onClick={() => selectFriendsTab()}
-          class="w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors"
+          class="flex-1 flex items-center gap-3 px-3 py-2 rounded-lg transition-colors"
           classList={{
             "bg-white/10 text-text-primary": dmsState.isShowingFriends,
             "hover:bg-white/5 text-text-secondary hover:text-text-primary": !dmsState.isShowingFriends,
@@ -60,6 +62,18 @@ const HomeSidebar: Component = () => {
         >
           <Users class="w-5 h-5 transition-colors" />
           <span class="font-medium">Friends</span>
+        </button>
+
+        {/* Quick Add Friend Button */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowAddFriendModal(true);
+          }}
+          class="p-2 rounded-lg text-text-secondary hover:text-accent-success hover:bg-white/10 transition-colors"
+          title="Add Friend"
+        >
+          <Plus class="w-5 h-5" />
         </button>
       </div>
 
@@ -90,19 +104,19 @@ const HomeSidebar: Component = () => {
 
       {/* Direct Messages Header */}
       <div class="flex items-center justify-between px-3 py-1 group mb-1">
-        <button 
+        <button
           onClick={() => setShowDMs(!showDMs())}
           class="flex items-center gap-1.5 px-1 py-1 rounded hover:bg-white/5 transition-colors flex-1 text-left"
         >
-          <ChevronDown 
-            class="w-3 h-3 text-text-secondary transition-transform duration-200" 
+          <ChevronDown
+            class="w-3 h-3 text-text-secondary transition-transform duration-200"
             classList={{ "-rotate-90": !showDMs() }}
           />
           <span class="text-xs font-semibold text-text-secondary uppercase tracking-wide group-hover:text-text-primary transition-colors">
             Direct Messages
           </span>
         </button>
-        
+
         <button
           onClick={() => setShowNewMessage(true)}
           class="p-1 rounded hover:bg-white/10 transition-colors text-text-secondary hover:text-text-primary opacity-0 group-hover:opacity-100"
@@ -151,6 +165,11 @@ const HomeSidebar: Component = () => {
       {/* New Message Modal */}
       <Show when={showNewMessage()}>
         <NewMessageModal onClose={() => setShowNewMessage(false)} />
+      </Show>
+
+      {/* Add Friend Modal */}
+      <Show when={showAddFriendModal()}>
+        <AddFriend onClose={() => setShowAddFriendModal(false)} />
       </Show>
     </aside>
   );

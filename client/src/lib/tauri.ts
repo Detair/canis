@@ -53,10 +53,13 @@ import type {
   ClaimedPrekeyResponse,
   SearchResponse,
   PaginatedMessages,
+  Pin,
+  CreatePinRequest,
+  UpdatePinRequest,
 } from "./types";
 
 // Re-export types for convenience
-export type { User, Channel, ChannelCategory, ChannelWithUnread, Message, AppSettings, Guild, GuildMember, GuildInvite, InviteResponse, InviteExpiry, Friend, Friendship, DMChannel, DMListItem, Page, PageListItem, GuildRole, GuildEmoji, ChannelOverride, CreateRoleRequest, UpdateRoleRequest, SetChannelOverrideRequest, AssignRoleResponse, RemoveRoleResponse, DeleteRoleResponse, AdminStats, AdminStatus, UserSummary, GuildSummary, AuditLogEntry, PaginatedResponse, ElevateResponse, UserDetailsResponse, GuildDetailsResponse, BulkBanResponse, BulkSuspendResponse, CallEndReason, CallStateResponse, E2EEStatus, InitE2EEResponse, PrekeyData, E2EEContent, ClaimedPrekeyInput, UserKeysResponse, ClaimedPrekeyResponse, SearchResponse };
+export type { User, Channel, ChannelCategory, ChannelWithUnread, Message, AppSettings, Guild, GuildMember, GuildInvite, InviteResponse, InviteExpiry, Friend, Friendship, DMChannel, DMListItem, Page, PageListItem, GuildRole, GuildEmoji, ChannelOverride, CreateRoleRequest, UpdateRoleRequest, SetChannelOverrideRequest, AssignRoleResponse, RemoveRoleResponse, DeleteRoleResponse, AdminStats, AdminStatus, UserSummary, GuildSummary, AuditLogEntry, PaginatedResponse, ElevateResponse, UserDetailsResponse, GuildDetailsResponse, BulkBanResponse, BulkSuspendResponse, CallEndReason, CallStateResponse, E2EEStatus, InitE2EEResponse, PrekeyData, E2EEContent, ClaimedPrekeyInput, UserKeysResponse, ClaimedPrekeyResponse, SearchResponse, Pin, CreatePinRequest, UpdatePinRequest };
 
 // Detect if running in Tauri
 const isTauri = typeof window !== "undefined" && "__TAURI__" in window;
@@ -1003,6 +1006,56 @@ export async function sendFriendRequest(username: string): Promise<Friendship> {
   return httpRequest<Friendship>("POST", "/api/friends/request", { username });
 }
 
+// Pins Commands
+
+export async function fetchPins(): Promise<Pin[]> {
+  if (isTauri) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return invoke("fetch_pins");
+  }
+
+  return httpRequest<Pin[]>("GET", "/api/me/pins");
+}
+
+export async function createPin(request: CreatePinRequest): Promise<Pin> {
+  if (isTauri) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return invoke("create_pin", { request });
+  }
+
+  return httpRequest<Pin>("POST", "/api/me/pins", request);
+}
+
+export async function updatePin(
+  pinId: string,
+  request: UpdatePinRequest
+): Promise<Pin> {
+  if (isTauri) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return invoke("update_pin", { pin_id: pinId, request });
+  }
+
+  return httpRequest<Pin>("PUT", `/api/me/pins/${pinId}`, request);
+}
+
+export async function deletePin(pinId: string): Promise<void> {
+  if (isTauri) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return invoke("delete_pin", { pin_id: pinId });
+  }
+
+  await httpRequest<void>("DELETE", `/api/me/pins/${pinId}`);
+}
+
+export async function reorderPins(pinIds: string[]): Promise<void> {
+  if (isTauri) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return invoke("reorder_pins", { pin_ids: pinIds });
+  }
+
+  await httpRequest<void>("PUT", "/api/me/pins/reorder", { pin_ids: pinIds });
+}
+
 export async function acceptFriendRequest(friendshipId: string): Promise<Friendship> {
   if (isTauri) {
     const { invoke } = await import("@tauri-apps/api/core");
@@ -1040,6 +1093,39 @@ export async function blockUser(userId: string): Promise<Friendship> {
 }
 
 // DM Commands
+
+export interface DMIconResponse {
+  icon_url: string;
+}
+
+export async function uploadDMAvatar(channelId: string, file: File): Promise<DMIconResponse> {
+  if (isTauri) {
+    // TODO: Implement Tauri file upload using invoke or plugin-http
+    return Promise.reject("File upload not supported in Desktop app yet");
+  } else {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    // Use raw fetch or helper
+    const token = getAccessToken();
+    const headers: HeadersInit = {};
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`${getServerUrl()}/api/dm/${channelId}/icon`, {
+      method: "POST",
+      headers,
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Upload failed: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+}
 
 export async function getDMs(): Promise<DMChannel[]> {
   if (isTauri) {

@@ -2,8 +2,9 @@
 //!
 //! Handles creation and management of DM channels (1:1 and group DMs).
 use axum::{
-    extract::{Path, State},
+    extract::{Path, State, Multipart},
     http::StatusCode,
+    response::IntoResponse,
     Json,
 };
 use serde::{Deserialize, Serialize};
@@ -12,6 +13,7 @@ use validator::Validate;
 
 use crate::{
     api::AppState,
+    chat::uploads::UploadError,
     auth::AuthUser,
     db::{self, Channel, ChannelType},
     ws::{broadcast_to_user, ServerEvent},
@@ -479,6 +481,151 @@ pub async fn leave_dm(
     }
 
     Ok(StatusCode::NO_CONTENT)
+}
+
+// ============================================================================
+// Icon Upload
+// ============================================================================
+
+/// Response for DM icon upload
+#[derive(Debug, Serialize)]
+pub struct DMIconResponse {
+    pub icon_url: String,
+}
+
+/// Upload a custom icon for a DM channel
+/// POST /api/dm/:id/icon
+pub async fn upload_dm_icon(
+    State(state): State<AppState>,
+    auth: AuthUser,
+    Path(channel_id): Path<Uuid>,
+    mut multipart: Multipart,
+) -> Result<Json<DMIconResponse>, UploadError> {
+    // Verify channel exists and is a DM
+    let channel = db::find_channel_by_id(&state.db, channel_id)
+        .await?
+        .ok_or(UploadError::Validation("Channel not found".to_string()))?;
+
+    if channel.channel_type != ChannelType::Dm {
+        return Err(UploadError::Validation("Not a DM channel".to_string()));
+    }
+
+    // Verify auth user is a participant
+    let is_participant = sqlx::query_scalar!(
+        r#"SELECT EXISTS(SELECT 1 FROM dm_participants WHERE channel_id = $1 AND user_id = $2) as "exists!""#,
+        channel_id,
+        auth.id
+    )
+    .fetch_one(&state.db)
+    .await?;
+
+    if !is_participant {
+        return Err(UploadError::Forbidden);
+    }
+
+    // Process file upload (similar to uploads.rs)
+    let s3 = state.s3.as_ref().ok_or(UploadError::NotConfigured)?;
+
+    let mut file_data: Option<Vec<u8>> = None;
+    let mut _filename: Option<String> = None; // Unused but parsed
+    let mut content_type: Option<String> = None;
+
+    while let Ok(Some(field)) = multipart.next_field().await {
+        if field.name() == Some("file") {
+            _filename = field.file_name().map(String::from);
+            content_type = field.content_type().map(String::from);
+            
+            let data = field.bytes().await.map_err(|e| UploadError::Validation(e.to_string()))?;
+            
+            if data.len() > state.config.max_upload_size {
+                return Err(UploadError::TooLarge { max_size: state.config.max_upload_size });
+            }
+            
+            file_data = Some(data.to_vec());
+            break; // Only need one file
+        }
+    }
+
+    let file_data = file_data.ok_or(UploadError::NoFile)?;
+    // Default to png if unknown, logic similar to uploads.rs can be improved with mime_guess if needed
+    let content_type = content_type.unwrap_or_else(|| "image/png".to_string());
+
+    // Validate image type
+    if !content_type.starts_with("image/") {
+        return Err(UploadError::InvalidMimeType { mime_type: content_type });
+    }
+
+    // S3 Key: avatars/channels/{channel_id}/{uuid}.{ext}
+    let file_id = Uuid::now_v7();
+    let extension = match content_type.as_str() {
+        "image/jpeg" => "jpg",
+        "image/gif" => "gif",
+        "image/webp" => "webp",
+        _ => "png",
+    };
+    let s3_key = format!("avatars/channels/{}/{}.{}", channel_id, file_id, extension);
+
+    // Upload to S3
+    s3.upload(&s3_key, file_data, &content_type)
+        .await
+        .map_err(|e| UploadError::Storage(e.to_string()))?; // S3Error to string
+
+    // Store S3 Key in DB
+    sqlx::query!(
+        "UPDATE channels SET icon_url = $1, updated_at = NOW() WHERE id = $2",
+        s3_key,
+        channel_id
+    )
+    .execute(&state.db)
+    .await?;
+
+    // Return API URL
+    let icon_url = format!("/api/dm/{}/icon", channel_id);
+
+    Ok(Json(DMIconResponse { icon_url }))
+}
+
+/// Get DM icon (redirects to S3 presigned URL).
+pub async fn get_dm_icon(
+    State(state): State<AppState>,
+    auth: AuthUser,
+    Path(channel_id): Path<Uuid>,
+) -> Result<impl IntoResponse, UploadError> {
+    // Check channel exists
+    let channel = db::find_channel_by_id(&state.db, channel_id)
+        .await?
+        .ok_or(UploadError::Validation("Channel not found".to_string()))?;
+
+    // Check if DM
+    if channel.channel_type != ChannelType::Dm {
+        return Err(UploadError::Validation("Not a DM channel".to_string()));
+    }
+
+    // Check participation
+    let is_participant = sqlx::query_scalar!(
+        r#"SELECT EXISTS(SELECT 1 FROM dm_participants WHERE channel_id = $1 AND user_id = $2) as "exists!""#,
+        channel_id,
+        auth.id
+    )
+    .fetch_one(&state.db)
+    .await?;
+
+    if !is_participant {
+        return Err(UploadError::Forbidden);
+    }
+
+    // Get S3 key from DB
+    let s3_key = channel.icon_url.ok_or(UploadError::Validation("No icon set".to_string()))?;
+
+    // Generate presigned URL
+    let s3 = state.s3.as_ref().ok_or(UploadError::NotConfigured)?;
+    let presigned_url = s3
+        .presign_get(&s3_key)
+        .await
+        .map_err(|e| UploadError::Storage(e.to_string()))?;
+
+    // Redirect
+    Ok(axum::response::Redirect::temporary(&presigned_url))
 }
 
 // ============================================================================

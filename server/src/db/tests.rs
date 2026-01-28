@@ -305,6 +305,7 @@ mod postgres_tests {
             None,
             None,
             Some("General discussion"),
+            None, // icon_url
             None,
         )
         .await
@@ -322,6 +323,7 @@ mod postgres_tests {
             None,
             None,
             None,
+            None, // icon_url
             Some(10),
         )
         .await
@@ -355,6 +357,7 @@ mod postgres_tests {
             None,
             None,
             None,
+            None,
         )
         .await
         .expect("Failed to create channel");
@@ -377,6 +380,7 @@ mod postgres_tests {
             None,
             None,
             None,
+            None,
         )
         .await
         .expect("Failed to create channel");
@@ -389,6 +393,7 @@ mod postgres_tests {
             Some("New topic"),
             None,
             None,
+            None // position
         )
         .await
         .expect("Failed to update channel")
@@ -404,6 +409,7 @@ mod postgres_tests {
             &pool,
             "to-delete",
             &ChannelType::Text,
+            None,
             None,
             None,
             None,
@@ -435,6 +441,7 @@ mod postgres_tests {
             &pool,
             "member-test",
             &ChannelType::Text,
+            None,
             None,
             None,
             None,
@@ -492,6 +499,7 @@ mod postgres_tests {
             None,
             None,
             None,
+            None,
         )
         .await
         .expect("Failed to create channel");
@@ -533,6 +541,7 @@ mod postgres_tests {
             &pool,
             "msg-test",
             &ChannelType::Text,
+            None,
             None,
             None,
             None,
@@ -602,6 +611,7 @@ mod postgres_tests {
             None,
             None,
             None,
+            None,
         )
         .await
         .expect("Failed to create channel");
@@ -655,6 +665,7 @@ mod postgres_tests {
             None,
             None,
             None,
+            None,
         )
         .await
         .expect("Failed to create channel");
@@ -703,6 +714,7 @@ mod postgres_tests {
             None,
             None,
             None,
+            None,
         )
         .await
         .expect("Failed to create channel");
@@ -740,6 +752,7 @@ mod postgres_tests {
             &pool,
             "attachment-test",
             &ChannelType::Text,
+            None,
             None,
             None,
             None,
@@ -808,6 +821,7 @@ mod postgres_tests {
             &pool,
             "multi-attach-test",
             &ChannelType::Text,
+            None,
             None,
             None,
             None,

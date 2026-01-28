@@ -148,6 +148,7 @@ export interface Channel {
   category_id: string | null;
   guild_id: string | null;
   topic: string | null;
+  icon_url: string | null;
   user_limit: number | null;
   position: number;
   created_at: string;
@@ -543,6 +544,7 @@ export interface DMListItem {
   category_id: string | null;
   guild_id: string | null;
   topic: string | null;
+  icon_url: string | null;
   user_limit: number | null;
   position: number;
   created_at: string;

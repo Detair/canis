@@ -78,6 +78,8 @@ pub struct Channel {
     pub guild_id: Option<Uuid>,
     /// Channel description/topic.
     pub topic: Option<String>,
+    /// Channel icon URL (for DMs/Group DMs).
+    pub icon_url: Option<String>,
     /// Max users allowed in voice channel.
     pub user_limit: Option<i32>,
     /// Display position in channel list.

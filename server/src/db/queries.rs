@@ -150,16 +150,18 @@ pub async fn update_user_profile(
     let mut query = String::from("UPDATE users SET updated_at = NOW()");
     let mut param_idx = 1;
 
+    use std::fmt::Write;
+
     if display_name.is_some() {
-        query.push_str(&format!(", display_name = ${param_idx}"));
+        write!(query, ", display_name = ${param_idx}").unwrap();
         param_idx += 1;
     }
     if email.is_some() {
-        query.push_str(&format!(", email = ${param_idx}"));
+        write!(query, ", email = ${param_idx}").unwrap();
         param_idx += 1;
     }
 
-    query.push_str(&format!(" WHERE id = ${param_idx} RETURNING *"));
+    write!(query, " WHERE id = ${param_idx} RETURNING *").unwrap();
 
     // Build the query with dynamic bindings
     let mut q = sqlx::query_as::<_, User>(&query);
@@ -344,6 +346,7 @@ pub async fn create_channel(
     category_id: Option<Uuid>,
     guild_id: Option<Uuid>,
     topic: Option<&str>,
+    icon_url: Option<&str>,
     user_limit: Option<i32>,
 ) -> sqlx::Result<Channel> {
     // Get the next position for this category
@@ -358,9 +361,9 @@ pub async fn create_channel(
 
     sqlx::query_as::<_, Channel>(
         r"
-        INSERT INTO channels (name, channel_type, category_id, guild_id, topic, user_limit, position)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
-        RETURNING id, name, channel_type, category_id, guild_id, topic, user_limit, position, max_screen_shares, created_at, updated_at
+        INSERT INTO channels (name, channel_type, category_id, guild_id, topic, icon_url, user_limit, position)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        RETURNING id, name, channel_type, category_id, guild_id, topic, icon_url, user_limit, position, max_screen_shares, created_at, updated_at
         ",
     )
     .bind(name)
@@ -368,6 +371,7 @@ pub async fn create_channel(
     .bind(category_id)
     .bind(guild_id)
     .bind(topic)
+    .bind(icon_url)
     .bind(user_limit)
     .bind(position)
     .fetch_one(pool)
@@ -380,6 +384,7 @@ pub async fn update_channel(
     id: Uuid,
     name: Option<&str>,
     topic: Option<&str>,
+    icon_url: Option<&str>,
     user_limit: Option<i32>,
     position: Option<i32>,
 ) -> sqlx::Result<Option<Channel>> {
@@ -388,16 +393,18 @@ pub async fn update_channel(
         UPDATE channels
         SET name = COALESCE($2, name),
             topic = COALESCE($3, topic),
-            user_limit = COALESCE($4, user_limit),
-            position = COALESCE($5, position),
+            icon_url = COALESCE($4, icon_url),
+            user_limit = COALESCE($5, user_limit),
+            position = COALESCE($6, position),
             updated_at = NOW()
         WHERE id = $1
-        RETURNING id, name, channel_type, category_id, guild_id, topic, user_limit, position, max_screen_shares, created_at, updated_at
+        RETURNING id, name, channel_type, category_id, guild_id, topic, icon_url, user_limit, position, max_screen_shares, created_at, updated_at
         ",
     )
     .bind(id)
     .bind(name)
     .bind(topic)
+    .bind(icon_url)
     .bind(user_limit)
     .bind(position)
     .fetch_optional(pool)

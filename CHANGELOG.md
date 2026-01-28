@@ -226,7 +226,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Pixel font rendering fixed (blurry text in pixel themes)
 - Reaction API endpoints corrected with proper WebSocket handlers
 - Message pagination cursor comparison corrected for stable ordering
+- Message pagination cursor comparison corrected for stable ordering
 - Server build failure fixed by adding `Deserialize` to `GuildEmoji`
+- **Fixed**: Pinned notes functionality restored (fixed API wrapper implementation) (#105)
 - Documentation formatting in admin handlers fixed
 
 ### Security

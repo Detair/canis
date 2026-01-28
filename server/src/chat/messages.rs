@@ -576,6 +576,7 @@ mod tests {
             None,
             None,
             None,
+            None,
         )
         .await
         .expect("Failed to create channel");
@@ -672,6 +673,7 @@ mod tests {
             None,
             None,
             None,
+            None,
         )
         .await
         .expect("Failed to create channel");
@@ -728,6 +730,7 @@ mod tests {
             &pool,
             "test-channel",
             &db::ChannelType::Text,
+            None,
             None,
             None,
             None,
@@ -825,6 +828,7 @@ mod tests {
             None,
             None,
             None,
+            None,
         )
         .await
         .expect("Failed to create channel");
@@ -886,6 +890,7 @@ mod tests {
             &pool,
             "test-channel",
             &db::ChannelType::Text,
+            None,
             None,
             None,
             None,
