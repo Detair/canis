@@ -163,6 +163,16 @@ export function handleDMNameUpdated(channelId: string, name: string): void {
 }
 
 /**
+ * Update a DM channel's icon URL.
+ */
+export function updateDMIconUrl(channelId: string, iconUrl: string): void {
+  const dmIndex = dmsState.dms.findIndex((d) => d.id === channelId);
+  if (dmIndex !== -1) {
+    setDmsState("dms", dmIndex, "icon_url", iconUrl);
+  }
+}
+
+/**
  * Get the currently selected DM
  */
 export function getSelectedDM(): DMListItem | null {

@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Custom avatars for DM and Group DM conversations (#104)
+  - Click avatar in conversation header to upload custom icon
+  - Avatars visible in sidebar and conversation header
+  - Works for both 1:1 DMs and group DMs
 - Custom display name for group DMs (#91)
   - PATCH `/api/dm/:id/name` endpoint to rename group DMs
   - Inline editing in conversation header (click group name to edit)
@@ -221,6 +225,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Legacy unscoped `GET /api/channels` endpoint that returned all channels across all guilds
 
 ### Fixed
+- Friend requests failing in desktop client (#107)
+  - Removed dead Tauri `invoke()` branches for friend commands (no corresponding Rust commands existed)
+  - All friend operations now use HTTP API consistently
+- DM avatar upload now works in desktop client and updates reactively (#104)
 - DM list now shows online status for 1:1 conversations using presence store
 - Kick member button now properly checks KICK_MEMBERS permission
 - Voice session finalization with retry logic for reliability

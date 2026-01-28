@@ -971,38 +971,18 @@ export async function reorderGuildChannels(
 // Friends Commands
 
 export async function getFriends(): Promise<Friend[]> {
-  if (isTauri) {
-    const { invoke } = await import("@tauri-apps/api/core");
-    return invoke("get_friends");
-  }
-
   return httpRequest<Friend[]>("GET", "/api/friends");
 }
 
 export async function getPendingFriends(): Promise<Friend[]> {
-  if (isTauri) {
-    const { invoke } = await import("@tauri-apps/api/core");
-    return invoke("get_pending_friends");
-  }
-
   return httpRequest<Friend[]>("GET", "/api/friends/pending");
 }
 
 export async function getBlockedFriends(): Promise<Friend[]> {
-  if (isTauri) {
-    const { invoke } = await import("@tauri-apps/api/core");
-    return invoke("get_blocked_friends");
-  }
-
   return httpRequest<Friend[]>("GET", "/api/friends/blocked");
 }
 
 export async function sendFriendRequest(username: string): Promise<Friendship> {
-  if (isTauri) {
-    const { invoke } = await import("@tauri-apps/api/core");
-    return invoke("send_friend_request", { username });
-  }
-
   return httpRequest<Friendship>("POST", "/api/friends/request", { username });
 }
 
@@ -1057,38 +1037,18 @@ export async function reorderPins(pinIds: string[]): Promise<void> {
 }
 
 export async function acceptFriendRequest(friendshipId: string): Promise<Friendship> {
-  if (isTauri) {
-    const { invoke } = await import("@tauri-apps/api/core");
-    return invoke("accept_friend_request", { friendshipId });
-  }
-
   return httpRequest<Friendship>("POST", `/api/friends/${friendshipId}/accept`);
 }
 
 export async function rejectFriendRequest(friendshipId: string): Promise<void> {
-  if (isTauri) {
-    const { invoke } = await import("@tauri-apps/api/core");
-    return invoke("reject_friend_request", { friendshipId });
-  }
-
   await httpRequest<void>("POST", `/api/friends/${friendshipId}/reject`);
 }
 
 export async function removeFriend(friendshipId: string): Promise<void> {
-  if (isTauri) {
-    const { invoke } = await import("@tauri-apps/api/core");
-    return invoke("remove_friend", { friendshipId });
-  }
-
   await httpRequest<void>("DELETE", `/api/friends/${friendshipId}`);
 }
 
 export async function blockUser(userId: string): Promise<Friendship> {
-  if (isTauri) {
-    const { invoke } = await import("@tauri-apps/api/core");
-    return invoke("block_user", { userId });
-  }
-
   return httpRequest<Friendship>("POST", `/api/friends/${userId}/block`);
 }
 
@@ -1099,32 +1059,26 @@ export interface DMIconResponse {
 }
 
 export async function uploadDMAvatar(channelId: string, file: File): Promise<DMIconResponse> {
-  if (isTauri) {
-    // TODO: Implement Tauri file upload using invoke or plugin-http
-    return Promise.reject("File upload not supported in Desktop app yet");
-  } else {
-    const formData = new FormData();
-    formData.append("file", file);
+  const formData = new FormData();
+  formData.append("file", file);
 
-    // Use raw fetch or helper
-    const token = getAccessToken();
-    const headers: HeadersInit = {};
-    if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
-    }
-
-    const response = await fetch(`${getServerUrl()}/api/dm/${channelId}/icon`, {
-      method: "POST",
-      headers,
-      body: formData,
-    });
-
-    if (!response.ok) {
-      throw new Error(`Upload failed: ${response.statusText}`);
-    }
-
-    return response.json();
+  const token = getAccessToken();
+  const headers: HeadersInit = {};
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
   }
+
+  const response = await fetch(`${getServerUrl()}/api/dm/${channelId}/icon`, {
+    method: "POST",
+    headers,
+    body: formData,
+  });
+
+  if (!response.ok) {
+    throw new Error(`Upload failed: ${response.statusText}`);
+  }
+
+  return response.json();
 }
 
 export async function getDMs(): Promise<DMChannel[]> {

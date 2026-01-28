@@ -7,7 +7,7 @@
 import { Component, Show, onCleanup, createEffect, createSignal } from "solid-js";
 import { Phone, Lock, Unlock, Check, X } from "lucide-solid";
 import { e2eeStatus } from "@/stores/e2ee";
-import { getSelectedDM, markDMAsRead } from "@/stores/dms";
+import { getSelectedDM, markDMAsRead, updateDMIconUrl } from "@/stores/dms";
 import { currentUser } from "@/stores/auth";
 import MessageList from "@/components/messages/MessageList";
 import MessageInput from "@/components/messages/MessageInput";
@@ -135,12 +135,8 @@ const DMConversation: Component = () => {
                 const file = e.target.files?.[0];
                 if (file && dm()) {
                   try {
-                    await uploadDMAvatar(dm()!.id, file);
-                    // Force reload or update local store?
-                    // Ideally store updates automatically if we refetch or update store manually.
-                    // For now, basic implementation.
-                    // Optimistic update or reload DMs logic might be needed.
-                    window.location.reload(); // Simple brute force for now to refresh lists
+                    const result = await uploadDMAvatar(dm()!.id, file);
+                    updateDMIconUrl(dm()!.id, result.icon_url);
                   } catch (err) {
                     console.error("Failed to upload icon", err);
                   }
@@ -149,37 +145,32 @@ const DMConversation: Component = () => {
             }}
             id="dm-avatar-upload"
           />
-          <Show
-            when={isGroupDM()}
-            fallback={
-              <div class="w-8 h-8 rounded-full bg-accent-primary flex items-center justify-center">
-                <span class="text-sm font-semibold text-white">
-                  {otherParticipants()[0]?.display_name?.charAt(0).toUpperCase()}
-                </span>
-              </div>
-            }
+          <label
+            for="dm-avatar-upload"
+            class="w-8 h-8 rounded-full flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity overflow-hidden relative group"
+            classList={{
+              "bg-accent-primary": !dm()?.icon_url,
+              "bg-surface-layer2": !!dm()?.icon_url,
+            }}
           >
-            <label
-              for="dm-avatar-upload"
-              class="w-8 h-8 rounded-full bg-surface-layer2 flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity overflow-hidden relative group"
+            <Show
+              when={dm()?.icon_url}
+              fallback={
+                <span class="text-sm font-semibold text-white">
+                  {isGroupDM()
+                    ? displayName().charAt(0).toUpperCase()
+                    : otherParticipants()[0]?.display_name?.charAt(0).toUpperCase()}
+                </span>
+              }
             >
-              <Show
-                when={dm()?.icon_url}
-                fallback={
-                  <svg class="w-4 h-4 text-text-secondary" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z" />
-                  </svg>
-                }
-              >
-                <img src={dm()!.icon_url!} alt="DM Icon" class="w-full h-full object-cover" />
-              </Show>
-              <div class="absolute inset-0 bg-black/40 hidden group-hover:flex items-center justify-center">
-                <svg class="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                </svg>
-              </div>
-            </label>
-          </Show>
+              <img src={dm()!.icon_url!} alt="DM Icon" class="w-full h-full object-cover" />
+            </Show>
+            <div class="absolute inset-0 bg-black/40 hidden group-hover:flex items-center justify-center rounded-full">
+              <svg class="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+              </svg>
+            </div>
+          </label>
           {/* Editable name for group DMs */}
           <Show
             when={isGroupDM() && isEditingName()}
