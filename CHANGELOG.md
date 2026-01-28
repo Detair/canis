@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Pixel art theme system with "Pixel Cozy" warm earth-tone theme
+- Theme family architecture allowing community theme variants
+- Structural CSS tokens (radii, fonts, shadows) for theme-aware UI
+- Dithered texture patterns for pixel theme backgrounds
+- Press Start 2P pixel font for UI elements
+- Theme creation guide (THEME_GUIDE.md) for community contributors
+- Cross-family fade transition when switching between theme types
+- Theme consistency tests for validating theme definitions
 - WebSocket notifications for friend requests
   - Real-time notification when receiving a friend request
   - Real-time notification when a friend request is accepted
@@ -183,6 +191,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Display preferences for indicator modes (dense/minimal/discord)
 
 ### Changed
+- Consolidated ThemeName type to single source of truth in types.ts
+- UnoCSS theme config now uses CSS custom properties for border-radius and shadows
 - StatusIndicator component now uses SVG shapes instead of colored dots
 - UserStatus type extended from 4 to 5 statuses (added 'dnd')
 - Improved UI contrast and accessibility

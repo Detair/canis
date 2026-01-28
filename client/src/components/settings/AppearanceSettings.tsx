@@ -6,7 +6,7 @@
 
 import { Component, For } from "solid-js";
 import { Check } from "lucide-solid";
-import { themeState, setTheme, type ThemeName } from "@/stores/theme";
+import { themeState, setTheme, type ThemeDefinition } from "@/stores/theme";
 
 const AppearanceSettings: Component = () => {
   return (
@@ -67,9 +67,9 @@ const AppearanceSettings: Component = () => {
 
                 {/* Color preview dots */}
                 <div class="flex gap-1">
-                  <PreviewDot theme={theme.id} type="surface" />
-                  <PreviewDot theme={theme.id} type="accent" />
-                  <PreviewDot theme={theme.id} type="text" />
+                  <PreviewDot theme={theme} type="surface" />
+                  <PreviewDot theme={theme} type="accent" />
+                  <PreviewDot theme={theme} type="text" />
                 </div>
               </div>
             </button>
@@ -82,31 +82,13 @@ const AppearanceSettings: Component = () => {
 
 // Color preview dot component
 const PreviewDot: Component<{
-  theme: ThemeName;
+  theme: ThemeDefinition;
   type: "surface" | "accent" | "text";
 }> = (props) => {
-  const colors: Record<ThemeName, Record<string, string>> = {
-    "focused-hybrid": {
-      surface: "#1E1E2E",
-      accent: "#88C0D0",
-      text: "#ECEFF4",
-    },
-    "solarized-dark": {
-      surface: "#002b36",
-      accent: "#268bd2",
-      text: "#839496",
-    },
-    "solarized-light": {
-      surface: "#fdf6e3",
-      accent: "#268bd2",
-      text: "#657b83",
-    },
-  };
-
   return (
     <div
       class="w-4 h-4 rounded-full border border-white/20"
-      style={{ "background-color": colors[props.theme][props.type] }}
+      style={{ "background-color": props.theme.preview[props.type] }}
     />
   );
 };

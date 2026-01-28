@@ -9,6 +9,24 @@ export default defineConfig({
     }),
   ],
   theme: {
+    borderRadius: {
+      sm: 'var(--radius-sm)',
+      DEFAULT: 'var(--radius-md)',
+      md: 'var(--radius-md)',
+      lg: 'var(--radius-lg)',
+      xl: 'var(--radius-xl)',
+      '2xl': 'var(--radius-xl)',
+      full: 'var(--radius-full)',
+    },
+    boxShadow: {
+      sm: 'var(--shadow-sm)',
+      DEFAULT: 'var(--shadow-md)',
+      md: 'var(--shadow-md)',
+    },
+    fontFamily: {
+      ui: 'var(--font-ui)',
+      content: 'var(--font-content)',
+    },
     colors: {
       // Theme System - CSS Variables (supports runtime theme switching)
       surface: {
@@ -41,14 +59,14 @@ export default defineConfig({
         secondary: "var(--color-surface-layer2)",
         tertiary: "var(--color-surface-base)",
       },
-      success: "#A3BE8C",
-      warning: "#EBCB8B",
+      success: "var(--color-accent-success)",
+      warning: "var(--color-accent-warning)",
       danger: "var(--color-accent-danger)",
       // Status colors for admin panels
       status: {
-        success: "#A3BE8C",
-        error: "#BF616A",
-        warning: "#EBCB8B",
+        success: "var(--color-accent-success)",
+        error: "var(--color-accent-danger)",
+        warning: "var(--color-accent-warning)",
       },
     },
   },
