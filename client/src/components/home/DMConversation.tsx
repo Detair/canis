@@ -91,7 +91,7 @@ const DMConversation: Component = () => {
         </div>
       }
     >
-      <div class="flex-1 flex flex-col bg-surface-layer1">
+      <div class="flex-1 flex flex-col min-h-0 bg-surface-layer1">
         {/* Header */}
         <header class="h-12 px-4 flex items-center gap-3 border-b border-white/5 bg-surface-layer1 shadow-sm">
           <Show
