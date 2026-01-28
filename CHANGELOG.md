@@ -191,6 +191,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Display preferences for indicator modes (dense/minimal/discord)
 
 ### Changed
+- JWT signing algorithm upgraded from HS256 → EdDSA (Ed25519) for stronger cryptographic security
+- Infrastructure: Redis replaced with Valkey for open-source compatibility
+- API error response format standardized across all endpoints (consistent error codes)
+- Health endpoint now verifies database and Redis connectivity (returns "degraded" status on failure)
 - Consolidated ThemeName type to single source of truth in types.ts
 - UnoCSS theme config now uses CSS custom properties for border-radius and shadows
 - StatusIndicator component now uses SVG shapes instead of colored dots
@@ -204,12 +208,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Deprecated
 
 ### Removed
+- Legacy unscoped `GET /api/channels` endpoint that returned all channels across all guilds
 
 ### Fixed
 - DM list now shows online status for 1:1 conversations using presence store
 - Kick member button now properly checks KICK_MEMBERS permission
+- Voice session finalization with retry logic for reliability
+- Redis broadcast failures now logged instead of silently ignored
+- VoiceStatsLimiter periodic cleanup prevents memory leaks
+- Admin elevated session cache falls back to database on cache miss
+- Pixel font rendering fixed (blurry text in pixel themes)
+- Reaction API endpoints corrected with proper WebSocket handlers
+- Message pagination cursor comparison corrected for stable ordering
 
 ### Security
+- Attachment access now enforces guild/DM membership (previously any authenticated user could access any file)
+- CORS hardened with configurable origins for production (development mode allows any origin)
+- Request-ID header propagation for security tracing and correlation
+- MFA verification enforced during login flow
+- Markdown HTML output sanitized with DOMPurify to prevent XSS
 - Prevented `@everyone` role from being assigned dangerous permissions (e.g., `MANAGE_GUILD`, `BAN_MEMBERS`) via API validation
 - XSS hardening for Mermaid SVG rendering (forbid foreignObject, style, script tags)
 - Ownership verification in page reorder operations prevents cross-guild attacks
