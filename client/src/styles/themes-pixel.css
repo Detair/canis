@@ -1,4 +1,19 @@
 /**
+ * Press Start 2P — 8-bit Pixel Font
+ * License: SIL Open Font License 1.1 (OFL)
+ * Source: https://fonts.google.com/specimen/Press+Start+2P
+ * Author: CodeMan38
+ * Bundled locally to avoid network dependency and FOUT on theme switch.
+ */
+@font-face {
+  font-family: "Press Start 2P";
+  src: url("/fonts/PressStart2P-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: block;
+}
+
+/**
  * Pixel Theme Family — Structural Overrides
  *
  * These styles apply to ALL pixel-* themes via [data-theme^="pixel-"].
