@@ -4,6 +4,7 @@ import { Router } from "@solidjs/router";
 import "virtual:uno.css";
 import "@unocss/reset/tailwind.css";
 import "./styles/global.css";
+import "./styles/themes-structure.css";
 import "./styles/themes.css";
 import "./styles/highlight-theme.css";
 import AppRoutes from "./App";
