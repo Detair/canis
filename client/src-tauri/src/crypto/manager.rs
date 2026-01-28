@@ -43,6 +43,7 @@ pub type Result<T> = std::result::Result<T, CryptoManagerError>;
 
 /// Device keys from server (for establishing sessions).
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct DeviceKeys {
     /// Device ID.
     pub device_id: Uuid,
@@ -78,6 +79,7 @@ pub struct PrekeyInfo {
 
 /// E2EE content for a message.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct E2EEContent {
     /// Our Curve25519 public key (sender identification).
     pub sender_key: String,

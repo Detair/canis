@@ -1542,10 +1542,10 @@ pub async fn bulk_ban_users(
 
         // Ban the user
         let ban_result = sqlx::query(
-            r#"
+            r"
             INSERT INTO global_bans (user_id, banned_by, reason, expires_at)
             VALUES ($1, $2, $3, $4)
-            "#,
+            ",
         )
         .bind(user_id)
         .bind(admin.user_id)

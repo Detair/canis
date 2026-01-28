@@ -98,7 +98,7 @@ const DMConversation: Component = () => {
             when={isGroupDM()}
             fallback={
               <div class="w-8 h-8 rounded-full bg-accent-primary flex items-center justify-center">
-                <span class="text-sm font-semibold text-surface-base">
+                <span class="text-sm font-semibold text-white">
                   {otherParticipants()[0]?.display_name?.charAt(0).toUpperCase()}
                 </span>
               </div>

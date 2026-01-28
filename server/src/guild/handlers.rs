@@ -140,7 +140,7 @@ pub async fn list_guilds(
 ) -> Result<Json<Vec<GuildWithMemberCount>>, GuildError> {
     // Query guilds with member count in a single query
     let rows: Vec<(Uuid, String, Uuid, Option<String>, Option<String>, chrono::DateTime<chrono::Utc>, i64)> = sqlx::query_as(
-        r#"SELECT
+        r"SELECT
             g.id, g.name, g.owner_id, g.icon_url, g.description, g.created_at,
             COUNT(gm2.user_id) as member_count
            FROM guilds g
@@ -148,7 +148,7 @@ pub async fn list_guilds(
            LEFT JOIN guild_members gm2 ON g.id = gm2.guild_id
            WHERE gm.user_id = $1
            GROUP BY g.id, g.name, g.owner_id, g.icon_url, g.description, g.created_at
-           ORDER BY g.created_at"#,
+           ORDER BY g.created_at",
     )
     .bind(auth.id)
     .fetch_all(&state.db)
@@ -301,11 +301,11 @@ pub(super) async fn initialize_channel_read_state(
     user_id: Uuid,
 ) -> Result<(), GuildError> {
     sqlx::query(
-        r#"INSERT INTO channel_read_state (user_id, channel_id, last_read_at)
+        r"INSERT INTO channel_read_state (user_id, channel_id, last_read_at)
            SELECT $1, c.id, NOW()
            FROM channels c
            WHERE c.guild_id = $2 AND c.channel_type = 'text'
-           ON CONFLICT (user_id, channel_id) DO NOTHING"#,
+           ON CONFLICT (user_id, channel_id) DO NOTHING",
     )
     .bind(user_id)
     .bind(guild_id)
@@ -560,11 +560,11 @@ pub async fn reorder_channels(
 
     for ch in &body.channels {
         sqlx::query(
-            r#"
+            r"
             UPDATE channels
             SET position = $3, category_id = $4
             WHERE id = $1 AND guild_id = $2
-            "#,
+            ",
         )
         .bind(ch.id)
         .bind(guild_id)

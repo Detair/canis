@@ -1272,7 +1272,7 @@ async fn update_presence(state: &AppState, user_id: Uuid, status: &str) -> Resul
 /// Get list of user's accepted friend IDs.
 async fn get_user_friends(db: &sqlx::PgPool, user_id: Uuid) -> Result<Vec<Uuid>, sqlx::Error> {
     let friends: Vec<(Uuid,)> = sqlx::query_as(
-        r#"
+        r"
         SELECT CASE
             WHEN user1_id = $1 THEN user2_id
             ELSE user1_id
@@ -1280,7 +1280,7 @@ async fn get_user_friends(db: &sqlx::PgPool, user_id: Uuid) -> Result<Vec<Uuid>,
         FROM friendships
         WHERE (user1_id = $1 OR user2_id = $1)
         AND status = 'accepted'
-        "#,
+        "
     )
     .bind(user_id)
     .fetch_all(db)

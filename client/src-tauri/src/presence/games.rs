@@ -32,6 +32,7 @@ impl GamesDatabase {
 
     /// Find a game by process name (case-insensitive).
     /// Note: This ignores match_args filtering. Use `find_by_process_and_args` for full matching.
+    #[allow(dead_code)]
     pub fn find_by_process(&self, process_name: &str) -> Option<&GameEntry> {
         let lower = process_name.to_lowercase();
         self.games

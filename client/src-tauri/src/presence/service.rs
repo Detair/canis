@@ -61,6 +61,7 @@ pub fn start_presence_service(app: AppHandle) {
 }
 
 /// Stop background presence polling.
+#[allow(dead_code)]
 pub fn stop_presence_service() {
     RUNNING.store(false, Ordering::SeqCst);
 }

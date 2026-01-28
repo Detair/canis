@@ -499,8 +499,8 @@ const AudioDeviceSettings: Component<AudioDeviceSettingsProps> = (props) => {
                   onClick={() => (isTesting() ? stopMicTest() : startMicTest())}
                   class="px-4 py-2 rounded-xl font-medium text-sm transition-all duration-200"
                   classList={{
-                    "bg-accent-primary text-surface-base hover:bg-accent-primary/90": !isTesting(),
-                    "bg-accent-danger text-surface-base hover:bg-accent-danger/90": isTesting(),
+                    "bg-accent-primary text-white hover:bg-accent-primary/90": !isTesting(),
+                    "bg-accent-danger text-white hover:bg-accent-danger/90": isTesting(),
                   }}
                 >
                   {isTesting() ? "Stop Test" : "Test Microphone"}
@@ -590,8 +590,8 @@ const AudioDeviceSettings: Component<AudioDeviceSettingsProps> = (props) => {
                   disabled={isTestingSpeaker()}
                   class="px-4 py-2 rounded-xl font-medium text-sm transition-all duration-200"
                   classList={{
-                    "bg-accent-primary text-surface-base hover:bg-accent-primary/90": !isTestingSpeaker(),
-                    "bg-accent-primary/50 text-surface-base cursor-not-allowed": isTestingSpeaker(),
+                    "bg-accent-primary text-white hover:bg-accent-primary/90": !isTestingSpeaker(),
+                    "bg-accent-primary/50 text-white cursor-not-allowed": isTestingSpeaker(),
                   }}
                 >
                   {isTestingSpeaker() ? "Playing..." : "Test Speaker"}
@@ -608,7 +608,7 @@ const AudioDeviceSettings: Component<AudioDeviceSettingsProps> = (props) => {
           <div class="px-6 py-4 border-t border-white/10 flex justify-end">
             <button
               onClick={props.onClose}
-              class="px-5 py-2.5 bg-accent-primary hover:bg-accent-primary/90 text-surface-base rounded-xl font-medium text-sm transition-all duration-200"
+              class="px-5 py-2.5 bg-accent-primary hover:bg-accent-primary/90 text-white rounded-xl font-medium text-sm transition-all duration-200"
             >
               Done
             </button>

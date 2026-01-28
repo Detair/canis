@@ -35,9 +35,9 @@ pub async fn send_friend_request(
 
     // Check if friendship already exists (in either direction)
     let existing = sqlx::query_as::<_, Friendship>(
-        r#"SELECT * FROM friendships
+        r"SELECT * FROM friendships
            WHERE (requester_id = $1 AND addressee_id = $2)
-              OR (requester_id = $2 AND addressee_id = $1)"#
+              OR (requester_id = $2 AND addressee_id = $1)"
     )
     .bind(auth.id)
     .bind(target_id)
@@ -313,9 +313,9 @@ pub async fn block_user(
 
     // Check if friendship already exists
     let existing = sqlx::query_as::<_, Friendship>(
-        r#"SELECT * FROM friendships
+        r"SELECT * FROM friendships
            WHERE (requester_id = $1 AND addressee_id = $2)
-              OR (requester_id = $2 AND addressee_id = $1)"#
+              OR (requester_id = $2 AND addressee_id = $1)"
     )
     .bind(auth.id)
     .bind(user_id)

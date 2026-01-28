@@ -40,7 +40,7 @@ const AppearanceSettings: Component = () => {
                   }}
                 >
                   {themeState.currentTheme === theme.id && (
-                    <Check class="w-3 h-3 text-surface-base" />
+                    <Check class="w-3 h-3 text-white" />
                   )}
                 </div>
 

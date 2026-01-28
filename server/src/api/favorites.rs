@@ -184,7 +184,7 @@ pub async fn list_favorites(
     auth_user: AuthUser,
 ) -> Result<Json<FavoritesResponse>, FavoritesError> {
     let rows = sqlx::query_as::<_, FavoriteChannelRow>(
-        r#"
+        r"
         SELECT
             fc.channel_id,
             c.name as channel_name,
@@ -201,7 +201,7 @@ pub async fn list_favorites(
         JOIN guild_members gm ON gm.guild_id = fc.guild_id AND gm.user_id = fc.user_id
         WHERE fc.user_id = $1
         ORDER BY fg.position ASC, fc.position ASC
-        "#,
+        ",
     )
     .bind(auth_user.id)
     .fetch_all(&state.db)
@@ -256,11 +256,11 @@ pub async fn add_favorite(
 
     // 5. Insert guild entry (ON CONFLICT for race condition)
     sqlx::query(
-        r#"
+        r"
         INSERT INTO user_favorite_guilds (user_id, guild_id, position)
         SELECT $1, $2, COALESCE((SELECT MAX(position) + 1 FROM user_favorite_guilds WHERE user_id = $1), 0)
         ON CONFLICT (user_id, guild_id) DO NOTHING
-        "#,
+        ",
     )
     .bind(auth_user.id)
     .bind(guild_id)
@@ -269,11 +269,11 @@ pub async fn add_favorite(
 
     // 6. Insert channel entry
     let result = sqlx::query_as::<_, FavoriteRow>(
-        r#"
+        r"
         INSERT INTO user_favorite_channels (user_id, channel_id, guild_id, position)
         VALUES ($1, $2, $3, COALESCE((SELECT MAX(position) + 1 FROM user_favorite_channels WHERE user_id = $1 AND guild_id = $3), 0))
         RETURNING channel_id, guild_id, position, created_at
-        "#,
+        ",
     )
     .bind(auth_user.id)
     .bind(channel_id)

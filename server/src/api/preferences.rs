@@ -97,11 +97,11 @@ pub async fn get_preferences(
     auth_user: AuthUser,
 ) -> Result<Json<PreferencesResponse>, PreferencesError> {
     let row = sqlx::query_as::<_, UserPreferencesRow>(
-        r#"
+        r"
         SELECT user_id, preferences, updated_at
         FROM user_preferences
         WHERE user_id = $1
-        "#,
+        ",
     )
     .bind(auth_user.id)
     .fetch_optional(&state.db)
@@ -131,14 +131,14 @@ pub async fn update_preferences(
     Json(request): Json<UpdatePreferencesRequest>,
 ) -> Result<Json<PreferencesResponse>, PreferencesError> {
     let row = sqlx::query_as::<_, UserPreferencesRow>(
-        r#"
+        r"
         INSERT INTO user_preferences (user_id, preferences, updated_at)
         VALUES ($1, $2, NOW())
         ON CONFLICT (user_id) DO UPDATE
         SET preferences = EXCLUDED.preferences,
             updated_at = NOW()
         RETURNING user_id, preferences, updated_at
-        "#,
+        ",
     )
     .bind(auth_user.id)
     .bind(&request.preferences)

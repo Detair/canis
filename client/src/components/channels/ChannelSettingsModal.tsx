@@ -197,7 +197,7 @@ const NotificationOption: Component<{
             "border-white/30": !isSelected(),
           }}
         >
-          {isSelected() && <Check class="w-3 h-3 text-surface-base" />}
+          {isSelected() && <Check class="w-3 h-3 text-white" />}
         </div>
 
         {/* Content */}

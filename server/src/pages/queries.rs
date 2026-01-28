@@ -159,9 +159,9 @@ pub async fn list_pages(
         Some(gid) => {
             sqlx::query_as!(
                 PageListItem,
-                r#"SELECT id, guild_id, title, slug, position, requires_acceptance, updated_at
+                r"SELECT id, guild_id, title, slug, position, requires_acceptance, updated_at
                 FROM pages WHERE guild_id = $1 AND deleted_at IS NULL
-                ORDER BY position"#,
+                ORDER BY position",
                 gid
             )
             .fetch_all(pool)
@@ -170,9 +170,9 @@ pub async fn list_pages(
         None => {
             sqlx::query_as!(
                 PageListItem,
-                r#"SELECT id, guild_id, title, slug, position, requires_acceptance, updated_at
+                r"SELECT id, guild_id, title, slug, position, requires_acceptance, updated_at
                 FROM pages WHERE guild_id IS NULL AND deleted_at IS NULL
-                ORDER BY position"#
+                ORDER BY position"
             )
             .fetch_all(pool)
             .await?
@@ -191,7 +191,7 @@ pub async fn get_page_by_slug(
         Some(gid) => {
             sqlx::query_as!(
                 Page,
-                r#"SELECT * FROM pages WHERE guild_id = $1 AND slug = $2 AND deleted_at IS NULL"#,
+                r"SELECT * FROM pages WHERE guild_id = $1 AND slug = $2 AND deleted_at IS NULL",
                 gid,
                 slug
             )
@@ -201,7 +201,7 @@ pub async fn get_page_by_slug(
         None => {
             sqlx::query_as!(
                 Page,
-                r#"SELECT * FROM pages WHERE guild_id IS NULL AND slug = $1 AND deleted_at IS NULL"#,
+                r"SELECT * FROM pages WHERE guild_id IS NULL AND slug = $1 AND deleted_at IS NULL",
                 slug
             )
             .fetch_optional(pool)
@@ -213,7 +213,7 @@ pub async fn get_page_by_slug(
 
 /// Get page by ID.
 pub async fn get_page_by_id(pool: &PgPool, id: Uuid) -> Result<Option<Page>, sqlx::Error> {
-    let page: Option<Page> = sqlx::query_as!(Page, r#"SELECT * FROM pages WHERE id = $1"#, id)
+    let page: Option<Page> = sqlx::query_as!(Page, r"SELECT * FROM pages WHERE id = $1", id)
         .fetch_optional(pool)
         .await?;
     Ok(page)
@@ -235,9 +235,9 @@ pub async fn create_page(
 
     let page: Page = sqlx::query_as!(
         Page,
-        r#"INSERT INTO pages (guild_id, title, slug, content, content_hash, position, requires_acceptance, created_by, updated_by)
+        r"INSERT INTO pages (guild_id, title, slug, content, content_hash, position, requires_acceptance, created_by, updated_by)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8)
-        RETURNING *"#,
+        RETURNING *",
         guild_id,
         title,
         slug,
@@ -280,10 +280,10 @@ pub async fn update_page(
 
     let updated_page: Page = sqlx::query_as!(
         Page,
-        r#"UPDATE pages SET
+        r"UPDATE pages SET
             title = $2, slug = $3, content = $4, content_hash = $5,
             requires_acceptance = $6, updated_by = $7, updated_at = NOW()
-        WHERE id = $1 RETURNING *"#,
+        WHERE id = $1 RETURNING *",
         id,
         new_title,
         new_slug,
@@ -301,7 +301,7 @@ pub async fn update_page(
 /// Soft delete a page.
 pub async fn soft_delete_page(pool: &PgPool, id: Uuid) -> Result<(), sqlx::Error> {
     sqlx::query!(
-        r#"UPDATE pages SET deleted_at = NOW() WHERE id = $1"#,
+        r"UPDATE pages SET deleted_at = NOW() WHERE id = $1",
         id
     )
     .execute(pool)
@@ -313,7 +313,7 @@ pub async fn soft_delete_page(pool: &PgPool, id: Uuid) -> Result<(), sqlx::Error
 pub async fn restore_page(pool: &PgPool, id: Uuid) -> Result<Page, sqlx::Error> {
     let page: Page = sqlx::query_as!(
         Page,
-        r#"UPDATE pages SET deleted_at = NULL WHERE id = $1 RETURNING *"#,
+        r"UPDATE pages SET deleted_at = NULL WHERE id = $1 RETURNING *",
         id
     )
     .fetch_one(pool)
@@ -343,8 +343,8 @@ pub async fn reorder_pages(
     let valid_count: i64 = match guild_id {
         Some(gid) => {
             sqlx::query_scalar(
-                r#"SELECT COUNT(*) FROM pages
-                   WHERE id = ANY($1) AND guild_id = $2 AND deleted_at IS NULL"#,
+                r"SELECT COUNT(*) FROM pages
+                   WHERE id = ANY($1) AND guild_id = $2 AND deleted_at IS NULL",
             )
             .bind(page_ids)
             .bind(gid)
@@ -353,8 +353,8 @@ pub async fn reorder_pages(
         }
         None => {
             sqlx::query_scalar(
-                r#"SELECT COUNT(*) FROM pages
-                   WHERE id = ANY($1) AND guild_id IS NULL AND deleted_at IS NULL"#,
+                r"SELECT COUNT(*) FROM pages
+                   WHERE id = ANY($1) AND guild_id IS NULL AND deleted_at IS NULL",
             )
             .bind(page_ids)
             .fetch_one(pool)
@@ -371,7 +371,7 @@ pub async fn reorder_pages(
     // Now safe to update positions
     for (position, page_id) in page_ids.iter().enumerate() {
         sqlx::query!(
-            r#"UPDATE pages SET position = $2 WHERE id = $1"#,
+            r"UPDATE pages SET position = $2 WHERE id = $1",
             page_id,
             position as i32
         )
@@ -414,9 +414,9 @@ pub async fn accept_page(
     content_hash: &str,
 ) -> Result<(), sqlx::Error> {
     sqlx::query!(
-        r#"INSERT INTO page_acceptances (user_id, page_id, content_hash)
+        r"INSERT INTO page_acceptances (user_id, page_id, content_hash)
         VALUES ($1, $2, $3)
-        ON CONFLICT (user_id, page_id) DO UPDATE SET content_hash = $3, accepted_at = NOW()"#,
+        ON CONFLICT (user_id, page_id) DO UPDATE SET content_hash = $3, accepted_at = NOW()",
         user_id,
         page_id,
         content_hash
@@ -434,7 +434,7 @@ pub async fn get_acceptance(
 ) -> Result<Option<PageAcceptance>, sqlx::Error> {
     let acceptance: Option<PageAcceptance> = sqlx::query_as!(
         PageAcceptance,
-        r#"SELECT * FROM page_acceptances WHERE user_id = $1 AND page_id = $2"#,
+        r"SELECT * FROM page_acceptances WHERE user_id = $1 AND page_id = $2",
         user_id,
         page_id
     )
@@ -451,14 +451,14 @@ pub async fn get_pending_acceptance(
 ) -> Result<Vec<PageListItem>, sqlx::Error> {
     let pages: Vec<PageListItem> = sqlx::query_as!(
         PageListItem,
-        r#"SELECT p.id, p.guild_id, p.title, p.slug, p.position, p.requires_acceptance, p.updated_at
+        r"SELECT p.id, p.guild_id, p.title, p.slug, p.position, p.requires_acceptance, p.updated_at
         FROM pages p
         WHERE p.requires_acceptance = true AND p.deleted_at IS NULL
         AND NOT EXISTS (
             SELECT 1 FROM page_acceptances pa
             WHERE pa.page_id = p.id AND pa.user_id = $1 AND pa.content_hash = p.content_hash
         )
-        ORDER BY p.guild_id NULLS FIRST, p.position"#,
+        ORDER BY p.guild_id NULLS FIRST, p.position",
         user_id
     )
     .fetch_all(pool)

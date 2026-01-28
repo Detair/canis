@@ -133,7 +133,7 @@ const AddFriend: Component<AddFriendProps> = (props) => {
               </button>
               <button
                 type="submit"
-                class="px-4 py-2 bg-accent-primary text-surface-base rounded-lg font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                class="px-4 py-2 bg-accent-primary text-white rounded-lg font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={isSubmitting()}
               >
                 {isSubmitting() ? "Sending..." : "Send Request"}

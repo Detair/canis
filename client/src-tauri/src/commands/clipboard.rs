@@ -104,6 +104,7 @@ impl Default for ClipboardSettings {
 /// Pending clipboard clear information.
 #[derive(Debug)]
 struct PendingClear {
+    #[allow(dead_code)]
     content_hash: [u8; 32],
     clear_at: Instant,
     context: CopyContext,

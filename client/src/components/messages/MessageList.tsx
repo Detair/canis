@@ -1,5 +1,5 @@
 import { Component, For, Show, createEffect, on, createMemo, createSignal, onMount, onCleanup } from "solid-js";
-import { Loader2, ChevronDown } from "lucide-solid";
+import { Loader2, ChevronDown, AlertCircle } from "lucide-solid";
 import MessageItem from "./MessageItem";
 import {
   messagesState,
@@ -146,8 +146,27 @@ const MessageList: Component<MessageListProps> = (props) => {
         </div>
       </Show>
 
+      {/* Error state */}
+      <Show when={!loading() && messages().length === 0 && messagesState.error}>
+        <div class="flex flex-col items-center justify-center h-full text-center px-4">
+          <AlertCircle class="w-10 h-10 text-accent-danger mb-4" />
+          <h3 class="text-lg font-semibold text-text-primary mb-2">
+            Failed to load messages
+          </h3>
+          <p class="text-text-secondary max-w-sm mb-4">
+            {messagesState.error}
+          </p>
+          <button
+            onClick={() => loadInitialMessages(props.channelId)}
+            class="px-4 py-2 bg-accent-primary text-white rounded-lg font-medium hover:opacity-90 transition-opacity"
+          >
+            Retry
+          </button>
+        </div>
+      </Show>
+
       {/* Empty state */}
-      <Show when={!loading() && messages().length === 0}>
+      <Show when={!loading() && messages().length === 0 && !messagesState.error}>
         <div class="flex flex-col items-center justify-center h-full text-center px-4">
           <div class="w-20 h-20 bg-surface-layer2 rounded-full flex items-center justify-center mb-4">
             <span class="text-4xl">👋</span>
@@ -179,7 +198,7 @@ const MessageList: Component<MessageListProps> = (props) => {
       <Show when={hasNewMessages()}>
         <button
           onClick={() => scrollToBottom(true)}
-          class="fixed bottom-24 left-1/2 transform -translate-x-1/2 bg-accent-primary hover:bg-accent-primary/90 text-surface-base px-5 py-2.5 rounded-full shadow-2xl flex items-center gap-2 transition-all z-10 font-medium"
+          class="fixed bottom-24 left-1/2 transform -translate-x-1/2 bg-accent-primary hover:bg-accent-primary/90 text-white px-5 py-2.5 rounded-full shadow-2xl flex items-center gap-2 transition-all z-10 font-medium"
         >
           <ChevronDown class="w-4 h-4" />
           <span>

@@ -22,11 +22,11 @@ pub async fn store_metrics(
     guild_id: Option<Uuid>,
 ) {
     let result = sqlx::query(
-        r#"
+        r"
         INSERT INTO connection_metrics
         (time, user_id, session_id, channel_id, guild_id, latency_ms, packet_loss, jitter_ms, quality)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-        "#,
+        ",
     )
     .bind(Utc::now())
     .bind(user_id)
@@ -86,12 +86,12 @@ pub async fn finalize_session(
     if !has_metrics {
         // Insert session with NULL aggregates (very short call)
         sqlx::query(
-            r#"
+            r"
             INSERT INTO connection_sessions
             (id, user_id, channel_id, guild_id, started_at, ended_at,
              avg_latency, avg_loss, avg_jitter, worst_quality)
             VALUES ($1, $2, $3, $4, $5, NOW(), NULL, NULL, NULL, NULL)
-            "#,
+            ",
         )
         .bind(session_id)
         .bind(user_id)
@@ -103,7 +103,7 @@ pub async fn finalize_session(
     } else {
         // Insert session with aggregated metrics
         sqlx::query(
-            r#"
+            r"
             INSERT INTO connection_sessions
             (id, user_id, channel_id, guild_id, started_at, ended_at,
              avg_latency, avg_loss, avg_jitter, worst_quality)
@@ -115,7 +115,7 @@ pub async fn finalize_session(
                 MIN(quality)::SMALLINT
             FROM connection_metrics
             WHERE session_id = $1
-            "#,
+            ",
         )
         .bind(session_id)
         .bind(user_id)

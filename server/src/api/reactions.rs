@@ -104,11 +104,11 @@ pub async fn add_reaction(
 
     // Insert reaction (ignore if already exists)
     sqlx::query(
-        r#"
+        r"
         INSERT INTO message_reactions (message_id, user_id, emoji)
         VALUES ($1, $2, $3)
         ON CONFLICT (message_id, user_id, emoji) DO NOTHING
-        "#,
+        ",
     )
     .bind(message_id)
     .bind(auth_user.id)
@@ -118,10 +118,10 @@ pub async fn add_reaction(
 
     // Get updated count
     let count: (i64,) = sqlx::query_as(
-        r#"
+        r"
         SELECT COUNT(*) FROM message_reactions
         WHERE message_id = $1 AND emoji = $2
-        "#,
+        ",
     )
     .bind(message_id)
     .bind(&req.emoji)
@@ -176,10 +176,10 @@ pub async fn remove_reaction(
     }
 
     sqlx::query(
-        r#"
+        r"
         DELETE FROM message_reactions
         WHERE message_id = $1 AND user_id = $2 AND emoji = $3
-        "#,
+        ",
     )
     .bind(message_id)
     .bind(auth_user.id)
@@ -228,7 +228,7 @@ pub async fn get_reactions(
     }
 
     let reactions = sqlx::query_as::<_, ReactionRow>(
-        r#"
+        r"
         SELECT
             emoji,
             COUNT(*) as count,
@@ -237,7 +237,7 @@ pub async fn get_reactions(
         WHERE message_id = $1
         GROUP BY emoji
         ORDER BY MIN(created_at)
-        "#,
+        ",
     )
     .bind(message_id)
     .bind(auth_user.id)

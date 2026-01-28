@@ -2,7 +2,7 @@
 //!
 //! Unit tests for config parsing and response structures.
 
-use std::env;
+
 
 /// Test that REQUIRE_E2EE_SETUP parses correctly from environment.
 #[test]

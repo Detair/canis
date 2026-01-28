@@ -211,7 +211,7 @@ pub async fn get_summary(
 
     // Get aggregate stats for the last 30 days
     let aggregate = sqlx::query_as::<_, AggregateStats>(
-        r#"
+        r"
         SELECT
             AVG(avg_latency)::SMALLINT AS avg_latency,
             AVG(avg_loss)::REAL AS avg_loss,
@@ -221,7 +221,7 @@ pub async fn get_summary(
         FROM connection_sessions
         WHERE user_id = $1
           AND started_at >= NOW() - INTERVAL '30 days'
-        "#,
+        ",
     )
     .bind(auth.id)
     .fetch_one(&state.db)
@@ -229,7 +229,7 @@ pub async fn get_summary(
 
     // Get daily breakdown
     let daily_stats = sqlx::query_as::<_, DailyStat>(
-        r#"
+        r"
         SELECT
             DATE(started_at) AS date,
             AVG(avg_latency)::SMALLINT AS avg_latency,
@@ -241,7 +241,7 @@ pub async fn get_summary(
           AND started_at >= NOW() - INTERVAL '30 days'
         GROUP BY DATE(started_at)
         ORDER BY date DESC
-        "#,
+        ",
     )
     .bind(auth.id)
     .fetch_all(&state.db)
@@ -284,7 +284,7 @@ pub async fn get_sessions(
 
     // Get sessions with channel and guild names
     let sessions = sqlx::query_as::<_, SessionSummary>(
-        r#"
+        r"
         SELECT
             s.id,
             COALESCE(c.name, 'DM Call') AS channel_name,
@@ -301,7 +301,7 @@ pub async fn get_sessions(
         WHERE s.user_id = $1
         ORDER BY s.started_at DESC
         LIMIT $2 OFFSET $3
-        "#,
+        ",
     )
     .bind(auth.id)
     .bind(limit)
@@ -331,7 +331,7 @@ pub async fn get_session_detail(
 
     // Get session summary
     let summary = sqlx::query_as::<_, SessionSummary>(
-        r#"
+        r"
         SELECT
             s.id,
             COALESCE(c.name, 'DM Call') AS channel_name,
@@ -346,7 +346,7 @@ pub async fn get_session_detail(
         LEFT JOIN channels c ON c.id = s.channel_id
         LEFT JOIN guilds g ON g.id = s.guild_id
         WHERE s.id = $1 AND s.user_id = $2
-        "#,
+        ",
     )
     .bind(session_id)
     .bind(auth.id)
@@ -372,7 +372,7 @@ pub async fn get_session_detail(
         let bucket_interval = format!("{} seconds", bucket_seconds);
 
         sqlx::query_as::<_, MetricPoint>(
-            r#"
+            r"
             SELECT
                 time_bucket($1::INTERVAL, time) AS time,
                 AVG(latency_ms)::SMALLINT AS latency_ms,
@@ -383,7 +383,7 @@ pub async fn get_session_detail(
             WHERE session_id = $2
             GROUP BY time_bucket($1::INTERVAL, time)
             ORDER BY time ASC
-            "#,
+            ",
         )
         .bind(&bucket_interval)
         .bind(session_id)
@@ -392,7 +392,7 @@ pub async fn get_session_detail(
     } else {
         // Return all metrics
         sqlx::query_as::<_, MetricPoint>(
-            r#"
+            r"
             SELECT
                 time,
                 latency_ms,
@@ -402,7 +402,7 @@ pub async fn get_session_detail(
             FROM connection_metrics
             WHERE session_id = $1
             ORDER BY time ASC
-            "#,
+            ",
         )
         .bind(session_id)
         .fetch_all(&state.db)

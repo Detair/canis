@@ -223,7 +223,7 @@ mod tests {
             if i < groups.len() - 1 {
                 assert_eq!(group.len(), 4);
             } else {
-                assert!(group.len() >= 1 && group.len() <= 4);
+                assert!(!group.is_empty() && group.len() <= 4);
             }
         }
     }
@@ -270,8 +270,7 @@ mod tests {
                 // Should indicate wrong length
                 assert!(
                     msg.contains("must be 32 bytes") || msg.contains("Invalid recovery key"),
-                    "Unexpected error message: {}",
-                    msg
+                    "Unexpected error message: {msg}",
                 );
             }
             _ => panic!("Expected InvalidKey error"),

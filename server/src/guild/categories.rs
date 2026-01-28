@@ -156,12 +156,12 @@ pub async fn list_categories(
     })?;
 
     let categories = sqlx::query_as::<_, Category>(
-        r#"
+        r"
         SELECT id, guild_id, name, position, parent_id, created_at
         FROM channel_categories
         WHERE guild_id = $1
         ORDER BY position
-        "#,
+        ",
     )
     .bind(guild_id)
     .fetch_all(&state.db)
@@ -228,7 +228,7 @@ pub async fn create_category(
     // Insert with auto-position
     let category_id = Uuid::now_v7();
     let category = sqlx::query_as::<_, Category>(
-        r#"
+        r"
         INSERT INTO channel_categories (id, guild_id, name, parent_id, position)
         VALUES ($1, $2, $3, $4, (
             SELECT COALESCE(MAX(position) + 1, 0)
@@ -236,7 +236,7 @@ pub async fn create_category(
             WHERE guild_id = $2 AND parent_id IS NOT DISTINCT FROM $4
         ))
         RETURNING id, guild_id, name, position, parent_id, created_at
-        "#,
+        ",
     )
     .bind(category_id)
     .bind(guild_id)
@@ -325,7 +325,7 @@ pub async fn update_category(
 
     // Build and execute update query
     let category = sqlx::query_as::<_, Category>(
-        r#"
+        r"
         UPDATE channel_categories
         SET
             name = COALESCE($3, name),
@@ -333,7 +333,7 @@ pub async fn update_category(
             parent_id = CASE WHEN $5 THEN $6 ELSE parent_id END
         WHERE id = $1 AND guild_id = $2
         RETURNING id, guild_id, name, position, parent_id, created_at
-        "#,
+        ",
     )
     .bind(category_id)
     .bind(guild_id)
@@ -443,11 +443,11 @@ pub async fn reorder_categories(
         }
 
         sqlx::query(
-            r#"
+            r"
             UPDATE channel_categories
             SET position = $3, parent_id = $4
             WHERE id = $1 AND guild_id = $2
-            "#,
+            ",
         )
         .bind(cat.id)
         .bind(guild_id)

@@ -156,12 +156,12 @@ pub async fn list_pins(
     auth_user: AuthUser,
 ) -> Result<Json<Vec<Pin>>, PinsError> {
     let rows = sqlx::query_as::<_, PinRow>(
-        r#"
+        r"
         SELECT id, user_id, pin_type, content, title, metadata, created_at, position
         FROM user_pins
         WHERE user_id = $1
         ORDER BY position ASC, created_at DESC
-        "#,
+        ",
     )
     .bind(auth_user.id)
     .fetch_all(&state.db)
@@ -210,11 +210,11 @@ pub async fn create_pin(
 
     // Insert pin
     let row = sqlx::query_as::<_, PinRow>(
-        r#"
+        r"
         INSERT INTO user_pins (user_id, pin_type, content, title, metadata, position)
         VALUES ($1, $2, $3, $4, $5, $6)
         RETURNING id, user_id, pin_type, content, title, metadata, created_at, position
-        "#,
+        ",
     )
     .bind(auth_user.id)
     .bind(request.pin_type.as_str())
@@ -264,14 +264,14 @@ pub async fn update_pin(
 
     // Update pin
     let row = sqlx::query_as::<_, PinRow>(
-        r#"
+        r"
         UPDATE user_pins
         SET content = COALESCE($3, content),
             title = COALESCE($4, title),
             metadata = COALESCE($5, metadata)
         WHERE id = $1 AND user_id = $2
         RETURNING id, user_id, pin_type, content, title, metadata, created_at, position
-        "#,
+        ",
     )
     .bind(pin_id)
     .bind(auth_user.id)

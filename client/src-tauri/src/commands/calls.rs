@@ -16,6 +16,7 @@ use crate::AppState;
 
 /// Call capabilities (for future video/screen share support).
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct CallCapabilities {
     pub audio: bool,
     pub video: bool,
