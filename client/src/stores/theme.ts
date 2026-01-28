@@ -11,11 +11,19 @@ import type { ThemeName } from "@/lib/types";
 
 export type { ThemeName };
 
+export type ThemeFamily = "standard" | "pixel";
+
 export interface ThemeDefinition {
   id: ThemeName;
   name: string;
   description: string;
   isDark: boolean;
+  family: ThemeFamily;
+  preview: {
+    surface: string;
+    accent: string;
+    text: string;
+  };
 }
 
 // ============================================================================
@@ -28,18 +36,24 @@ export const availableThemes: ThemeDefinition[] = [
     name: "Focused Hybrid",
     description: "Modern dark theme with high contrast",
     isDark: true,
+    family: "standard",
+    preview: { surface: "#1E1E2E", accent: "#88C0D0", text: "#ECEFF4" },
   },
   {
     id: "solarized-dark",
     name: "Solarized Dark",
     description: "Precision colors for machines and people",
     isDark: true,
+    family: "standard",
+    preview: { surface: "#002b36", accent: "#268bd2", text: "#839496" },
   },
   {
     id: "solarized-light",
     name: "Solarized Light",
     description: "Warm light theme for daytime use",
     isDark: false,
+    family: "standard",
+    preview: { surface: "#fdf6e3", accent: "#268bd2", text: "#657b83" },
   },
 ];
 
@@ -85,6 +99,13 @@ export function setTheme(newTheme: ThemeName): void {
  */
 export function getCurrentTheme(): ThemeDefinition | undefined {
   return availableThemes.find((t) => t.id === theme());
+}
+
+/**
+ * Get the family of a theme by ID.
+ */
+export function getThemeFamily(themeId: ThemeName): ThemeFamily {
+  return availableThemes.find((t) => t.id === themeId)?.family ?? "standard";
 }
 
 /**
