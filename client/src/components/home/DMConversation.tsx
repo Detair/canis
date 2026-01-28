@@ -77,7 +77,7 @@ const DMConversation: Component = () => {
     if (others.length === 0) {
       return currentDM.participants[0]?.display_name ?? "Unknown";
     }
-    return currentDM.name || others.map(p => p.display_name).join(", ");
+    return others.map(p => p.display_name).join(", ");
   };
 
   const isGroupDM = () => otherParticipants().length > 1;

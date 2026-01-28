@@ -26,13 +26,14 @@ const DMItem: Component<DMItemProps> = (props) => {
   };
 
   // Get the other participant(s) for display
+  // Note: dm.name from the server includes ALL participants (including self),
+  // so we only use it for group DMs with a custom name set by the user.
   const displayName = () => {
     const others = otherParticipants();
     if (others.length === 0) {
-      // Edge case: only self in DM (shouldn't happen normally)
       return props.dm.participants[0]?.display_name ?? "Unknown";
     }
-    return props.dm.name || others.map(p => p.display_name).join(", ");
+    return others.map(p => p.display_name).join(", ");
   };
 
   const isGroupDM = () => otherParticipants().length > 1;
@@ -103,7 +104,7 @@ const DMItem: Component<DMItemProps> = (props) => {
           when={isGroupDM()}
           fallback={
             <div class="w-10 h-10 rounded-full bg-accent-primary flex items-center justify-center">
-              <span class="text-sm font-semibold text-surface-base">
+              <span class="text-sm font-semibold text-white">
                 {otherParticipants()[0]?.display_name?.charAt(0).toUpperCase() || "?"}
               </span>
             </div>
@@ -156,7 +157,7 @@ const DMItem: Component<DMItemProps> = (props) => {
 
           {/* Unread badge */}
           <Show when={props.dm.unread_count > 0}>
-            <span class="flex-shrink-0 min-w-5 h-5 px-1.5 bg-accent-primary text-surface-base text-xs font-bold rounded-full flex items-center justify-center">
+            <span class="flex-shrink-0 min-w-5 h-5 px-1.5 bg-accent-primary text-white text-xs font-bold rounded-full flex items-center justify-center">
               {props.dm.unread_count > 99 ? "99+" : props.dm.unread_count}
             </span>
           </Show>
