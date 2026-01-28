@@ -89,9 +89,25 @@ createEffect(() => {
 /**
  * Set the current theme.
  * Updates through the unified preferences store which handles sync.
+ * When switching between theme families, applies a brief fade transition.
  */
 export function setTheme(newTheme: ThemeName): void {
-  updatePreference("theme", newTheme);
+  const currentDef = getCurrentTheme();
+  const newDef = availableThemes.find((t) => t.id === newTheme);
+
+  // Cross-family switch: fade out, swap theme, fade in
+  if (currentDef && newDef && currentDef.family !== newDef.family) {
+    document.documentElement.classList.add("theme-family-transition");
+    setTimeout(() => {
+      updatePreference("theme", newTheme);
+      requestAnimationFrame(() => {
+        document.documentElement.classList.remove("theme-family-transition");
+      });
+    }, 150);
+  } else {
+    // Same family: instant switch
+    updatePreference("theme", newTheme);
+  }
 }
 
 /**

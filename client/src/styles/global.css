@@ -54,3 +54,9 @@ input.bg-transparent,
 textarea.bg-transparent {
   background-color: transparent;
 }
+
+/* Theme family transition — smooth fade when switching between families */
+.theme-family-transition {
+  opacity: 0;
+  transition: opacity 150ms ease-in-out;
+}
