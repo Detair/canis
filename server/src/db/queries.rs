@@ -327,7 +327,7 @@ pub async fn cleanup_expired_device_transfers(pool: &PgPool) -> sqlx::Result<u64
 pub async fn find_channel_by_id(pool: &PgPool, id: Uuid) -> sqlx::Result<Option<Channel>> {
     sqlx::query_as::<_, Channel>(
         r"
-        SELECT id, name, channel_type, category_id, guild_id, topic, user_limit, position, max_screen_shares, created_at, updated_at
+        SELECT id, name, channel_type, category_id, guild_id, topic, icon_url, user_limit, position, max_screen_shares, created_at, updated_at
         FROM channels
         WHERE id = $1
         ",
@@ -854,7 +854,7 @@ pub async fn is_guild_member(pool: &PgPool, guild_id: Uuid, user_id: Uuid) -> sq
 pub async fn get_guild_channels(pool: &PgPool, guild_id: Uuid) -> sqlx::Result<Vec<Channel>> {
     sqlx::query_as::<_, Channel>(
         r"
-        SELECT id, name, channel_type, category_id, guild_id, topic, user_limit, position, max_screen_shares, created_at, updated_at
+        SELECT id, name, channel_type, category_id, guild_id, topic, icon_url, user_limit, position, max_screen_shares, created_at, updated_at
         FROM channels
         WHERE guild_id = $1
         ORDER BY position ASC
