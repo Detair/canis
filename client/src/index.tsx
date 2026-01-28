@@ -8,6 +8,7 @@ import "./styles/themes-structure.css";
 import "./styles/themes.css";
 import "./styles/themes-pixel.css";
 import "./styles/highlight-theme.css";
+import "./styles/themes-pixel-highlight.css";
 import AppRoutes from "./App";
 
 const root = document.getElementById("root");
