@@ -12,7 +12,7 @@ Add a "Join Guild" button to the server rail that opens a modal where users can 
 - Single text input accepting both bare invite codes and full URLs
 - Code extraction logic:
   - Try URL match: `/invite/([A-Za-z0-9]+)$/`
-  - Try bare code match: `/^[A-Za-z0-9]{8}$/`
+  - Try bare code match: `/^[A-Za-z0-9]{8,16}$/`
   - Show validation error if neither matches
 - On success: close modal, navigate to joined guild
 - Uses existing `joinViaInviteCode(code)` from guilds store

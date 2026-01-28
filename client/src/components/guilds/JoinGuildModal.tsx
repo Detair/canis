@@ -22,8 +22,8 @@ function extractInviteCode(input: string): string | null {
   const trimmed = input.trim();
   if (!trimmed) return null;
 
-  // Try URL match: anything ending with /invite/<code>
-  const urlMatch = trimmed.match(/\/invite\/([A-Za-z0-9]+)$/);
+  // Try URL match: /invite/<code>, ignoring trailing slash and query params
+  const urlMatch = trimmed.match(/\/invite\/([A-Za-z0-9]+)\/?(?:\?.*)?$/);
   if (urlMatch) return urlMatch[1];
 
   // Try bare invite code (8-16 char alphanumeric)
@@ -55,6 +55,7 @@ const JoinGuildModal: Component<JoinGuildModalProps> = (props) => {
       await joinViaInviteCode(code);
       props.onClose();
     } catch (err) {
+      console.error("Failed to join guild via invite code:", code, err);
       setError(err instanceof Error ? err.message : "Failed to join server");
     } finally {
       setIsJoining(false);
@@ -123,7 +124,7 @@ const JoinGuildModal: Component<JoinGuildModalProps> = (props) => {
               Cancel
             </button>
             <button
-              type="submit"
+              type="button"
               onClick={handleSubmit}
               class="px-6 py-2 bg-accent-primary hover:bg-accent-primary/90 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={isJoining() || !inviteCode()}

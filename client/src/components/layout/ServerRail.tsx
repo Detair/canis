@@ -11,7 +11,7 @@
  * Structure:
  * - Top: "Canis Home" logo (Unified Home dashboard)
  * - Middle: Server/Guild icons (scrollable)
- * - Bottom: "Add Server" (+) button
+ * - Bottom: "Create Server" (+) button, "Join Server" button
  */
 
 import { Component, createSignal, For, Show } from "solid-js";
