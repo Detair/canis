@@ -23,6 +23,7 @@ import type {
   Page,
   PageListItem,
   GuildRole,
+  GuildEmoji,
   ChannelOverride,
   CreateRoleRequest,
   UpdateRoleRequest,
@@ -55,7 +56,7 @@ import type {
 } from "./types";
 
 // Re-export types for convenience
-export type { User, Channel, ChannelCategory, ChannelWithUnread, Message, AppSettings, Guild, GuildMember, GuildInvite, InviteResponse, InviteExpiry, Friend, Friendship, DMChannel, DMListItem, Page, PageListItem, GuildRole, ChannelOverride, CreateRoleRequest, UpdateRoleRequest, SetChannelOverrideRequest, AssignRoleResponse, RemoveRoleResponse, DeleteRoleResponse, AdminStats, AdminStatus, UserSummary, GuildSummary, AuditLogEntry, PaginatedResponse, ElevateResponse, UserDetailsResponse, GuildDetailsResponse, BulkBanResponse, BulkSuspendResponse, CallEndReason, CallStateResponse, E2EEStatus, InitE2EEResponse, PrekeyData, E2EEContent, ClaimedPrekeyInput, UserKeysResponse, ClaimedPrekeyResponse, SearchResponse };
+export type { User, Channel, ChannelCategory, ChannelWithUnread, Message, AppSettings, Guild, GuildMember, GuildInvite, InviteResponse, InviteExpiry, Friend, Friendship, DMChannel, DMListItem, Page, PageListItem, GuildRole, GuildEmoji, ChannelOverride, CreateRoleRequest, UpdateRoleRequest, SetChannelOverrideRequest, AssignRoleResponse, RemoveRoleResponse, DeleteRoleResponse, AdminStats, AdminStatus, UserSummary, GuildSummary, AuditLogEntry, PaginatedResponse, ElevateResponse, UserDetailsResponse, GuildDetailsResponse, BulkBanResponse, BulkSuspendResponse, CallEndReason, CallStateResponse, E2EEStatus, InitE2EEResponse, PrekeyData, E2EEContent, ClaimedPrekeyInput, UserKeysResponse, ClaimedPrekeyResponse, SearchResponse };
 
 // Detect if running in Tauri
 const isTauri = typeof window !== "undefined" && "__TAURI__" in window;
@@ -407,7 +408,7 @@ export async function uploadAvatar(file: File): Promise<User> {
   formData.append("avatar", file);
 
   const baseUrl = (browserState.serverUrl || "http://localhost:8080").replace(/\/+$/, "");
-  
+
   const response = await fetch(`${baseUrl}/auth/me/avatar`, {
     method: "POST",
     headers,
@@ -503,7 +504,7 @@ export async function uploadFile(
 ): Promise<any> {
   // For now, we use standard fetch for both Browser and Tauri
   // Tauri 2.0 supports fetch with proper configuration
-  
+
   const token = browserState.accessToken || localStorage.getItem("accessToken");
   const headers: Record<string, string> = {};
 
@@ -516,7 +517,7 @@ export async function uploadFile(
   formData.append("file", file);
 
   const baseUrl = (browserState.serverUrl || "http://localhost:8080").replace(/\/+$/, "");
-  
+
   const response = await fetch(`${baseUrl}/api/messages/upload`, {
     method: "POST",
     headers,
@@ -829,6 +830,76 @@ export async function updateGuildCategory(
       parent_id: updates.parentId,
     }
   );
+}
+
+// Guild Emoji Commands
+
+export async function getGuildEmojis(guildId: string): Promise<GuildEmoji[]> {
+  if (isTauri) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return invoke("get_guild_emojis", { guildId });
+  }
+
+  return httpRequest<GuildEmoji[]>("GET", `/api/guilds/${guildId}/emojis`);
+}
+
+export async function uploadGuildEmoji(
+  guildId: string,
+  name: string,
+  file: File
+): Promise<GuildEmoji> {
+  const token = browserState.accessToken || localStorage.getItem("accessToken");
+  const headers: Record<string, string> = {};
+
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  const formData = new FormData();
+  formData.append("name", name);
+  formData.append("file", file);
+
+  const baseUrl = (browserState.serverUrl || "http://localhost:8080").replace(/\/+$/, "");
+
+  const response = await fetch(`${baseUrl}/api/guilds/${guildId}/emojis`, {
+    method: "POST",
+    headers,
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: response.statusText }));
+    throw new Error(error.message || error.error || "Upload failed");
+  }
+
+  return response.json();
+}
+
+export async function updateGuildEmoji(
+  guildId: string,
+  emojiId: string,
+  name: string
+): Promise<GuildEmoji> {
+  if (isTauri) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return invoke("update_guild_emoji", { guildId, emojiId, name });
+  }
+
+  return httpRequest<GuildEmoji>("PATCH", `/api/guilds/${guildId}/emojis/${emojiId}`, {
+    name,
+  });
+}
+
+export async function deleteGuildEmoji(
+  guildId: string,
+  emojiId: string
+): Promise<void> {
+  if (isTauri) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return invoke("delete_guild_emoji", { guildId, emojiId });
+  }
+
+  await httpRequest<void>("DELETE", `/api/guilds/${guildId}/emojis/${emojiId}`);
 }
 
 /**

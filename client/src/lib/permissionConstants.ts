@@ -40,6 +40,7 @@ export const PermissionBits = {
 
   // Pages (bit 21)
   MANAGE_PAGES: 1 << 21,
+  MANAGE_EMOJIS_AND_STICKERS: 1 << 22,
 } as const;
 
 export type PermissionBit = (typeof PermissionBits)[keyof typeof PermissionBits];
@@ -250,6 +251,14 @@ export const PERMISSIONS: PermissionDefinition[] = [
     name: "Manage Pages",
     description: "Allows creating, editing, and deleting information pages",
     category: "pages",
+    forbiddenForEveryone: true,
+  },
+  {
+    key: "MANAGE_EMOJIS_AND_STICKERS",
+    bit: PermissionBits.MANAGE_EMOJIS_AND_STICKERS,
+    name: "Manage Emojis",
+    description: "Allows managing custom guild emojis",
+    category: "guild_management",
     forbiddenForEveryone: true,
   },
 ];

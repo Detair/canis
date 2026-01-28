@@ -141,7 +141,7 @@ pub struct RoleResponse {
 // Emoji Types
 // ============================================================================
 
-#[derive(Debug, Clone, FromRow, Serialize)]
+#[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
 pub struct GuildEmoji {
     pub id: Uuid,
     pub guild_id: Uuid,

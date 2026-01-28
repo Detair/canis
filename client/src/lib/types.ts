@@ -194,11 +194,11 @@ export interface Reaction {
 export interface GuildEmoji {
   id: string;
   name: string;
-  guildId: string;
-  imageUrl: string;
+  guild_id: string;
+  image_url: string;
   animated: boolean;
-  uploadedBy: string;
-  createdAt: string;
+  uploaded_by: string;
+  created_at: string;
 }
 
 export interface Message {
@@ -316,12 +316,12 @@ export type ServerEvent =
   | { type: "unsubscribed"; channel_id: string }
   | { type: "message_new"; channel_id: string; message: Message }
   | {
-      type: "message_edit";
-      channel_id: string;
-      message_id: string;
-      content: string;
-      edited_at: string;
-    }
+    type: "message_edit";
+    channel_id: string;
+    message_id: string;
+    content: string;
+    edited_at: string;
+  }
   | { type: "message_delete"; channel_id: string; message_id: string }
   | { type: "typing_start"; channel_id: string; user_id: string }
   | { type: "typing_stop"; channel_id: string; user_id: string }
@@ -334,35 +334,35 @@ export type ServerEvent =
   | { type: "voice_user_muted"; channel_id: string; user_id: string }
   | { type: "voice_user_unmuted"; channel_id: string; user_id: string }
   | {
-      type: "voice_room_state";
-      channel_id: string;
-      participants: VoiceParticipant[];
-      screen_shares?: ScreenShareServerInfo[];
-    }
+    type: "voice_room_state";
+    channel_id: string;
+    participants: VoiceParticipant[];
+    screen_shares?: ScreenShareServerInfo[];
+  }
   | { type: "voice_error"; code: string; message: string }
   // Screen share events
   | {
-      type: "screen_share_started";
-      channel_id: string;
-      user_id: string;
-      username: string;
-      source_label: string;
-      has_audio: boolean;
-      quality: "low" | "medium" | "high" | "premium";
-      started_at?: string;
-    }
+    type: "screen_share_started";
+    channel_id: string;
+    user_id: string;
+    username: string;
+    source_label: string;
+    has_audio: boolean;
+    quality: "low" | "medium" | "high" | "premium";
+    started_at?: string;
+  }
   | {
-      type: "screen_share_stopped";
-      channel_id: string;
-      user_id: string;
-      reason: string;
-    }
+    type: "screen_share_stopped";
+    channel_id: string;
+    user_id: string;
+    reason: string;
+  }
   | {
-      type: "screen_share_quality_changed";
-      channel_id: string;
-      user_id: string;
-      new_quality: "low" | "medium" | "high" | "premium";
-    }
+    type: "screen_share_quality_changed";
+    channel_id: string;
+    user_id: string;
+    new_quality: "low" | "medium" | "high" | "premium";
+  }
   | { type: "error"; code: string; message: string }
   // Call events
   | { type: "incoming_call"; channel_id: string; initiator: string; initiator_name: string }

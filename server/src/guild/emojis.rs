@@ -274,13 +274,7 @@ pub async fn create_emoji(
     .await?;
 
     // Broadcast update
-    // We construct the event manually since we added the variant but not a helper.
-    let event = ServerEvent::GuildEmojiUpdated {
-        guild_id,
-        emojis: vec![emoji.clone()], // For now sending just the new one is weird if it says "emojis" list. 
-        // Ideally should send full list? Client might replace list.
-        // Let's query full list.
-    };
+    // Re-query full list for broadcast
 
     // Re-query full list for broadcast
     let all_emojis = sqlx::query_as::<_, GuildEmoji>(

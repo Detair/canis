@@ -95,7 +95,7 @@ const EmojiPicker: Component<EmojiPickerProps> = (props) => {
                       onClick={() => handleSelect(`:${emoji.name}:`)}
                       title={`:${emoji.name}:`}
                     >
-                      <img src={emoji.imageUrl} alt={emoji.name} class="w-6 h-6" />
+                      <img src={emoji.image_url} alt={emoji.name} class="w-6 h-6" />
                     </button>
                   )}
                 </For>

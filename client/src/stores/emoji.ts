@@ -6,6 +6,7 @@
 
 import { createStore } from "solid-js/store";
 import type { GuildEmoji } from "@/lib/types";
+import * as tauri from "@/lib/tauri";
 
 // ============================================================================
 // Types
@@ -208,6 +209,50 @@ export function setGuildEmojis(guildId: string, emojis: GuildEmoji[]): void {
  */
 export function getGuildEmojis(guildId: string): GuildEmoji[] {
   return emojiState.guildEmojis[guildId] ?? [];
+}
+
+/**
+ * Load emojis for a guild from API
+ */
+export async function loadGuildEmojis(guildId: string): Promise<void> {
+  const emojis = await tauri.getGuildEmojis(guildId);
+  setGuildEmojis(guildId, emojis);
+}
+
+/**
+ * Upload a new guild emoji
+ */
+export async function uploadEmoji(
+  guildId: string,
+  name: string,
+  file: File
+): Promise<void> {
+  const emoji = await tauri.uploadGuildEmoji(guildId, name, file);
+  setEmojiState("guildEmojis", guildId, (prev) => [emoji, ...(prev || [])]);
+}
+
+/**
+ * Update a guild emoji
+ */
+export async function updateEmoji(
+  guildId: string,
+  emojiId: string,
+  name: string
+): Promise<void> {
+  const updated = await tauri.updateGuildEmoji(guildId, emojiId, name);
+  setEmojiState("guildEmojis", guildId, (prev) =>
+    (prev || []).map(e => e.id === emojiId ? updated : e)
+  );
+}
+
+/**
+ * Delete a guild emoji
+ */
+export async function deleteEmoji(guildId: string, emojiId: string): Promise<void> {
+  await tauri.deleteGuildEmoji(guildId, emojiId);
+  setEmojiState("guildEmojis", guildId, (prev) =>
+    (prev || []).filter((e) => e.id !== emojiId)
+  );
 }
 
 // ============================================================================

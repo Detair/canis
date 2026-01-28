@@ -49,7 +49,7 @@ pub struct PaginationParams {
     /// Number of items to skip.
     #[serde(default)]
     pub offset: i64,
-    /// Search query (searches username, display_name, email for users; name for guilds).
+    /// Search query (searches username, `display_name`, email for users; name for guilds).
     pub search: Option<String>,
 }
 
