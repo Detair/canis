@@ -1,5 +1,5 @@
 import { Component, For, Show, createSignal, onMount } from "solid-js";
-import { Users, Info, Plus, FileText, ChevronDown } from "lucide-solid";
+import { Users, Plus, ChevronDown } from "lucide-solid";
 import { dmsState, loadDMs, selectFriendsTab } from "@/stores/dms";
 import DMItem from "./DMItem";
 import NewMessageModal from "./NewMessageModal";
@@ -10,12 +10,6 @@ const HomeSidebar: Component = () => {
   const [showNewMessage, setShowNewMessage] = createSignal(false);
   const [showAddFriendModal, setShowAddFriendModal] = createSignal(false);
   const [showDMs, setShowDMs] = createSignal(true);
-
-  // Mock server pages for now - in a real app these might come from a store
-  const serverPages = [
-    { id: "rules", title: "Rules", icon: FileText },
-    { id: "announcements", title: "Announcements", icon: Info },
-  ];
 
   onMount(() => {
     loadDMs();
@@ -75,28 +69,6 @@ const HomeSidebar: Component = () => {
         >
           <Plus class="w-5 h-5" />
         </button>
-      </div>
-
-      {/* Separator */}
-      <div class="mx-3 my-2 border-t border-white/10" />
-
-      {/* Server Information Pages */}
-      <div class="mt-2 px-3 mb-2">
-        <div class="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-1 px-2">
-          Information
-        </div>
-        <div class="space-y-1">
-          <For each={serverPages}>
-            {(page) => (
-              <div class="relative group">
-                <button class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-surface-highlight transition-colors bg-surface-base/30">
-                  <page.icon class="w-4 h-4 text-text-secondary group-hover:text-text-primary transition-colors" />
-                  <span class="text-sm font-medium">{page.title}</span>
-                </button>
-              </div>
-            )}
-          </For>
-        </div>
       </div>
 
       {/* Separator */}
