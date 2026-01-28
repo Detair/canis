@@ -1,8 +1,42 @@
 /**
- * Theme Definitions
+ * Theme Color Definitions
  *
- * CSS variables for theme switching via data-theme attribute.
- * Each theme defines semantic color tokens used throughout the app.
+ * Each theme defines semantic color tokens as CSS custom properties.
+ * Themes are activated via the data-theme attribute on <html>.
+ *
+ * HOW TO ADD A NEW COLOR THEME:
+ * 1. Add your theme ID to ThemeName in src/stores/theme.ts
+ * 2. Add a ThemeDefinition entry to the availableThemes array
+ * 3. Copy any existing color block below and change the data-theme value
+ * 4. Replace all color values with your palette
+ * 5. (Optional) For pixel themes, set family: "pixel" — structural styles
+ *    in themes-pixel.css are inherited automatically via [data-theme^="pixel-"]
+ *
+ * TOKEN REFERENCE:
+ * --color-surface-base       Main app background (most visible area)
+ * --color-surface-layer1     Sidebar, panels, cards (one level above base)
+ * --color-surface-layer2     Nested panels, dropdowns, popovers
+ * --color-surface-highlight  Active/selected/hovered items
+ * --color-text-primary       Main text, headings (high contrast required)
+ * --color-text-secondary     Muted text: timestamps, hints, descriptions
+ * --color-text-input         Text inside input fields
+ * --color-accent-primary     Buttons, links, active indicators
+ * --color-accent-primary-hover  Hovered state of accent-primary
+ * --color-accent-danger      Delete actions, errors, destructive UI
+ * --color-accent-success     Online status, success messages, confirmations
+ * --color-accent-warning     Warnings, pending states, caution indicators
+ * --color-border-subtle      Faint dividers between content sections
+ * --color-border-default     Visible borders on inputs, cards, panels
+ * --color-selection-bg       Text selection highlight background
+ * --color-selection-text     Text color when selected
+ * --color-error-bg           Error banner/toast background
+ * --color-error-border       Error banner/toast border
+ * --color-error-text         Error message text color
+ *
+ * ACCESSIBILITY:
+ * Ensure text-primary achieves >=7:1 contrast on surface-base (AAA).
+ * Ensure text-secondary achieves >=4.5:1 contrast on surface-layer1 (AA).
+ * Use https://webaim.org/resources/contrastchecker/ to verify.
  */
 
 /* Focused Hybrid - Modern dark theme with high contrast */

@@ -27,9 +27,26 @@ export interface ThemeDefinition {
 }
 
 // ============================================================================
-// Constants
+// Available Themes
 // ============================================================================
 
+/**
+ * Available Themes
+ *
+ * Central registry of all themes. This is the SINGLE SOURCE OF TRUTH
+ * for theme definitions. ThemeName type and validation derive from this array.
+ *
+ * To add a new theme:
+ * 1. Add your theme ID string to the THEME_NAMES array in src/lib/types.ts
+ * 2. Add a ThemeDefinition entry below
+ * 3. Add matching CSS color variables in src/styles/themes.css
+ * 4. For pixel themes: set family: "pixel" to inherit structural overrides
+ *    from themes-pixel.css (fonts, borders, dithering, etc.)
+ *
+ * Theme families: Themes with the same family share structural CSS.
+ * The pixel-* family uses [data-theme^="pixel-"] selector.
+ * Standard themes use the default structural tokens.
+ */
 export const availableThemes: ThemeDefinition[] = [
   {
     id: "focused-hybrid",
