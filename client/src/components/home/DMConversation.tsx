@@ -5,7 +5,7 @@
  */
 
 import { Component, Show, onCleanup, createEffect, createSignal } from "solid-js";
-import { Phone, Lock, Unlock } from "lucide-solid";
+import { Phone, Lock, Unlock, Check, X } from "lucide-solid";
 import { e2eeStatus } from "@/stores/e2ee";
 import { getSelectedDM, markDMAsRead } from "@/stores/dms";
 import { currentUser } from "@/stores/auth";
@@ -14,12 +14,14 @@ import MessageInput from "@/components/messages/MessageInput";
 import TypingIndicator from "@/components/messages/TypingIndicator";
 import { CallBanner } from "@/components/call";
 import { callState, startCall, isInCallForChannel } from "@/stores/call";
-import { startDMCall, joinVoice, uploadDMAvatar } from "@/lib/tauri";
+import { startDMCall, joinVoice, uploadDMAvatar, updateDMName } from "@/lib/tauri";
 
 const DMConversation: Component = () => {
   const dm = () => getSelectedDM();
   const [isStartingCall, setIsStartingCall] = createSignal(false);
   const [showEncryptionTooltip, setShowEncryptionTooltip] = createSignal(false);
+  const [isEditingName, setIsEditingName] = createSignal(false);
+  const [editName, setEditName] = createSignal("");
 
   // E2EE status for encryption indicator
   const isEncrypted = () => e2eeStatus().initialized;
@@ -73,14 +75,43 @@ const DMConversation: Component = () => {
   const displayName = () => {
     const currentDM = dm();
     if (!currentDM) return "";
+    // For group DMs, use the channel name (custom or auto-generated)
+    if (isGroupDM()) {
+      return currentDM.name;
+    }
+    // For 1:1 DMs, show the other participant's display name
     const others = otherParticipants();
     if (others.length === 0) {
       return currentDM.participants[0]?.display_name ?? "Unknown";
     }
-    return others.map(p => p.display_name).join(", ");
+    return others[0].display_name;
   };
 
   const isGroupDM = () => otherParticipants().length > 1;
+
+  const startEditingName = () => {
+    setEditName(dm()?.name ?? displayName());
+    setIsEditingName(true);
+  };
+
+  const saveEditedName = async () => {
+    const currentDM = dm();
+    const newName = editName().trim();
+    if (!currentDM || !newName || newName === currentDM.name) {
+      setIsEditingName(false);
+      return;
+    }
+    try {
+      await updateDMName(currentDM.id, newName);
+      setIsEditingName(false);
+    } catch (err) {
+      console.error("Failed to update DM name:", err);
+    }
+  };
+
+  const cancelEditingName = () => {
+    setIsEditingName(false);
+  };
 
   return (
     <Show
@@ -149,7 +180,49 @@ const DMConversation: Component = () => {
               </div>
             </label>
           </Show>
-          <span class="font-semibold text-text-primary">{displayName()}</span>
+          {/* Editable name for group DMs */}
+          <Show
+            when={isGroupDM() && isEditingName()}
+            fallback={
+              <span
+                class="font-semibold text-text-primary"
+                classList={{ "cursor-pointer hover:underline": isGroupDM() }}
+                onClick={() => isGroupDM() && startEditingName()}
+                title={isGroupDM() ? "Click to rename" : undefined}
+              >
+                {displayName()}
+              </span>
+            }
+          >
+            <div class="flex items-center gap-1">
+              <input
+                type="text"
+                value={editName()}
+                onInput={(e) => setEditName(e.currentTarget.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") saveEditedName();
+                  if (e.key === "Escape") cancelEditingName();
+                }}
+                class="px-2 py-0.5 rounded text-sm font-semibold text-text-primary bg-surface-layer2 border border-white/10 outline-none focus:ring-1 focus:ring-accent-primary/50 w-48"
+                maxLength={100}
+                autofocus
+              />
+              <button
+                onClick={saveEditedName}
+                class="p-1 rounded hover:bg-white/10 text-accent-success transition-colors"
+                title="Save"
+              >
+                <Check class="w-4 h-4" />
+              </button>
+              <button
+                onClick={cancelEditingName}
+                class="p-1 rounded hover:bg-white/10 text-text-secondary transition-colors"
+                title="Cancel"
+              >
+                <X class="w-4 h-4" />
+              </button>
+            </div>
+          </Show>
 
           {/* Encryption Indicator */}
           <div

@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Custom display name for group DMs (#91)
+  - PATCH `/api/dm/:id/name` endpoint to rename group DMs
+  - Inline editing in conversation header (click group name to edit)
+  - Real-time name sync via WebSocket `dm_name_updated` event
 - Join Server button in server rail with invite code/link input modal
 - Pixel art theme system with "Pixel Cozy" warm earth-tone theme
 - Theme family architecture allowing community theme variants

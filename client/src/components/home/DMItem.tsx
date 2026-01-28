@@ -25,18 +25,21 @@ const DMItem: Component<DMItemProps> = (props) => {
     return props.dm.participants.filter(p => p.user_id !== me?.id);
   };
 
+  const isGroupDM = () => otherParticipants().length > 1;
+
   // Get the other participant(s) for display
-  // Note: dm.name from the server includes ALL participants (including self),
-  // so we only use it for group DMs with a custom name set by the user.
   const displayName = () => {
+    // For group DMs, use the channel name (custom or auto-generated)
+    if (isGroupDM()) {
+      return props.dm.name;
+    }
+    // For 1:1 DMs, show the other participant's display name
     const others = otherParticipants();
     if (others.length === 0) {
       return props.dm.participants[0]?.display_name ?? "Unknown";
     }
-    return others.map(p => p.display_name).join(", ");
+    return others[0].display_name;
   };
-
-  const isGroupDM = () => otherParticipants().length > 1;
 
   // Get online status for 1:1 DMs
   const isOnline = () => {

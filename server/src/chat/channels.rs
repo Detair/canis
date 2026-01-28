@@ -64,6 +64,7 @@ pub struct ChannelResponse {
     pub position: i32,
     /// Maximum concurrent screen shares (voice channels only).
     pub max_screen_shares: i32,
+    pub icon_url: Option<String>,
     pub created_at: chrono::DateTime<chrono::Utc>,
 }
 

@@ -391,6 +391,8 @@ export type ServerEvent =
   // Friend events
   | { type: "friend_request_received"; friendship_id: string; from_user_id: string; from_username: string; from_display_name: string; from_avatar_url: string | null }
   | { type: "friend_request_accepted"; friendship_id: string; user_id: string; username: string; display_name: string; avatar_url: string | null }
+  // DM metadata events
+  | { type: "dm_name_updated"; channel_id: string; name: string; updated_by: string }
   // State sync events
   | { type: "patch"; entity_type: string; entity_id: string; diff: Record<string, unknown> };
 

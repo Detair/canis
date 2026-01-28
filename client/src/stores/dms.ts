@@ -153,6 +153,16 @@ export function handleDMReadEvent(channelId: string): void {
 }
 
 /**
+ * Update a DM channel's name (from WebSocket event).
+ */
+export function handleDMNameUpdated(channelId: string, name: string): void {
+  const dmIndex = dmsState.dms.findIndex((d) => d.id === channelId);
+  if (dmIndex !== -1) {
+    setDmsState("dms", dmIndex, "name", name);
+  }
+}
+
+/**
  * Get the currently selected DM
  */
 export function getSelectedDM(): DMListItem | null {

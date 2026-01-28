@@ -24,7 +24,7 @@ import { getChannel, channelsState, handleChannelReadEvent, incrementUnreadCount
 import { currentUser } from "./auth";
 import { guildsState, getGuildIdForChannel, incrementGuildUnread } from "./guilds";
 import type { MentionType, SoundEventType } from "@/lib/sound/types";
-import { handleDMReadEvent } from "./dms";
+import { handleDMReadEvent, handleDMNameUpdated } from "./dms";
 
 // Detect if running in Tauri
 const isTauri = typeof window !== "undefined" && "__TAURI__" in window;
@@ -476,6 +476,11 @@ async function handleServerEvent(event: ServerEvent): Promise<void> {
     // DM read sync event
     case "dm_read":
       handleDMReadEvent(event.channel_id);
+      break;
+
+    // DM name updated
+    case "dm_name_updated":
+      handleDMNameUpdated(event.channel_id, event.name);
       break;
 
     // Guild channel read sync event

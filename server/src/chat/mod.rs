@@ -71,6 +71,7 @@ pub fn dm_router() -> Router<AppState> {
         .route("/", get(dm::list_dms).post(dm::create_dm))
         .route("/:id", get(dm::get_dm))
         .route("/:id/leave", post(dm::leave_dm))
+        .route("/:id/name", patch(dm::update_dm_name))
         .route("/:id/read", post(dm::mark_as_read))
         .route("/:id/icon", get(dm::get_dm_icon).post(dm::upload_dm_icon))
 }

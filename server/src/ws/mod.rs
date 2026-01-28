@@ -555,6 +555,17 @@ pub enum ServerEvent {
         avatar_url: Option<String>,
     },
 
+    // DM metadata events
+    /// DM channel name was updated (broadcast to all participants)
+    DmNameUpdated {
+        /// DM channel ID.
+        channel_id: Uuid,
+        /// New name for the DM channel.
+        name: String,
+        /// User who changed the name.
+        updated_by: Uuid,
+    },
+
     // Admin events (broadcast to admin subscribers)
     /// User was banned
     AdminUserBanned {

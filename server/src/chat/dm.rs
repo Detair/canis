@@ -484,6 +484,102 @@ pub async fn leave_dm(
 }
 
 // ============================================================================
+// Update Group DM Name
+// ============================================================================
+
+#[derive(Debug, Deserialize, Validate)]
+pub struct UpdateDMNameRequest {
+    #[validate(length(min = 1, max = 100, message = "Name must be 1-100 characters"))]
+    pub name: String,
+}
+
+/// Update a group DM's display name
+/// PATCH /api/dm/:id/name
+pub async fn update_dm_name(
+    State(state): State<AppState>,
+    auth: AuthUser,
+    Path(channel_id): Path<Uuid>,
+    Json(body): Json<UpdateDMNameRequest>,
+) -> Result<Json<DMResponse>, ChannelError> {
+    body.validate()
+        .map_err(|e| ChannelError::Validation(e.to_string()))?;
+
+    // Verify channel exists and is a DM
+    let channel = db::find_channel_by_id(&state.db, channel_id)
+        .await?
+        .ok_or(ChannelError::NotFound)?;
+
+    if channel.channel_type != ChannelType::Dm {
+        return Err(ChannelError::NotFound);
+    }
+
+    // Verify auth user is a participant
+    let is_participant = sqlx::query_scalar!(
+        r#"SELECT EXISTS(SELECT 1 FROM dm_participants WHERE channel_id = $1 AND user_id = $2) as "exists!""#,
+        channel_id,
+        auth.id
+    )
+    .fetch_one(&state.db)
+    .await?;
+
+    if !is_participant {
+        return Err(ChannelError::Forbidden);
+    }
+
+    // Verify it's a group DM (more than 2 participants)
+    let participant_count = sqlx::query_scalar!(
+        r#"SELECT COUNT(*) as "count!" FROM dm_participants WHERE channel_id = $1"#,
+        channel_id
+    )
+    .fetch_one(&state.db)
+    .await?;
+
+    if participant_count <= 2 {
+        return Err(ChannelError::Validation(
+            "Cannot rename 1:1 DM channels".to_string(),
+        ));
+    }
+
+    // Update the channel name
+    let updated_channel = sqlx::query_as::<_, crate::db::Channel>(
+        r"UPDATE channels SET name = $1, updated_at = NOW()
+          WHERE id = $2
+          RETURNING id, name, channel_type, category_id, guild_id, topic, user_limit, position, max_screen_shares, created_at, updated_at",
+    )
+    .bind(&body.name)
+    .bind(channel_id)
+    .fetch_one(&state.db)
+    .await?;
+
+    // Get participants
+    let participants = get_dm_participants(&state.db, channel_id).await?;
+
+    // Broadcast name change to all participants via the channel
+    if let Err(e) = crate::ws::broadcast_to_channel(
+        &state.redis,
+        channel_id,
+        &ServerEvent::DmNameUpdated {
+            channel_id,
+            name: body.name.clone(),
+            updated_by: auth.id,
+        },
+    )
+    .await
+    {
+        tracing::warn!(
+            channel_id = %channel_id,
+            error = %e,
+            "Failed to broadcast DmNameUpdated event"
+        );
+    }
+
+    Ok(Json(DMResponse {
+        channel: updated_channel.into(),
+        participants,
+    }))
+}
+
+// ============================================================================
 // Icon Upload
 // ============================================================================
 

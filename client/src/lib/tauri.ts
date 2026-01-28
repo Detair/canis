@@ -1192,6 +1192,16 @@ export async function markDMAsRead(
   });
 }
 
+/**
+ * Update the display name of a group DM channel.
+ */
+export async function updateDMName(
+  channelId: string,
+  name: string
+): Promise<void> {
+  await httpRequest<void>("PATCH", `/api/dm/${channelId}/name`, { name });
+}
+
 // DM Call Commands
 
 /**
