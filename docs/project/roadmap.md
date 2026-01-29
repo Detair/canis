@@ -14,7 +14,7 @@ This roadmap outlines the development path from the current prototype to a produ
 | **Phase 1** | ✅ Complete | 100% | Voice state sync, audio device selection |
 | **Phase 2** | ✅ Complete | 100% | Voice Island, VAD, Speaking Indicators, Command Palette, File Attachments, Theme System, Code Highlighting |
 | **Phase 3** | ✅ Complete | 100% | Guild system, Friends, DMs, Home View, Rate Limiting, Permission System + UI, Information Pages, DM Voice Calls |
-| **Phase 4** | 🔄 In Progress | 80% | E2EE Key Backup + DM Messaging, User Connectivity Monitor, Rich Presence, Sound Pack, Cross-Server Favorites |
+| **Phase 4** | 🔄 In Progress | 67% | E2EE DM Messaging, User Connectivity Monitor, Rich Presence, First User Setup, Context Menus |
 | **Phase 5** | 📋 Planned | 0% | - |
 
 **Production Ready Features:**
@@ -32,6 +32,8 @@ This roadmap outlines the development path from the current prototype to a produ
 - ✅ Admin dashboard with user/guild management
 - ✅ User connection quality monitoring with history
 - ✅ Cross-server channel favorites with star toggle
+- ✅ First-user setup wizard with automatic admin bootstrap
+- ✅ Right-click context menus for messages, channels, and users
 
 ---
 
@@ -280,12 +282,13 @@ This roadmap outlines the development path from the current prototype to a produ
 - [ ] **[Voice] Screen Sharing**
   - Update SFU to handle multiple video tracks (Webcam + Screen).
   - Update Client UI to render "Filmstrip" or "Grid" layouts.
-- [ ] **[UX] Advanced Browser Context Menus**
-  - **Context:** Standardize right-click behavior across the app to reduce reliance on visible icons and improve desktop-like feel.
-  - **Strategy:**
-    - Implement a global `ContextMenuProvider` using Solid.js Portals
-    - Create `ContextMenu.tsx` with standard actions (Copy, Reply, Delete, Mark as Read)
-    - Add `onContextMenu` listeners to `MessageItem.tsx` and `ChannelItem.tsx`
+- [x] **[UX] Advanced Browser Context Menus** ✅
+  - Global `ContextMenuProvider` using Solid.js Portals
+  - `ContextMenu.tsx` component with keyboard navigation (Arrow keys, Enter, Home/End, Escape)
+  - Message menu: Copy Text, Copy Message Link, Copy ID, Delete (own messages)
+  - Channel menu: Mark as Read, Mute/Unmute, Add to Favorites, Edit Channel, Copy ID
+  - User menu: View Profile, Send Message, Add Friend, Block, Copy User ID
+  - Implementation files: `client/src/components/ui/ContextMenu.tsx`, `client/src/lib/contextMenuBuilders.ts`
     - Support keyboard navigation and accessibility
   - **Implementation:**
     - Architecture: `ContextMenuProvider.tsx` with portal support
