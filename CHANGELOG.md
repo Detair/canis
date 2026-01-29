@@ -249,6 +249,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Legacy unscoped `GET /api/channels` endpoint that returned all channels across all guilds
 
 ### Fixed
+- Emoji picker positioning and viewport clipping issues
+  - Integrated @floating-ui/dom for smart positioning that adapts to available space
+  - Picker now automatically flips up/down and shifts left/right to stay visible
+  - Dynamic max-height adjustment based on viewport size
+  - Click-outside and Escape key support for better UX
+  - Portal-based rendering prevents clipping by parent containers
+  - Smooth fade-in animation when picker appears
 - Friend requests failing in desktop client (#107)
   - Removed dead Tauri `invoke()` branches for friend commands (no corresponding Rust commands existed)
   - All friend operations now use HTTP API consistently
