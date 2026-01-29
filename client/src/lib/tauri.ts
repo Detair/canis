@@ -153,6 +153,31 @@ export async function fetchUploadLimits(): Promise<void> {
 type UploadType = 'avatar' | 'emoji' | 'attachment';
 
 /**
+ * Format bytes to human-readable size
+ */
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(0)}KB`;
+  }
+  return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
+}
+
+/**
+ * Get formatted upload size limit for UI display
+ * @param type - Type of upload (avatar, emoji, or attachment)
+ * @returns Human-readable size string (e.g., "5MB", "256KB")
+ */
+export function getUploadLimitText(type: UploadType): string {
+  const maxSize = type === 'avatar'
+    ? uploadLimits.max_avatar_size
+    : type === 'emoji'
+    ? uploadLimits.max_emoji_size
+    : uploadLimits.max_upload_size;
+
+  return formatFileSize(maxSize);
+}
+
+/**
  * Validate file size on frontend before upload.
  * Uses limits fetched from server, with fallback to hardcoded defaults.
  *
@@ -160,7 +185,7 @@ type UploadType = 'avatar' | 'emoji' | 'attachment';
  * @param type - Type of upload (avatar, emoji, or attachment)
  * @returns Error message if file is too large, null if valid
  */
-function validateFileSize(file: File, type: UploadType): string | null {
+export function validateFileSize(file: File, type: UploadType): string | null {
   const maxSize = type === 'avatar'
     ? uploadLimits.max_avatar_size
     : type === 'emoji'
@@ -168,21 +193,10 @@ function validateFileSize(file: File, type: UploadType): string | null {
     : uploadLimits.max_upload_size;
 
   if (file.size > maxSize) {
-    // Format sizes based on magnitude
-    const formatSize = (bytes: number): string => {
-      if (bytes < 1024 * 1024) {
-        return `${(bytes / 1024).toFixed(0)}KB`;
-      }
-      return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
-    };
-
-    return `File too large (${formatSize(file.size)}). Maximum size is ${formatSize(maxSize)}.`;
+    return `File too large (${formatFileSize(file.size)}). Maximum size is ${formatFileSize(maxSize)}.`;
   }
   return null;
 }
-
-// Export for use in components
-export { validateFileSize };
 
 // Browser state (when not in Tauri)
 const browserState = {

@@ -3,7 +3,7 @@ import { Camera, Upload } from "lucide-solid";
 import { authState, updateUser } from "@/stores/auth";
 import Avatar from "@/components/ui/Avatar";
 import * as tauri from "@/lib/tauri";
-import { validateFileSize } from "@/lib/tauri";
+import { validateFileSize, getUploadLimitText } from "@/lib/tauri";
 
 const AccountSettings: Component = () => {
   const user = () => authState.user;
@@ -97,7 +97,7 @@ const AccountSettings: Component = () => {
             </button>
           </div>
           <p class="text-xs text-text-secondary">
-            Maximum size: 5MB
+            Maximum size: {getUploadLimitText('avatar')}
           </p>
           <div class="space-y-1">
             <div class="flex items-center gap-2 text-sm">

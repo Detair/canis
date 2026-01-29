@@ -2,7 +2,7 @@ import { Component, createSignal, Show, For, onCleanup } from "solid-js";
 import { PlusCircle, Send, UploadCloud, X, File as FileIcon } from "lucide-solid";
 import { sendMessage, messagesState, addMessage } from "@/stores/messages";
 import { stopTyping, sendTyping } from "@/stores/websocket";
-import { uploadMessageWithFile, validateFileSize } from "@/lib/tauri";
+import { uploadMessageWithFile, validateFileSize, getUploadLimitText } from "@/lib/tauri";
 
 interface MessageInputProps {
   channelId: string;
@@ -179,7 +179,7 @@ const MessageInput: Component<MessageInputProps> = (props) => {
         <div class="absolute inset-0 z-50 bg-surface-base/90 backdrop-blur-sm rounded-lg border-2 border-dashed border-accent-primary flex flex-col items-center justify-center pointer-events-none m-4">
           <UploadCloud class="w-12 h-12 text-accent-primary mb-2" />
           <p class="text-text-primary font-medium">Drop files to upload</p>
-          <p class="text-xs text-text-secondary mt-1">Maximum size: 50MB</p>
+          <p class="text-xs text-text-secondary mt-1">Maximum size: {getUploadLimitText('attachment')}</p>
         </div>
       </Show>
 

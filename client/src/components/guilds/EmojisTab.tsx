@@ -14,7 +14,7 @@ import { authState } from "@/stores/auth";
 import { isGuildOwner } from "@/stores/guilds";
 import { memberHasPermission } from "@/stores/permissions";
 import { PermissionBits } from "@/lib/permissionConstants";
-import { validateFileSize } from "@/lib/tauri";
+import { validateFileSize, getUploadLimitText } from "@/lib/tauri";
 
 interface EmojisTabProps {
     guildId: string;
@@ -91,7 +91,7 @@ const EmojisTab: Component<EmojisTabProps> = (props) => {
                 <div>
                     <h3 class="text-lg font-semibold text-text-primary">Emojis</h3>
                     <p class="text-sm text-text-secondary">
-                        Upload custom emojis for your server. Maximum size: 256KB
+                        Upload custom emojis for your server. Maximum size: {getUploadLimitText('emoji')}
                     </p>
                 </div>
 

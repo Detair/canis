@@ -20,27 +20,13 @@ use crate::db::{
 };
 use crate::ws::broadcast_user_patch;
 use crate::ratelimit::NormalizedIp;
+use crate::util::format_file_size;
 
 use super::error::{AuthError, AuthResult};
 use super::jwt::{generate_token_pair, validate_refresh_token};
 use super::mfa_crypto::{decrypt_mfa_secret, encrypt_mfa_secret};
 use super::middleware::AuthUser;
 use super::password::{hash_password, verify_password};
-
-// ============================================================================
-// Helpers
-// ============================================================================
-
-/// Format file size in human-readable units
-fn format_file_size(bytes: usize) -> String {
-    if bytes < 1024 {
-        format!("{} bytes", bytes)
-    } else if bytes < 1024 * 1024 {
-        format!("{}KB", bytes / 1024)
-    } else {
-        format!("{:.1}MB", bytes as f64 / (1024.0 * 1024.0))
-    }
-}
 
 // ============================================================================
 // Request/Response Types
