@@ -154,12 +154,17 @@ type UploadType = 'avatar' | 'emoji' | 'attachment';
 
 /**
  * Format bytes to human-readable size
+ *
+ * Matches server implementation in util.rs for consistency.
  */
 function formatFileSize(bytes: number): string {
-  if (bytes < 1024 * 1024) {
-    return `${(bytes / 1024).toFixed(0)}KB`;
+  if (bytes < 1024) {
+    return `${bytes} bytes`;
+  } else if (bytes < 1024 * 1024) {
+    return `${Math.floor(bytes / 1024)}KB`;
+  } else {
+    return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
   }
-  return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
 }
 
 /**

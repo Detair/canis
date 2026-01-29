@@ -55,7 +55,7 @@ impl IntoResponse for EmojiError {
     fn into_response(self) -> axum::response::Response {
         match self {
             EmojiError::FileTooLarge { max_size } => {
-                let message = format!("File too large (max {}KB for emojis)", max_size / 1024);
+                let message = format!("File too large (max {} for emojis)", crate::util::format_file_size(max_size));
                 (
                     StatusCode::PAYLOAD_TOO_LARGE,
                     Json(json!({
