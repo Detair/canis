@@ -139,12 +139,27 @@ pub async fn get_config(
     State(state): State<AppState>,
 ) -> Result<Json<SetupConfigResponse>, SetupError> {
     // Only allow fetching config if setup is incomplete
-    if db::is_setup_complete(&state.db).await? {
+    if db::is_setup_complete(&state.db).await.map_err(|e| {
+        tracing::error!(
+            error = %e,
+            operation = "is_setup_complete",
+            "Database query failed in get_config handler"
+        );
+        SetupError::Database(e)
+    })? {
         return Err(SetupError::SetupAlreadyComplete);
     }
 
     // Get server_name (must be string)
-    let server_name_value = db::get_config_value(&state.db, "server_name").await?;
+    let server_name_value = db::get_config_value(&state.db, "server_name").await.map_err(|e| {
+        tracing::error!(
+            error = %e,
+            operation = "get_config_value",
+            key = "server_name",
+            "Database query failed in get_config handler"
+        );
+        SetupError::Database(e)
+    })?;
     let server_name = server_name_value
         .as_str()
         .ok_or_else(|| {
@@ -158,7 +173,15 @@ pub async fn get_config(
         .to_string();
 
     // Get registration_policy (must be string)
-    let policy_value = db::get_config_value(&state.db, "registration_policy").await?;
+    let policy_value = db::get_config_value(&state.db, "registration_policy").await.map_err(|e| {
+        tracing::error!(
+            error = %e,
+            operation = "get_config_value",
+            key = "registration_policy",
+            "Database query failed in get_config handler"
+        );
+        SetupError::Database(e)
+    })?;
     let registration_policy = policy_value
         .as_str()
         .ok_or_else(|| {
@@ -172,7 +195,15 @@ pub async fn get_config(
         .to_string();
 
     // Get terms_url (optional string or null)
-    let terms_value = db::get_config_value(&state.db, "terms_url").await?;
+    let terms_value = db::get_config_value(&state.db, "terms_url").await.map_err(|e| {
+        tracing::error!(
+            error = %e,
+            operation = "get_config_value",
+            key = "terms_url",
+            "Database query failed in get_config handler"
+        );
+        SetupError::Database(e)
+    })?;
     let terms_url = if terms_value.is_null() {
         None
     } else {
@@ -187,7 +218,15 @@ pub async fn get_config(
     };
 
     // Get privacy_url (optional string or null)
-    let privacy_value = db::get_config_value(&state.db, "privacy_url").await?;
+    let privacy_value = db::get_config_value(&state.db, "privacy_url").await.map_err(|e| {
+        tracing::error!(
+            error = %e,
+            operation = "get_config_value",
+            key = "privacy_url",
+            "Database query failed in get_config handler"
+        );
+        SetupError::Database(e)
+    })?;
     let privacy_url = if privacy_value.is_null() {
         None
     } else {

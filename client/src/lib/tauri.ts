@@ -266,7 +266,9 @@ async function httpRequest<T>(
         if (text.length > 0 && text.length < 500) {
           errorMessage = text;
         }
-      } catch {
+      } catch (textError) {
+        // Log double failure (both JSON and text parsing failed)
+        console.error(`[httpRequest] Failed to parse error response as both JSON and text for ${path}:`, textError);
         // Use statusText as final fallback
       }
     }

@@ -86,7 +86,29 @@ async function completeSetup(config: SetupConfig): Promise<void> {
   }
 
   if (!accessToken) {
-    throw new Error("No access token available");
+    throw new Error("No access token available. Please log in again.");
+  }
+
+  // Basic JWT validation: should have 3 parts (header.payload.signature)
+  const parts = accessToken.split('.');
+  if (parts.length !== 3) {
+    throw new Error("Access token is malformed. Please log in again.");
+  }
+
+  // Optional: Check if token is expired
+  try {
+    const payload = JSON.parse(atob(parts[1]));
+    if (payload.exp && payload.exp * 1000 < Date.now()) {
+      throw new Error("Access token has expired. Please log in again.");
+    }
+  } catch (e) {
+    // If we can't decode the token, continue - server will validate
+    // Only warn if it's not the expiry check that failed
+    if (e instanceof Error && !e.message.includes("expired")) {
+      console.warn("[SetupWizard] Failed to decode token for expiry check:", e);
+    } else {
+      throw e; // Re-throw expiry errors
+    }
   }
 
   const response = await fetch(`${serverUrl}/api/setup/complete`, {
