@@ -192,7 +192,8 @@ setup_distrobox_container() {
             glib2-devel gdk-pixbuf2-devel libsoup3-devel \
             webkit2gtk4.1-devel gtk3-devel \
             clang clang-devel \
-            alsa-lib-devel pulseaudio-libs-devel
+            alsa-lib-devel pulseaudio-libs-devel \
+            libvpx-devel nasm
 
         echo "System packages installed."
     '
@@ -305,7 +306,8 @@ setup_atomic_layered() {
     sudo rpm-ostree install --idempotent \
         gcc gcc-c++ make pkg-config openssl-devel curl git \
         glib2-devel gdk-pixbuf2-devel libsoup3-devel \
-        webkit2gtk4.1-devel gtk3-devel
+        webkit2gtk4.1-devel gtk3-devel \
+        libvpx-devel nasm clang-devel
 
     log_warn "A reboot is required for changes to take effect."
     log_warn "After rebooting, run this script again to complete setup."
@@ -338,7 +340,8 @@ setup_system_deps_debian() {
 
         $CMD_PREFIX apt-get update
         $CMD_PREFIX apt-get install -y build-essential pkg-config libssl-dev curl git \
-            libglib2.0-dev libgdk-pixbuf2.0-dev libsoup-3.0-dev libwebkit2gtk-4.1-dev
+            libglib2.0-dev libgdk-pixbuf2.0-dev libsoup-3.0-dev libwebkit2gtk-4.1-dev \
+            libvpx-dev nasm libclang-dev
         log_success "System dependencies installed."
     else
         log_warn "Skipping system package installation (no sudo)."
@@ -353,7 +356,8 @@ setup_system_deps_fedora() {
         if [ "$EUID" -ne 0 ]; then CMD_PREFIX="sudo"; fi
 
         $CMD_PREFIX dnf install -y gcc gcc-c++ make pkg-config openssl-devel curl git \
-            glib2-devel gdk-pixbuf2-devel libsoup3-devel webkit2gtk4.1-devel gtk3-devel
+            glib2-devel gdk-pixbuf2-devel libsoup3-devel webkit2gtk4.1-devel gtk3-devel \
+            libvpx-devel nasm clang-devel
         log_success "System dependencies installed."
     else
         log_warn "Skipping system package installation (no sudo)."

@@ -306,6 +306,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Legacy unscoped `GET /api/channels` endpoint that returned all channels across all guilds
 
 ### Fixed
+- Screen share quality tier now rejects invalid values instead of silently defaulting to "medium"
+- Eliminated redundant screen capture source lookup (was querying all targets twice per share start)
+- Encoder shutdown now responds promptly to stop signal instead of blocking on next frame
+- Removed unused RTP sequence tracking (handled by webrtc-rs internally)
+- Pre-allocated I420 buffer in VP9 encoder to avoid per-frame heap allocation
 - Emoji picker positioning and viewport clipping issues
   - Integrated @floating-ui/dom for smart positioning that adapts to available space
   - Picker now automatically flips up/down and shifts left/right to stay visible
