@@ -9,7 +9,7 @@ import { ChevronDown, ChevronRight } from "lucide-solid";
 import { preferences, updateNestedPreference } from "@/stores/preferences";
 
 interface CollapsibleModuleProps {
-  id: "activeNow" | "pending" | "pins";
+  id: "activeNow" | "pending" | "pins" | "unread";
   title: string;
   badge?: number;
   children: JSX.Element;

@@ -10,7 +10,7 @@ import { dmsState, getSelectedDM } from "@/stores/dms";
 import { getUserActivity } from "@/stores/presence";
 import { currentUser } from "@/stores/auth";
 import { ActivityIndicator } from "@/components/ui";
-import { ActiveNowModule, PendingModule, PinsModule } from "./modules";
+import { ActiveNowModule, PendingModule, PinsModule, UnreadModule } from "./modules";
 
 const HomeRightPanel: Component = () => {
   const dm = () => getSelectedDM();
@@ -29,6 +29,7 @@ const HomeRightPanel: Component = () => {
         fallback={
           // Modular Sidebar (Friends View)
           <div class="flex-1 flex flex-col overflow-y-auto">
+            <UnreadModule />
             <ActiveNowModule />
             <PendingModule />
             <PinsModule />

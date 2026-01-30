@@ -61,6 +61,28 @@ import type {
 // Re-export types for convenience
 export type { User, Channel, ChannelCategory, ChannelWithUnread, Message, AppSettings, Guild, GuildMember, GuildInvite, InviteResponse, InviteExpiry, Friend, Friendship, DMChannel, DMListItem, Page, PageListItem, GuildRole, GuildEmoji, ChannelOverride, CreateRoleRequest, UpdateRoleRequest, SetChannelOverrideRequest, AssignRoleResponse, RemoveRoleResponse, DeleteRoleResponse, AdminStats, AdminStatus, UserSummary, GuildSummary, AuditLogEntry, PaginatedResponse, ElevateResponse, UserDetailsResponse, GuildDetailsResponse, BulkBanResponse, BulkSuspendResponse, CallEndReason, CallStateResponse, E2EEStatus, InitE2EEResponse, PrekeyData, E2EEContent, ClaimedPrekeyInput, UserKeysResponse, ClaimedPrekeyResponse, SearchResponse, Pin, CreatePinRequest, UpdatePinRequest };
 
+/**
+ * Unread aggregation types
+ */
+export interface ChannelUnread {
+  channel_id: string;
+  channel_name: string;
+  unread_count: number;
+}
+
+export interface GuildUnreadSummary {
+  guild_id: string;
+  guild_name: string;
+  channels: ChannelUnread[];
+  total_unread: number;
+}
+
+export interface UnreadAggregate {
+  guilds: GuildUnreadSummary[];
+  dms: ChannelUnread[];
+  total: number;
+}
+
 // Detect if running in Tauri
 const isTauri = typeof window !== "undefined" && "__TAURI__" in window;
 
@@ -2923,4 +2945,12 @@ export async function removeReaction(
     "DELETE",
     `/api/channels/${channelId}/messages/${messageId}/reactions/${encodeURIComponent(emoji)}`
   );
+}
+
+/**
+ * Get aggregate unread counts across all guilds and DMs.
+ * Returns unread counts grouped by guild, plus DM unreads.
+ */
+export async function getUnreadAggregate(): Promise<UnreadAggregate> {
+  return fetchApi<UnreadAggregate>("/api/me/unread");
 }
