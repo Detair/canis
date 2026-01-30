@@ -47,6 +47,7 @@ export const DEFAULT_PREFERENCES: UserPreferences = {
   channelNotifications: {},
   homeSidebar: {
     collapsed: {
+      unread: false,
       activeNow: false,
       pending: false,
       pins: false,

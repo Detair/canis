@@ -198,3 +198,38 @@ pub struct Session {
     /// When the session was created.
     pub created_at: DateTime<Utc>,
 }
+
+/// Channel unread count for a specific channel.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChannelUnread {
+    /// Channel ID.
+    pub channel_id: Uuid,
+    /// Channel name.
+    pub channel_name: String,
+    /// Number of unread messages.
+    pub unread_count: i64,
+}
+
+/// Guild unread summary for the unread aggregator.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GuildUnreadSummary {
+    /// Guild ID.
+    pub guild_id: Uuid,
+    /// Guild name.
+    pub guild_name: String,
+    /// Channels with unread messages in this guild.
+    pub channels: Vec<ChannelUnread>,
+    /// Total unread count for this guild.
+    pub total_unread: i64,
+}
+
+/// Aggregate unread counts across all guilds and DMs.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UnreadAggregate {
+    /// Guild-based unreads.
+    pub guilds: Vec<GuildUnreadSummary>,
+    /// DM unreads.
+    pub dms: Vec<ChannelUnread>,
+    /// Total unread count across everything.
+    pub total: i64,
+}

@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Home page unread aggregator in modular sidebar
+  - Centralized view of unread messages across all guilds and DMs
+  - Grouped by guild with channel-level unread counts
+  - Direct navigation to channels with unread messages
+  - Comprehensive error handling with user-friendly toast notifications
+  - Automatic refresh when window gains focus
+  - Collapsible module with unread badge
+  - API endpoint: `GET /api/me/unread`
+  - Performance-optimized database query with covering indexes
 - First user setup wizard with automatic admin bootstrap
   - First user to register automatically receives system admin permissions
   - Mandatory setup wizard for configuring server name, registration policy, and legal URLs

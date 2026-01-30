@@ -472,6 +472,7 @@ export interface UserPreferences {
   // Home sidebar section collapse states
   homeSidebar: {
     collapsed: {
+      unread: boolean;
       activeNow: boolean;
       pending: boolean;
       pins: boolean;

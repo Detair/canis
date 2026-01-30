@@ -9,7 +9,10 @@ use sqlx::{PgPool, Row};
 use tracing::error;
 use uuid::Uuid;
 
-use super::models::{Channel, ChannelMember, ChannelType, FileAttachment, Message, Session, User};
+use super::models::{
+    Channel, ChannelMember, ChannelType, ChannelUnread, FileAttachment, GuildUnreadSummary,
+    Message, Session, UnreadAggregate, User,
+};
 
 /// Log and return a database error with context.
 ///
@@ -969,4 +972,122 @@ pub async fn count_users(pool: &PgPool) -> sqlx::Result<i64> {
             e
         })?;
     Ok(row.get("count"))
+}
+
+// ============================================================================
+// Unread Aggregation Queries
+// ============================================================================
+
+/// Get aggregate unread counts across all guilds and DMs for a user.
+///
+/// This query provides a centralized view of all unread activity:
+/// - Guilds: Channels with unreads, grouped by guild
+/// - DMs: Direct message conversations with unreads
+///
+/// Unread count is calculated by comparing message `created_at` with the user's
+/// `last_read_at` from `channel_read_state`.
+#[tracing::instrument(skip(pool))]
+pub async fn get_unread_aggregate(pool: &PgPool, user_id: Uuid) -> sqlx::Result<UnreadAggregate> {
+    // Get guild channel unreads
+    let guild_rows = sqlx::query(
+        r"
+        SELECT
+            g.id as guild_id,
+            g.name as guild_name,
+            c.id as channel_id,
+            c.name as channel_name,
+            COUNT(m.id)::bigint as unread_count
+        FROM guild_members gm
+        INNER JOIN guilds g ON g.id = gm.guild_id
+        INNER JOIN channels c ON c.guild_id = g.id
+        LEFT JOIN channel_read_state crs ON crs.channel_id = c.id AND crs.user_id = $1
+        LEFT JOIN messages m ON m.channel_id = c.id
+            AND m.deleted_at IS NULL
+            AND (
+                crs.last_read_at IS NULL
+                OR m.created_at > crs.last_read_at
+            )
+        WHERE gm.user_id = $1
+        GROUP BY g.id, g.name, c.id, c.name
+        HAVING COUNT(m.id) > 0
+        ORDER BY g.name, c.position
+        ",
+    )
+    .bind(user_id)
+    .fetch_all(pool)
+    .await
+    .map_err(db_error!("get_unread_aggregate:guilds", user_id = %user_id))?;
+
+    // Get DM unreads
+    let dm_rows = sqlx::query(
+        r"
+        SELECT
+            c.id as channel_id,
+            c.name as channel_name,
+            COUNT(m.id)::bigint as unread_count
+        FROM dm_participants dp
+        INNER JOIN channels c ON c.id = dp.channel_id
+        LEFT JOIN channel_read_state crs ON crs.channel_id = c.id AND crs.user_id = $1
+        LEFT JOIN messages m ON m.channel_id = c.id
+            AND m.deleted_at IS NULL
+            AND m.user_id != $1
+            AND (
+                crs.last_read_at IS NULL
+                OR m.created_at > crs.last_read_at
+            )
+        WHERE dp.user_id = $1 AND c.channel_type = 'dm'
+        GROUP BY c.id, c.name
+        HAVING COUNT(m.id) > 0
+        ORDER BY c.name
+        ",
+    )
+    .bind(user_id)
+    .fetch_all(pool)
+    .await
+    .map_err(db_error!("get_unread_aggregate:dms", user_id = %user_id))?;
+
+    // Group guild channels by guild
+    let mut guilds_map: std::collections::HashMap<Uuid, GuildUnreadSummary> =
+        std::collections::HashMap::new();
+
+    for row in guild_rows {
+        let guild_id: Uuid = row.get("guild_id");
+        let guild_name: String = row.get("guild_name");
+        let channel_id: Uuid = row.get("channel_id");
+        let channel_name: String = row.get("channel_name");
+        let unread_count: i64 = row.get("unread_count");
+
+        let guild_summary = guilds_map.entry(guild_id).or_insert_with(|| GuildUnreadSummary {
+            guild_id,
+            guild_name: guild_name.clone(),
+            channels: Vec::new(),
+            total_unread: 0,
+        });
+
+        guild_summary.channels.push(ChannelUnread {
+            channel_id,
+            channel_name,
+            unread_count,
+        });
+        guild_summary.total_unread += unread_count;
+    }
+
+    let mut guilds: Vec<GuildUnreadSummary> = guilds_map.into_values().collect();
+    guilds.sort_by(|a, b| a.guild_name.cmp(&b.guild_name));
+
+    // Build DM list
+    let dms: Vec<ChannelUnread> = dm_rows
+        .iter()
+        .map(|row| ChannelUnread {
+            channel_id: row.get("channel_id"),
+            channel_name: row.get("channel_name"),
+            unread_count: row.get("unread_count"),
+        })
+        .collect();
+
+    // Calculate total
+    let total = guilds.iter().map(|g| g.total_unread).sum::<i64>()
+        + dms.iter().map(|d| d.unread_count).sum::<i64>();
+
+    Ok(UnreadAggregate { guilds, dms, total })
 }

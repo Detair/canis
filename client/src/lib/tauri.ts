@@ -61,6 +61,28 @@ import type {
 // Re-export types for convenience
 export type { User, Channel, ChannelCategory, ChannelWithUnread, Message, AppSettings, Guild, GuildMember, GuildInvite, InviteResponse, InviteExpiry, Friend, Friendship, DMChannel, DMListItem, Page, PageListItem, GuildRole, GuildEmoji, ChannelOverride, CreateRoleRequest, UpdateRoleRequest, SetChannelOverrideRequest, AssignRoleResponse, RemoveRoleResponse, DeleteRoleResponse, AdminStats, AdminStatus, UserSummary, GuildSummary, AuditLogEntry, PaginatedResponse, ElevateResponse, UserDetailsResponse, GuildDetailsResponse, BulkBanResponse, BulkSuspendResponse, CallEndReason, CallStateResponse, E2EEStatus, InitE2EEResponse, PrekeyData, E2EEContent, ClaimedPrekeyInput, UserKeysResponse, ClaimedPrekeyResponse, SearchResponse, Pin, CreatePinRequest, UpdatePinRequest };
 
+/**
+ * Unread aggregation types
+ */
+export interface ChannelUnread {
+  channel_id: string;
+  channel_name: string;
+  unread_count: number;
+}
+
+export interface GuildUnreadSummary {
+  guild_id: string;
+  guild_name: string;
+  channels: ChannelUnread[];
+  total_unread: number;
+}
+
+export interface UnreadAggregate {
+  guilds: GuildUnreadSummary[];
+  dms: ChannelUnread[];
+  total: number;
+}
+
 // Detect if running in Tauri
 const isTauri = typeof window !== "undefined" && "__TAURI__" in window;
 
@@ -1172,56 +1194,55 @@ export async function uploadGuildEmoji(
     console.warn('[uploadGuildEmoji] Frontend validation failed:', validationError);
     throw new Error(validationError);
   }
-}
 
-const token = browserState.accessToken || localStorage.getItem("accessToken");
-const headers: Record<string, string> = {};
+  const token = browserState.accessToken || localStorage.getItem("accessToken");
+  const headers: Record<string, string> = {};
 
-if (token) {
-  headers["Authorization"] = `Bearer ${token}`;
-}
-
-const formData = new FormData();
-formData.append("name", name);
-formData.append("file", file);
-
-const baseUrl = (browserState.serverUrl || "http://localhost:8080").replace(/\/+$/, "");
-
-const response = await fetch(`${baseUrl}/api/guilds/${guildId}/emojis`, {
-  method: "POST",
-  headers,
-  body: formData,
-});
-
-if (!response.ok) {
-  let errorMessage = `Upload failed (HTTP ${response.status})`;
-
-  try {
-    const errorBody = await response.json();
-    errorMessage = errorBody.message || errorBody.error || errorMessage;
-  } catch (parseError) {
-    console.warn('[uploadGuildEmoji] Failed to parse error response:', parseError);
-    errorMessage = response.statusText || errorMessage;
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
   }
 
-  console.error('[uploadGuildEmoji] Upload failed:', {
-    status: response.status,
-    error: errorMessage,
-    guildId,
-    emojiName: name,
-    fileSize: file.size,
-    fileName: file.name,
+  const formData = new FormData();
+  formData.append("name", name);
+  formData.append("file", file);
+
+  const baseUrl = (browserState.serverUrl || "http://localhost:8080").replace(/\/+$/, "");
+
+  const response = await fetch(`${baseUrl}/api/guilds/${guildId}/emojis`, {
+    method: "POST",
+    headers,
+    body: formData,
   });
 
-  throw new Error(errorMessage);
-}
+  if (!response.ok) {
+    let errorMessage = `Upload failed (HTTP ${response.status})`;
 
-try {
-  return await response.json();
-} catch (parseError) {
-  console.error('[uploadGuildEmoji] Failed to parse success response:', parseError);
-  throw new Error('Server returned invalid response');
-}
+    try {
+      const errorBody = await response.json();
+      errorMessage = errorBody.message || errorBody.error || errorMessage;
+    } catch (parseError) {
+      console.warn('[uploadGuildEmoji] Failed to parse error response:', parseError);
+      errorMessage = response.statusText || errorMessage;
+    }
+
+    console.error('[uploadGuildEmoji] Upload failed:', {
+      status: response.status,
+      error: errorMessage,
+      guildId,
+      emojiName: name,
+      fileSize: file.size,
+      fileName: file.name,
+    });
+
+    throw new Error(errorMessage);
+  }
+
+  try {
+    return await response.json();
+  } catch (parseError) {
+    console.error('[uploadGuildEmoji] Failed to parse success response:', parseError);
+    throw new Error('Server returned invalid response');
+  }
 }
 
 export async function updateGuildEmoji(
@@ -1411,51 +1432,50 @@ export async function uploadDMAvatar(channelId: string, file: File): Promise<DMI
     console.warn('[uploadDMAvatar] Frontend validation failed:', validationError);
     throw new Error(validationError);
   }
-}
 
-const formData = new FormData();
-formData.append("file", file);
+  const formData = new FormData();
+  formData.append("file", file);
 
-const token = getAccessToken();
-const headers: HeadersInit = {};
-if (token) {
-  headers["Authorization"] = `Bearer ${token}`;
-}
-
-const response = await fetch(`${getServerUrl()}/api/dm/${channelId}/icon`, {
-  method: "POST",
-  headers,
-  body: formData,
-});
-
-if (!response.ok) {
-  let errorMessage = `Upload failed (HTTP ${response.status})`;
-
-  try {
-    const errorBody = await response.json();
-    errorMessage = errorBody.message || errorBody.error || errorMessage;
-  } catch (parseError) {
-    console.warn('[uploadDMAvatar] Failed to parse error response:', parseError);
-    errorMessage = response.statusText || errorMessage;
+  const token = getAccessToken();
+  const headers: HeadersInit = {};
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
   }
 
-  console.error('[uploadDMAvatar] Upload failed:', {
-    status: response.status,
-    error: errorMessage,
-    channelId,
-    fileSize: file.size,
-    fileName: file.name,
+  const response = await fetch(`${getServerUrl()}/api/dm/${channelId}/icon`, {
+    method: "POST",
+    headers,
+    body: formData,
   });
 
-  throw new Error(errorMessage);
-}
+  if (!response.ok) {
+    let errorMessage = `Upload failed (HTTP ${response.status})`;
 
-try {
-  return await response.json();
-} catch (parseError) {
-  console.error('[uploadDMAvatar] Failed to parse success response:', parseError);
-  throw new Error('Server returned invalid response');
-}
+    try {
+      const errorBody = await response.json();
+      errorMessage = errorBody.message || errorBody.error || errorMessage;
+    } catch (parseError) {
+      console.warn('[uploadDMAvatar] Failed to parse error response:', parseError);
+      errorMessage = response.statusText || errorMessage;
+    }
+
+    console.error('[uploadDMAvatar] Upload failed:', {
+      status: response.status,
+      error: errorMessage,
+      channelId,
+      fileSize: file.size,
+      fileName: file.name,
+    });
+
+    throw new Error(errorMessage);
+  }
+
+  try {
+    return await response.json();
+  } catch (parseError) {
+    console.error('[uploadDMAvatar] Failed to parse success response:', parseError);
+    throw new Error('Server returned invalid response');
+  }
 }
 
 export async function getDMs(): Promise<DMChannel[]> {
@@ -2925,4 +2945,12 @@ export async function removeReaction(
     "DELETE",
     `/api/channels/${channelId}/messages/${messageId}/reactions/${encodeURIComponent(emoji)}`
   );
+}
+
+/**
+ * Get aggregate unread counts across all guilds and DMs.
+ * Returns unread counts grouped by guild, plus DM unreads.
+ */
+export async function getUnreadAggregate(): Promise<UnreadAggregate> {
+  return fetchApi<UnreadAggregate>("/api/me/unread");
 }

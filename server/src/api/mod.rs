@@ -6,6 +6,7 @@ pub mod favorites;
 pub mod pins;
 pub mod preferences;
 pub mod reactions;
+pub mod unread;
 mod settings;
 mod setup;
 
@@ -157,6 +158,7 @@ pub fn create_router(state: AppState) -> Router {
         .route("/api/me/favorites/reorder", put(favorites::reorder_channels))
         .route("/api/me/favorites/reorder-guilds", put(favorites::reorder_guilds))
         .route("/api/me/favorites/:channel_id", post(favorites::add_favorite).delete(favorites::remove_favorite))
+        .route("/api/me/unread", get(unread::get_unread_aggregate))
         .nest("/api/keys", crypto::router())
         .nest("/api/users/:user_id/keys", crypto::user_keys_router())
         // Message reactions
