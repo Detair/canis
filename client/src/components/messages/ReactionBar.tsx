@@ -1,5 +1,5 @@
 import { Component, For, Show, createSignal } from "solid-js";
-import EmojiPicker from "@/components/emoji/EmojiPicker";
+import PositionedEmojiPicker from "@/components/emoji/PositionedEmojiPicker";
 import type { Reaction } from "@/lib/types";
 
 interface ReactionBarProps {
@@ -11,6 +11,7 @@ interface ReactionBarProps {
 
 const ReactionBar: Component<ReactionBarProps> = (props) => {
   const [showPicker, setShowPicker] = createSignal(false);
+  let addReactionButtonRef: HTMLButtonElement | undefined;
 
   const handleReactionClick = (reaction: Reaction) => {
     if (reaction.me) {
@@ -45,8 +46,9 @@ const ReactionBar: Component<ReactionBarProps> = (props) => {
       </For>
 
       {/* Add reaction button */}
-      <div class="relative">
+      <div>
         <button
+          ref={addReactionButtonRef}
           class="w-6 h-6 flex items-center justify-center rounded hover:bg-white/10 text-text-secondary hover:text-text-primary transition-colors"
           onClick={() => setShowPicker(!showPicker())}
           title="Add reaction"
@@ -59,14 +61,13 @@ const ReactionBar: Component<ReactionBarProps> = (props) => {
           </svg>
         </button>
 
-        <Show when={showPicker()}>
-          <div class="absolute bottom-full left-0 mb-2 z-50">
-            <EmojiPicker
-              onSelect={handleAddReaction}
-              onClose={() => setShowPicker(false)}
-              guildId={props.guildId}
-            />
-          </div>
+        <Show when={showPicker() && addReactionButtonRef}>
+          <PositionedEmojiPicker
+            anchorEl={addReactionButtonRef!}
+            onSelect={handleAddReaction}
+            onClose={() => setShowPicker(false)}
+            guildId={props.guildId}
+          />
         </Show>
       </div>
     </div>

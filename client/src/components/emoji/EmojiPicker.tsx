@@ -6,6 +6,8 @@ interface EmojiPickerProps {
   onSelect: (emoji: string) => void;
   onClose: () => void;
   guildId?: string;
+  /** Optional max height in pixels (for viewport-aware sizing) */
+  maxHeight?: number;
 }
 
 const EmojiPicker: Component<EmojiPickerProps> = (props) => {
@@ -30,7 +32,10 @@ const EmojiPicker: Component<EmojiPickerProps> = (props) => {
   };
 
   return (
-    <div class="bg-surface-layer2 rounded-lg shadow-xl w-80 max-h-96 overflow-hidden flex flex-col border border-white/10">
+    <div
+      class="bg-surface-layer2 rounded-lg shadow-xl w-80 overflow-hidden flex flex-col border border-white/10"
+      style={props.maxHeight ? { "max-height": `${props.maxHeight}px` } : { "max-height": "384px" }}
+    >
       {/* Search */}
       <div class="p-2 border-b border-white/10">
         <input

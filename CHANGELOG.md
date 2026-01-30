@@ -11,11 +11,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Content spoilers with `||text||` syntax for hiding sensitive information
   - Click-to-reveal functionality with persistent reveal state
   - Supports markdown and inline spoilers
+  - ReDoS protection (500 character limit)
+  - XSS prevention via DOMPurify allowlist
 - @everyone and @here mention permission control
   - New MENTION_EVERYONE permission bit (bit 23) for guild roles
   - Server-side validation prevents unauthorized mass mentions
   - Permission UI toggle in guild role settings
   - Forbidden for @everyone role by default (moderator+ permission)
+- Home page unread aggregator in modular sidebar
+  - Centralized view of unread messages across all guilds and DMs
+  - Grouped by guild with channel-level unread counts
+  - Direct navigation to channels with unread messages
+  - Comprehensive error handling with user-friendly toast notifications
+  - Automatic refresh when window gains focus
+  - Collapsible module with unread badge
+  - API endpoint: `GET /api/me/unread`
+  - Performance-optimized database query with covering indexes
 - First user setup wizard with automatic admin bootstrap
   - First user to register automatically receives system admin permissions
   - Mandatory setup wizard for configuring server name, registration policy, and legal URLs
@@ -257,6 +268,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Legacy unscoped `GET /api/channels` endpoint that returned all channels across all guilds
 
 ### Fixed
+- Emoji picker positioning and viewport clipping issues
+  - Integrated @floating-ui/dom for smart positioning that adapts to available space
+  - Picker now automatically flips up/down and shifts left/right to stay visible
+  - Dynamic max-height adjustment based on viewport size
+  - Click-outside and Escape key support for better UX
+  - Portal-based rendering prevents clipping by parent containers
+  - Smooth fade-in animation when picker appears
 - Friend requests failing in desktop client (#107)
   - Removed dead Tauri `invoke()` branches for friend commands (no corresponding Rust commands existed)
   - All friend operations now use HTTP API consistently

@@ -7,7 +7,7 @@ import { formatTimestamp } from "@/lib/utils";
 import Avatar from "@/components/ui/Avatar";
 import CodeBlock from "@/components/ui/CodeBlock";
 import ReactionBar from "./ReactionBar";
-import EmojiPicker from "@/components/emoji/EmojiPicker";
+import PositionedEmojiPicker from "@/components/emoji/PositionedEmojiPicker";
 import { getServerUrl, getAccessToken, addReaction, removeReaction } from "@/lib/tauri";
 import { showContextMenu, type ContextMenuEntry } from "@/components/ui/ContextMenu";
 import { currentUser } from "@/stores/auth";
@@ -82,6 +82,7 @@ type ContentBlock = CodeBlockData | TextBlock;
 const MessageItem: Component<MessageItemProps> = (props) => {
   const [showReactionPicker, setShowReactionPicker] = createSignal(false);
   let contentRef: HTMLDivElement | undefined;
+  let reactionButtonRef: HTMLButtonElement | undefined;
 
   const author = () => props.message.author;
   const isEdited = () => !!props.message.edited_at;
@@ -364,8 +365,9 @@ const MessageItem: Component<MessageItemProps> = (props) => {
 
         {/* Add reaction button (shown on hover when no reactions exist) */}
         <Show when={!hasReactions()}>
-          <div class="relative mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div class="mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
             <button
+              ref={reactionButtonRef}
               class="w-6 h-6 flex items-center justify-center rounded hover:bg-white/10 text-text-secondary hover:text-text-primary transition-colors"
               onClick={() => setShowReactionPicker(!showReactionPicker())}
               title="Add reaction"
@@ -373,14 +375,13 @@ const MessageItem: Component<MessageItemProps> = (props) => {
               <SmilePlus class="w-4 h-4" />
             </button>
 
-            <Show when={showReactionPicker()}>
-              <div class="absolute bottom-full left-0 mb-2 z-50">
-                <EmojiPicker
-                  onSelect={handleAddReaction}
-                  onClose={() => setShowReactionPicker(false)}
-                  guildId={props.guildId}
-                />
-              </div>
+            <Show when={showReactionPicker() && reactionButtonRef}>
+              <PositionedEmojiPicker
+                anchorEl={reactionButtonRef!}
+                onSelect={handleAddReaction}
+                onClose={() => setShowReactionPicker(false)}
+                guildId={props.guildId}
+              />
             </Show>
           </div>
         </Show>

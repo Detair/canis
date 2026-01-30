@@ -4,7 +4,7 @@ This roadmap outlines the development path from the current prototype to a produ
 
 **Current Phase:** Phase 4 (Advanced Features) - In Progress
 
-**Last Updated:** 2026-01-29
+**Last Updated:** 2026-01-30
 
 ## Quick Status Overview
 
@@ -14,7 +14,7 @@ This roadmap outlines the development path from the current prototype to a produ
 | **Phase 1** | ✅ Complete | 100% | Voice state sync, audio device selection |
 | **Phase 2** | ✅ Complete | 100% | Voice Island, VAD, Speaking Indicators, Command Palette, File Attachments, Theme System, Code Highlighting |
 | **Phase 3** | ✅ Complete | 100% | Guild system, Friends, DMs, Home View, Rate Limiting, Permission System + UI, Information Pages, DM Voice Calls |
-| **Phase 4** | 🔄 In Progress | 67% | E2EE DM Messaging, User Connectivity Monitor, Rich Presence, First User Setup, Context Menus |
+| **Phase 4** | 🔄 In Progress | 75% | E2EE DM Messaging, User Connectivity Monitor, Rich Presence, First User Setup, Context Menus, Emoji Picker Polish |
 | **Phase 5** | 📋 Planned | 0% | - |
 
 **Production Ready Features:**
@@ -34,6 +34,7 @@ This roadmap outlines the development path from the current prototype to a produ
 - ✅ Cross-server channel favorites with star toggle
 - ✅ First-user setup wizard with automatic admin bootstrap
 - ✅ Right-click context menus for messages, channels, and users
+- ✅ Smart emoji picker with viewport-aware positioning and auto-flip
 
 ---
 
@@ -318,14 +319,17 @@ This roadmap outlines the development path from the current prototype to a produ
       - Validate permission in `server/src/chat/messages.rs` during message creation
       - Update `PermissionsTab.tsx` to include mention toggle in UI
       - Block `@here` and `@everyone` for users without permission
-- [ ] **[Chat] Emoji Picker Polish**
+- [x] **[Chat] Emoji Picker Polish** ✅
   - **Context:** Resolving UI regressions where the reaction window is transparent or cut off by container bounds.
   - **Implementation:**
-    - Fix sizing issues in `EmojiPicker.tsx` (ensure proper `max-h-96` and background opacity)
-    - Implement viewport boundary checks for portal positioning
-    - Integrate `floating-ui` for smart positioning that adapts to available space
-    - Ensure picker always remains visible regardless of message location
-    - Handle edge cases (top/bottom of viewport, narrow windows)
+    - ✅ Fix sizing issues in `EmojiPicker.tsx` (dynamic `maxHeight` prop replaces fixed `max-h-96`)
+    - ✅ Implement viewport boundary checks for portal positioning
+    - ✅ Integrate `@floating-ui/dom@1.7.5` for smart positioning that adapts to available space
+    - ✅ Ensure picker always remains visible regardless of message location
+    - ✅ Handle edge cases (top/bottom/left/right of viewport, narrow windows)
+    - ✅ Added click-outside, Escape key, and scroll-to-close behaviors
+    - ✅ Portal-based rendering prevents parent container clipping
+    - ✅ Smooth fade-in + scale animation (150ms ease-out)
 - [ ] **[Client] Mobile Support**
   - Adapt Tauri frontend for mobile or begin Flutter/Native implementation.
 
