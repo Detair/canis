@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Modernized dependencies across all workspace crates
+  - axum 0.7→0.8, tower 0.4→0.5, tower-http 0.5→0.6, utoipa 4→5
+  - fred 8→10 (Redis client), reqwest 0.11→0.13
+  - vodozemac 0.5→0.9 (E2EE crypto)
+  - cpal 0.15→0.17, rodio 0.19→0.21 (audio)
+  - sysinfo 0.30→0.34 (game detection)
+  - sqlx 0.7→0.8.6, rusqlite 0.29→0.32 (database)
+  - thiserror 1→2, validator 0.16→0.20, pulldown-cmark 0.10→0.13
+  - Removed unused x25519-dalek and ed25519-dalek crates
+
 ### Added
 - Content spoilers with `||text||` syntax for hiding sensitive information
   - Click-to-reveal functionality with persistent reveal state
@@ -261,6 +272,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Increased border visibility to `border-white/10` for main layout framing
 - DM group avatar size limit reduced from 50MB to 5MB for consistency with user avatars
 - Guild custom emoji size limit is now configurable (previously hardcoded at 256KB)
+- Updated dependencies for compatibility and performance:
+  - tokio-tungstenite 0.21 → 0.28 (WebSocket improvements)
+  - reqwest: migrated from deprecated `rustls-tls` to `rustls` feature
+  - Fixed breaking changes in tungstenite 0.28 Message::Text API
+- Added comprehensive dependency audit report (`DEPENDENCY_AUDIT.md`)
+  - Lists all 45+ dependencies with current vs latest versions
+  - Identifies critical updates (sqlx, axum) and blockers
+  - Provides phased update strategy with time estimates
+  - Documents known libsqlite3-sys version conflict
 
 ### Deprecated
 
