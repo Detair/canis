@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Native screen capture for Tauri desktop client
+  - Source picker modal to select monitors or windows
+  - VP9 software encoding with quality tiers (480p15 to 1080p60)
+  - RTP packetization and delivery via WebRTC video track
+  - Quality picker with low/medium/high/premium presets
+  - Auto-stop screen share when leaving voice channel
+  - Cross-platform via scap (ScreenCaptureKit, WGC, PipeWire)
 - Forgot password workflow with SMTP email delivery
   - POST /auth/forgot-password — request reset code via email
   - POST /auth/reset-password — reset password with code

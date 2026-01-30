@@ -3,14 +3,17 @@
 //! Tauri backend for the desktop application.
 
 mod audio;
+mod capture;
 mod commands;
 mod crypto;
 mod network;
 mod presence;
+mod video;
 mod webrtc;
 
 use audio::AudioHandle;
 use commands::clipboard::ClipboardGuard;
+use commands::screen_share::ScreenSharePipeline;
 use reqwest::Client as HttpClient;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -71,6 +74,11 @@ pub fn run() {
             commands::voice::set_output_device,
             commands::voice::is_in_voice,
             commands::voice::get_voice_channel,
+            // Screen share commands
+            commands::screen_share::enumerate_capture_sources,
+            commands::screen_share::start_screen_share,
+            commands::screen_share::stop_screen_share,
+            commands::screen_share::get_screen_share_status,
             // Settings commands
             commands::settings::get_settings,
             commands::settings::update_settings,
@@ -222,6 +230,8 @@ pub struct VoiceState {
     pub channel_id: Option<String>,
     /// Sender for encoded audio to WebRTC.
     pub audio_tx: Option<mpsc::Sender<Vec<u8>>>,
+    /// Active screen share pipeline, if any.
+    pub screen_share: Option<ScreenSharePipeline>,
 }
 
 impl VoiceState {
@@ -233,6 +243,7 @@ impl VoiceState {
             audio,
             channel_id: None,
             audio_tx: None,
+            screen_share: None,
         })
     }
 }

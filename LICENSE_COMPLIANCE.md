@@ -20,6 +20,36 @@ This document tracks third-party dependencies and their licenses for the VoiceCh
 - **Usage:** SMTP email transport for transactional emails (password reset)
 - **Compliance:** MIT licensed, fully compatible with project license
 
+## Screen Capture & Video Encoding
+
+### scap
+- **License:** MIT
+- **Source:** https://crates.io/crates/scap
+- **Version:** 0.1
+- **Usage:** Cross-platform screen capture (ScreenCaptureKit on macOS, WGC on Windows, PipeWire on Linux)
+- **Compliance:** MIT licensed, fully compatible with project license
+
+### vpx-encode
+- **License:** MIT (wraps libvpx which is BSD-3-Clause)
+- **Source:** https://crates.io/crates/vpx-encode
+- **Version:** 0.3
+- **Usage:** VP9 software video encoding for screen sharing
+- **Compliance:** MIT licensed, libvpx is BSD-3-Clause — both compatible
+
+### openh264
+- **License:** BSD-2-Clause
+- **Source:** https://crates.io/crates/openh264
+- **Version:** 0.6
+- **Usage:** H.264 fallback video encoding (Cisco patent-free binary)
+- **Compliance:** BSD-2-Clause licensed, Cisco OpenH264 binary is patent-free — fully compatible
+
+### image
+- **License:** MIT OR Apache-2.0
+- **Source:** https://crates.io/crates/image
+- **Version:** 0.25
+- **Usage:** PNG encoding for capture source thumbnails
+- **Compliance:** Dual MIT/Apache-2.0 licensed, fully compatible with project license
+
 ## Checking Dependency Licenses
 
 ### Rust Dependencies

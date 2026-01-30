@@ -94,8 +94,22 @@ export type ScreenShareQuality = "low" | "medium" | "high" | "premium";
  * Options for starting a screen share
  */
 export interface ScreenShareOptions {
+  /** Source ID (native capture only — from enumerateCaptureSources). */
+  sourceId?: string;
   quality?: ScreenShareQuality;
   withAudio?: boolean;
+}
+
+/**
+ * A native capture source (monitor or window).
+ * Returned by the Tauri `enumerate_capture_sources` command.
+ */
+export interface CaptureSource {
+  id: string;
+  name: string;
+  source_type: "monitor" | "window";
+  thumbnail: string | null;
+  is_primary: boolean;
 }
 
 /**
@@ -200,6 +214,8 @@ export interface VoiceAdapter {
   isScreenSharing(): boolean;
   /** Get info about current screen share (hasAudio, sourceLabel). Returns null if not sharing. */
   getScreenShareInfo(): { hasAudio: boolean; sourceLabel: string } | null;
+  /** Enumerate native capture sources (Tauri only). Returns null if not supported. */
+  enumerateCaptureSources?(): Promise<CaptureSource[] | null>;
 
   // Cleanup
   dispose(): void;

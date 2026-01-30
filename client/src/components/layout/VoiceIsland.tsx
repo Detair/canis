@@ -29,6 +29,7 @@ import { voiceState, setMute, setDeafen, leaveVoice, getVoiceChannelInfo, getLoc
 import { formatElapsedTime } from "@/lib/utils";
 import AudioDeviceSettings from "@/components/voice/AudioDeviceSettings";
 import ScreenShareQualityPicker from "@/components/voice/ScreenShareQualityPicker";
+import ScreenShareSourcePicker from "@/components/voice/ScreenShareSourcePicker";
 import { QualityIndicator } from "@/components/voice/QualityIndicator";
 import { QualityTooltip } from "@/components/voice/QualityTooltip";
 import type { ConnectionMetrics } from "@/lib/webrtc/types";
@@ -38,6 +39,11 @@ const VoiceIsland: Component = () => {
   const [showSettings, setShowSettings] = createSignal(false);
   const [showQualityTooltip, setShowQualityTooltip] = createSignal(false);
   const [showScreenSharePicker, setShowScreenSharePicker] = createSignal(false);
+  const [showSourcePicker, setShowSourcePicker] = createSignal(false);
+  const [selectedSourceId, setSelectedSourceId] = createSignal<string | undefined>(undefined);
+
+  // Detect if running in Tauri (native source picker available)
+  const isTauri = typeof window !== "undefined" && "__TAURI__" in window;
 
   // Draggable state - default to top-center
   const getInitialPosition = () => {
@@ -124,9 +130,20 @@ const VoiceIsland: Component = () => {
   const toggleScreenShare = async () => {
     if (voiceState.screenSharing) {
       await stopScreenShare();
+    } else if (isTauri) {
+      // Native: show source picker first, then quality picker
+      setShowSourcePicker(true);
     } else {
+      // Browser: show quality picker directly (uses getDisplayMedia)
       setShowScreenSharePicker(true);
     }
+  };
+
+  // Handle native source selection → open quality picker with source ID
+  const handleSourceSelected = (sourceId: string) => {
+    setShowSourcePicker(false);
+    setSelectedSourceId(sourceId);
+    setShowScreenSharePicker(true);
   };
 
   // Keyboard shortcuts (only when in voice)
@@ -370,10 +387,22 @@ const VoiceIsland: Component = () => {
         />
       </Show>
 
+      {/* Native Source Picker (Tauri only) */}
+      <Show when={showSourcePicker()}>
+        <ScreenShareSourcePicker
+          onSelect={handleSourceSelected}
+          onClose={() => setShowSourcePicker(false)}
+        />
+      </Show>
+
       {/* Screen Share Quality Picker */}
       <Show when={showScreenSharePicker()}>
         <ScreenShareQualityPicker
-          onClose={() => setShowScreenSharePicker(false)}
+          sourceId={selectedSourceId()}
+          onClose={() => {
+            setShowScreenSharePicker(false);
+            setSelectedSourceId(undefined);
+          }}
         />
       </Show>
     </div>

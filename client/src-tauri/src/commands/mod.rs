@@ -14,6 +14,7 @@ pub mod pins;
 pub mod preferences;
 pub mod presence;
 pub mod roles;
+pub mod screen_share;
 pub mod settings;
 pub mod sound;
 pub mod voice;

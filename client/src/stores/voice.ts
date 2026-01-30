@@ -524,9 +524,13 @@ export function setSpeaking(speaking: boolean): void {
 
 /**
  * Start screen sharing.
+ *
+ * @param quality - Quality tier (low/medium/high/premium)
+ * @param sourceId - Native capture source ID (Tauri only, from ScreenShareSourcePicker)
  */
 export async function startScreenShare(
-  quality?: ScreenShareQuality
+  quality?: ScreenShareQuality,
+  sourceId?: string,
 ): Promise<{ ok: boolean; error?: string }> {
   if (voiceState.state !== "connected" || !voiceState.channelId) {
     return { ok: false, error: "Not connected to voice channel" };
@@ -538,8 +542,8 @@ export async function startScreenShare(
 
   const adapter = await createVoiceAdapter();
 
-  // Start the capture first (user selects screen/window)
-  const result = await adapter.startScreenShare({ quality });
+  // Start the capture (native source for Tauri, browser getDisplayMedia for web)
+  const result = await adapter.startScreenShare({ quality, sourceId });
 
   if (!result.ok) {
     console.error("Failed to start screen share:", result.error);

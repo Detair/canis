@@ -3,6 +3,8 @@ import { MonitorUp, MonitorOff } from "lucide-solid";
 import { voiceState, stopScreenShare } from "@/stores/voice";
 
 interface ScreenShareButtonProps {
+  /** Show source picker first (native capture), then quality picker. */
+  onShowSourcePicker?: () => void;
   onShowQualityPicker?: () => void;
 }
 
@@ -25,8 +27,12 @@ const ScreenShareButton: Component<ScreenShareButtonProps> = (props) => {
         setLoading(false);
       }
     } else {
-      // Show quality picker before starting
-      props.onShowQualityPicker?.();
+      // Show source picker first (native), falls back to quality picker (browser)
+      if (props.onShowSourcePicker) {
+        props.onShowSourcePicker();
+      } else {
+        props.onShowQualityPicker?.();
+      }
     }
   };
 

@@ -15,6 +15,7 @@ import type {
   AudioDeviceList,
   ScreenShareOptions,
   ConnectionMetrics,
+  CaptureSource,
 } from "./types";
 
 export class TauriVoiceAdapter implements VoiceAdapter {
@@ -25,8 +26,9 @@ export class TauriVoiceAdapter implements VoiceAdapter {
   private noiseSuppression = false;
   private screenSharing = false;
 
-  // Screen share state (using WebView's getDisplayMedia)
-  private screenShareStream: MediaStream | null = null;
+  // Screen share state (native Rust capture)
+  private screenShareSourceName: string | null = null;
+  private screenShareWithAudio = false;
 
   // Event handlers
   private eventHandlers: Partial<VoiceAdapterEvents> = {};
@@ -55,11 +57,16 @@ export class TauriVoiceAdapter implements VoiceAdapter {
   async leave(): Promise<VoiceResult<void>> {
     console.log("[TauriVoiceAdapter] Leaving voice");
 
-    // Clean up screen share if active
-    if (this.screenShareStream) {
-      this.screenShareStream.getTracks().forEach(track => track.stop());
-      this.screenShareStream = null;
+    // Clean up screen share if active (native capture is stopped via Rust command)
+    if (this.screenSharing) {
+      try {
+        await invoke("stop_screen_share");
+      } catch {
+        // Best effort — leave_voice will also clean up
+      }
       this.screenSharing = false;
+      this.screenShareSourceName = null;
+      this.screenShareWithAudio = false;
     }
 
     try {
@@ -254,7 +261,7 @@ export class TauriVoiceAdapter implements VoiceAdapter {
     }
   }
 
-  // Screen sharing (uses WebView's getDisplayMedia API)
+  // Screen sharing (native Rust capture via Tauri commands)
 
   isScreenSharing(): boolean {
     return this.screenSharing;
@@ -265,77 +272,77 @@ export class TauriVoiceAdapter implements VoiceAdapter {
    * Returns null if not sharing.
    */
   getScreenShareInfo(): { hasAudio: boolean; sourceLabel: string } | null {
-    if (!this.screenShareStream) {
+    if (!this.screenSharing) {
       return null;
     }
 
-    const videoTrack = this.screenShareStream.getVideoTracks()[0];
-    const hasAudio = this.screenShareStream.getAudioTracks().length > 0;
+    return {
+      hasAudio: this.screenShareWithAudio,
+      sourceLabel: this.screenShareSourceName || "Screen",
+    };
+  }
 
-    // Get source label from video track (e.g., "screen:0:0", window title, etc.)
-    const sourceLabel = videoTrack?.label || "Screen";
-
-    return { hasAudio, sourceLabel };
+  /**
+   * Enumerate native capture sources (monitors and windows).
+   */
+  async enumerateCaptureSources(): Promise<CaptureSource[] | null> {
+    try {
+      return await invoke<CaptureSource[]>("enumerate_capture_sources");
+    } catch (err) {
+      console.error("[TauriVoiceAdapter] Failed to enumerate capture sources:", err);
+      return null;
+    }
   }
 
   async startScreenShare(options?: ScreenShareOptions): Promise<VoiceResult<void>> {
-    console.log("[TauriVoiceAdapter] Starting screen share via WebView", options);
+    console.log("[TauriVoiceAdapter] Starting native screen share", options);
 
-    if (this.screenShareStream) {
+    if (this.screenSharing) {
       return { ok: false, error: { type: "unknown", message: "Already sharing screen" } };
     }
 
-    try {
-      // Build video constraints based on quality
-      const quality = options?.quality ?? "medium";
-      const constraints = this.getDisplayMediaConstraints(quality);
+    if (!options?.sourceId) {
+      return { ok: false, error: { type: "unknown", message: "No source selected" } };
+    }
 
-      // Request display media using WebView's native API
-      const stream = await navigator.mediaDevices.getDisplayMedia({
-        video: constraints.video,
-        audio: options?.withAudio ?? false,
+    try {
+      await invoke("start_screen_share", {
+        sourceId: options.sourceId,
+        quality: options.quality ?? "medium",
+        withAudio: options.withAudio ?? false,
       });
 
-      // Get the video track
-      const videoTrack = stream.getVideoTracks()[0];
-      if (!videoTrack) {
-        stream.getTracks().forEach(t => t.stop());
-        return { ok: false, error: { type: "unknown", message: "No video track in stream" } };
+      this.screenSharing = true;
+      this.screenShareWithAudio = options.withAudio ?? false;
+      // Fetch source name from status
+      try {
+        const status = await invoke<{ source_name: string } | null>("get_screen_share_status");
+        this.screenShareSourceName = status?.source_name ?? "Screen";
+      } catch {
+        this.screenShareSourceName = "Screen";
       }
 
-      // Listen for track ending (user clicked "Stop sharing" in system UI)
-      videoTrack.onended = () => {
-        console.log("[TauriVoiceAdapter] Screen share track ended by user");
-        this.handleScreenShareEnded();
-      };
-
-      this.screenShareStream = stream;
-      this.screenSharing = true;
-
-      console.log("[TauriVoiceAdapter] Screen share started", {
-        hasAudio: stream.getAudioTracks().length > 0,
-        quality,
-      });
-
+      console.log("[TauriVoiceAdapter] Native screen share started");
       return { ok: true, value: undefined };
     } catch (err) {
       console.error("[TauriVoiceAdapter] Failed to start screen share:", err);
-      return { ok: false, error: this.mapScreenShareError(err) };
+      return { ok: false, error: this.mapTauriError(err) };
     }
   }
 
   async stopScreenShare(): Promise<VoiceResult<void>> {
-    console.log("[TauriVoiceAdapter] Stopping screen share");
+    console.log("[TauriVoiceAdapter] Stopping native screen share");
 
-    if (!this.screenShareStream) {
+    if (!this.screenSharing) {
       return { ok: false, error: { type: "unknown", message: "Not sharing screen" } };
     }
 
     try {
-      // Stop all tracks
-      this.screenShareStream.getTracks().forEach(track => track.stop());
-      this.screenShareStream = null;
+      await invoke("stop_screen_share");
+
       this.screenSharing = false;
+      this.screenShareSourceName = null;
+      this.screenShareWithAudio = false;
 
       console.log("[TauriVoiceAdapter] Screen share stopped");
       return { ok: true, value: undefined };
@@ -345,83 +352,17 @@ export class TauriVoiceAdapter implements VoiceAdapter {
     }
   }
 
-  // Handle screen share ending (e.g., user clicked system "Stop sharing" button)
-  private handleScreenShareEnded(): void {
-    if (this.screenShareStream) {
-      this.screenShareStream.getTracks().forEach(track => track.stop());
-      this.screenShareStream = null;
-      this.screenSharing = false;
-      // Notify listeners that screen share ended
-      // Pass empty string for userId (local user) and "user_stopped" reason
-      this.eventHandlers.onScreenShareStopped?.("", "user_stopped");
-    }
-  }
-
-  // Get display media constraints based on quality tier
-  private getDisplayMediaConstraints(quality: string): { video: DisplayMediaStreamOptions["video"] } {
-    const qualitySettings: Record<string, { width: number; height: number; frameRate: number }> = {
-      low: { width: 854, height: 480, frameRate: 15 },
-      medium: { width: 1280, height: 720, frameRate: 30 },
-      high: { width: 1920, height: 1080, frameRate: 30 },
-      premium: { width: 1920, height: 1080, frameRate: 60 },
-    };
-
-    const settings = qualitySettings[quality] || qualitySettings.medium;
-
-    return {
-      video: {
-        width: { ideal: settings.width, max: settings.width },
-        height: { ideal: settings.height, max: settings.height },
-        frameRate: { ideal: settings.frameRate, max: settings.frameRate },
-      } as DisplayMediaStreamOptions["video"],
-    };
-  }
-
-  // Map screen share specific errors
-  private mapScreenShareError(err: unknown): VoiceError {
-    if (err instanceof DOMException) {
-      switch (err.name) {
-        case "NotAllowedError":
-          return {
-            type: "permission_denied",
-            message: "Screen share permission denied. Please allow screen sharing when prompted.",
-          };
-        case "AbortError":
-          return {
-            type: "cancelled",
-            message: "Screen share cancelled",
-          };
-        case "NotFoundError":
-          return {
-            type: "not_found",
-            message: "No screen or window found to share",
-          };
-        case "NotReadableError":
-          return {
-            type: "hardware_error",
-            message: "Could not access screen. Another app may be blocking screen capture.",
-          };
-        case "OverconstrainedError":
-          return {
-            type: "constraint_error",
-            message: "Screen share quality settings not supported by your system",
-          };
-      }
-    }
-
-    return this.mapTauriError(err);
-  }
-
   // Cleanup
 
   dispose(): void {
     console.log("[TauriVoiceAdapter] Disposing");
 
-    // Clean up screen share if active
-    if (this.screenShareStream) {
-      this.screenShareStream.getTracks().forEach(track => track.stop());
-      this.screenShareStream = null;
+    // Clean up screen share if active (fire-and-forget)
+    if (this.screenSharing) {
+      invoke("stop_screen_share").catch(() => {});
       this.screenSharing = false;
+      this.screenShareSourceName = null;
+      this.screenShareWithAudio = false;
     }
 
     this.unlisteners.forEach((unlisten) => unlisten());

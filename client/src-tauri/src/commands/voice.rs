@@ -225,6 +225,12 @@ pub async fn leave_voice(state: State<'_, AppState>) -> Result<(), String> {
 
     let channel_id = voice_state.channel_id.take();
 
+    // Stop screen share if active
+    if let Some(pipeline) = voice_state.screen_share.take() {
+        info!("Auto-stopping screen share on voice leave");
+        pipeline.shutdown().await;
+    }
+
     // Stop audio
     voice_state.audio.stop_all().await;
     voice_state.audio_tx = None;

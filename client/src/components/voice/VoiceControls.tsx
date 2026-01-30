@@ -4,6 +4,10 @@ import { voiceState, toggleMute, toggleDeafen } from "@/stores/voice";
 import MicrophoneTest from "./MicrophoneTest";
 import ScreenShareButton from "./ScreenShareButton";
 import ScreenShareQualityPicker from "./ScreenShareQualityPicker";
+import ScreenShareSourcePicker from "./ScreenShareSourcePicker";
+
+// Detect if running in Tauri (native source picker available)
+const isTauri = typeof window !== "undefined" && "__TAURI__" in window;
 
 /**
  * Voice controls for mute/deafen/settings.
@@ -11,6 +15,14 @@ import ScreenShareQualityPicker from "./ScreenShareQualityPicker";
 const VoiceControls: Component = () => {
   const [showMicTest, setShowMicTest] = createSignal(false);
   const [showQualityPicker, setShowQualityPicker] = createSignal(false);
+  const [showSourcePicker, setShowSourcePicker] = createSignal(false);
+  const [selectedSourceId, setSelectedSourceId] = createSignal<string | undefined>(undefined);
+
+  const handleSourceSelected = (sourceId: string) => {
+    setShowSourcePicker(false);
+    setSelectedSourceId(sourceId);
+    setShowQualityPicker(true);
+  };
 
   return (
     <>
@@ -52,7 +64,10 @@ const VoiceControls: Component = () => {
         </button>
 
         {/* Screen share button */}
-        <ScreenShareButton onShowQualityPicker={() => setShowQualityPicker(true)} />
+        <ScreenShareButton
+          onShowSourcePicker={isTauri ? () => setShowSourcePicker(true) : undefined}
+          onShowQualityPicker={() => setShowQualityPicker(true)}
+        />
 
         {/* Settings button */}
         <button
@@ -69,9 +84,23 @@ const VoiceControls: Component = () => {
         <MicrophoneTest onClose={() => setShowMicTest(false)} />
       </Show>
 
+      {/* Native Source Picker (Tauri only) */}
+      <Show when={showSourcePicker()}>
+        <ScreenShareSourcePicker
+          onSelect={handleSourceSelected}
+          onClose={() => setShowSourcePicker(false)}
+        />
+      </Show>
+
       {/* Screen Share Quality Picker */}
       <Show when={showQualityPicker()}>
-        <ScreenShareQualityPicker onClose={() => setShowQualityPicker(false)} />
+        <ScreenShareQualityPicker
+          sourceId={selectedSourceId()}
+          onClose={() => {
+            setShowQualityPicker(false);
+            setSelectedSourceId(undefined);
+          }}
+        />
       </Show>
     </>
   );

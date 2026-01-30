@@ -4,6 +4,8 @@ import { startScreenShare } from "@/stores/voice";
 import type { ScreenShareQuality } from "@/lib/webrtc/types";
 
 interface ScreenShareQualityPickerProps {
+  /** Native capture source ID (passed from ScreenShareSourcePicker). */
+  sourceId?: string;
   onClose: () => void;
 }
 
@@ -27,7 +29,7 @@ const ScreenShareQualityPicker: Component<ScreenShareQualityPickerProps> = (prop
     setLoading(true);
 
     try {
-      const result = await startScreenShare(selectedQuality());
+      const result = await startScreenShare(selectedQuality(), props.sourceId);
 
       if (!result.ok) {
         setError(result.error ?? "Failed to start screen share");

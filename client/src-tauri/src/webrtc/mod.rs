@@ -23,6 +23,7 @@ use webrtc::{
     },
     rtp_transceiver::{
         rtp_codec::{RTCRtpCodecCapability, RTCRtpCodecParameters, RTPCodecType},
+        RTCPFeedback,
         rtp_sender::RTCRtpSender,
     },
     track::track_local::{track_local_static_rtp::TrackLocalStaticRTP, TrackLocal},
@@ -75,7 +76,7 @@ impl Default for IceServerConfig {
     }
 }
 
-/// WebRTC client for voice chat
+/// WebRTC client for voice chat and screen sharing
 pub struct WebRtcClient {
     api: Arc<API>,
     peer_connection: Arc<RwLock<Option<Arc<RTCPeerConnection>>>>,
@@ -83,6 +84,10 @@ pub struct WebRtcClient {
     local_track: Arc<RwLock<Option<Arc<TrackLocalStaticRTP>>>>,
     state: Arc<RwLock<ConnectionState>>,
     channel_id: Arc<RwLock<Option<String>>>,
+
+    // Video track for screen sharing (always added at connect time to avoid SDP renegotiation)
+    video_sender: Arc<RwLock<Option<Arc<RTCRtpSender>>>>,
+    video_track: Arc<RwLock<Option<Arc<TrackLocalStaticRTP>>>>,
 
     // Callbacks
     on_ice_candidate: Arc<RwLock<Option<Box<dyn Fn(String) + Send + Sync>>>>,
@@ -120,6 +125,81 @@ impl WebRtcClient {
             )
             .map_err(|e| WebRtcError::ApiError(e.to_string()))?;
 
+        // Register VP9 video codec (preferred, matching server PT 98)
+        let video_rtcp_feedback = vec![
+            RTCPFeedback {
+                typ: "goog-remb".to_string(),
+                parameter: String::new(),
+            },
+            RTCPFeedback {
+                typ: "ccm".to_string(),
+                parameter: "fir".to_string(),
+            },
+            RTCPFeedback {
+                typ: "nack".to_string(),
+                parameter: String::new(),
+            },
+            RTCPFeedback {
+                typ: "nack".to_string(),
+                parameter: "pli".to_string(),
+            },
+        ];
+
+        media_engine
+            .register_codec(
+                RTCRtpCodecParameters {
+                    capability: RTCRtpCodecCapability {
+                        mime_type: "video/VP9".to_string(),
+                        clock_rate: 90000,
+                        channels: 0,
+                        sdp_fmtp_line: "profile-id=0".to_string(),
+                        rtcp_feedback: video_rtcp_feedback.clone(),
+                    },
+                    payload_type: 98,
+                    ..Default::default()
+                },
+                RTPCodecType::Video,
+            )
+            .map_err(|e| WebRtcError::ApiError(e.to_string()))?;
+
+        // Register VP8 video codec (fallback, matching server PT 96)
+        media_engine
+            .register_codec(
+                RTCRtpCodecParameters {
+                    capability: RTCRtpCodecCapability {
+                        mime_type: "video/VP8".to_string(),
+                        clock_rate: 90000,
+                        channels: 0,
+                        sdp_fmtp_line: String::new(),
+                        rtcp_feedback: video_rtcp_feedback.clone(),
+                    },
+                    payload_type: 96,
+                    ..Default::default()
+                },
+                RTPCodecType::Video,
+            )
+            .map_err(|e| WebRtcError::ApiError(e.to_string()))?;
+
+        // Register H.264 video codec (matching server PT 102)
+        media_engine
+            .register_codec(
+                RTCRtpCodecParameters {
+                    capability: RTCRtpCodecCapability {
+                        mime_type: "video/H264".to_string(),
+                        clock_rate: 90000,
+                        channels: 0,
+                        sdp_fmtp_line:
+                            "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f"
+                                .to_string(),
+                        rtcp_feedback: video_rtcp_feedback,
+                    },
+                    payload_type: 102,
+                    ..Default::default()
+                },
+                RTPCodecType::Video,
+            )
+            .map_err(|e| WebRtcError::ApiError(e.to_string()))?;
+
         // Create interceptor registry
         let mut registry = Registry::new();
         registry = register_default_interceptors(registry, &mut media_engine)
@@ -140,6 +220,8 @@ impl WebRtcClient {
             local_track: Arc::new(RwLock::new(None)),
             state: Arc::new(RwLock::new(ConnectionState::Disconnected)),
             channel_id: Arc::new(RwLock::new(None)),
+            video_sender: Arc::new(RwLock::new(None)),
+            video_track: Arc::new(RwLock::new(None)),
             on_ice_candidate: Arc::new(RwLock::new(None)),
             on_state_change: Arc::new(RwLock::new(None)),
             on_remote_track: Arc::new(RwLock::new(None)),
@@ -247,10 +329,30 @@ impl WebRtcClient {
             .await
             .map_err(|e| WebRtcError::TrackError(e.to_string()))?;
 
+        // Create video track for screen sharing (always added to avoid SDP renegotiation)
+        let video_track = Arc::new(TrackLocalStaticRTP::new(
+            RTCRtpCodecCapability {
+                mime_type: "video/VP9".to_string(),
+                clock_rate: 90000,
+                channels: 0,
+                sdp_fmtp_line: "profile-id=0".to_string(),
+                rtcp_feedback: vec![],
+            },
+            "screen-video".to_string(),
+            "screen-share-stream".to_string(),
+        ));
+
+        let video_sender = pc
+            .add_track(video_track.clone() as Arc<dyn TrackLocal + Send + Sync>)
+            .await
+            .map_err(|e| WebRtcError::TrackError(e.to_string()))?;
+
         // Store references
         *self.peer_connection.write().await = Some(pc);
         *self.audio_sender.write().await = Some(sender);
         *self.local_track.write().await = Some(local_track);
+        *self.video_sender.write().await = Some(video_sender);
+        *self.video_track.write().await = Some(video_track);
 
         info!("WebRTC peer connection created for channel {}", channel_id);
         Ok(())
@@ -390,6 +492,11 @@ impl WebRtcClient {
         (*self.local_track.read().await).clone()
     }
 
+    /// Get the video track for screen sharing
+    pub async fn get_video_track(&self) -> Option<Arc<TrackLocalStaticRTP>> {
+        (*self.video_track.read().await).clone()
+    }
+
     /// Disconnect and clean up
     pub async fn disconnect(&self) -> Result<(), WebRtcError> {
         // Close peer connection
@@ -402,6 +509,8 @@ impl WebRtcClient {
         // Clear state
         *self.audio_sender.write().await = None;
         *self.local_track.write().await = None;
+        *self.video_sender.write().await = None;
+        *self.video_track.write().await = None;
         *self.state.write().await = ConnectionState::Disconnected;
         *self.channel_id.write().await = None;
 
