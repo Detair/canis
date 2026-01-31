@@ -12,6 +12,7 @@ import { selectGuild } from "@/stores/guilds";
 import { selectChannel } from "@/stores/channels";
 import { selectDM } from "@/stores/dms";
 import { showToast } from "@/components/ui/Toast";
+import Skeleton from "@/components/ui/Skeleton";
 import CollapsibleModule from "./CollapsibleModule";
 
 const UnreadModule: Component = () => {
@@ -120,8 +121,35 @@ const UnreadModule: Component = () => {
           <Show
             when={!loading()}
             fallback={
-              <div class="flex items-center justify-center py-4">
-                <div class="animate-spin w-5 h-5 border-2 border-accent-primary border-t-transparent rounded-full"></div>
+              <div class="space-y-4">
+                {/* Guild skeleton */}
+                <div class="space-y-1">
+                  <Skeleton width="80px" height="10px" />
+                  <div class="space-y-1">
+                    <div class="flex items-center justify-between px-2 py-1.5">
+                      <div class="flex items-center gap-2">
+                        <Skeleton width="16px" height="16px" />
+                        <Skeleton width="120px" height="14px" />
+                      </div>
+                      <Skeleton width="24px" height="18px" />
+                    </div>
+                    <div class="flex items-center justify-between px-2 py-1.5">
+                      <div class="flex items-center gap-2">
+                        <Skeleton width="16px" height="16px" />
+                        <Skeleton width="90px" height="14px" />
+                      </div>
+                      <Skeleton width="24px" height="18px" />
+                    </div>
+                  </div>
+                </div>
+                {/* DM skeleton */}
+                <div class="space-y-1">
+                  <Skeleton width="120px" height="10px" />
+                  <div class="flex items-center justify-between px-2 py-1.5">
+                    <Skeleton width="100px" height="14px" />
+                    <Skeleton width="24px" height="18px" />
+                  </div>
+                </div>
               </div>
             }
           >
