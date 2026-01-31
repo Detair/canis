@@ -33,6 +33,7 @@ impl BgraToI420Converter {
     ///
     /// This clones the internal buffers. For the capture pipeline, this is called once per frame
     /// and the clone is cheaper than re-allocation since the Vec capacity is reused.
+    #[allow(clippy::many_single_char_names)]
     pub fn convert_owned(&mut self, bgra: &[u8]) -> I420Frame {
         let w = self.width as usize;
         let h = self.height as usize;
