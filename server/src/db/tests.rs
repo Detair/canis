@@ -866,4 +866,251 @@ mod postgres_tests {
             .expect("Failed to list attachments");
         assert_eq!(remaining.len(), 0);
     }
+
+    // ========================================================================
+    // Unread Aggregation Tests
+    // ========================================================================
+
+    #[sqlx::test]
+    async fn test_get_unread_aggregate_empty(pool: PgPool) {
+        // Create a user with no guild memberships or DMs
+        let user = create_user(&pool, "lonely", "Lonely User", None, "hash")
+            .await
+            .expect("create user");
+
+        let result = get_unread_aggregate(&pool, user.id)
+            .await
+            .expect("get_unread_aggregate");
+
+        assert!(result.guilds.is_empty());
+        assert!(result.dms.is_empty());
+        assert_eq!(result.total, 0);
+    }
+
+    #[sqlx::test]
+    async fn test_get_unread_aggregate_guild_unreads(pool: PgPool) {
+        // Create owner and guild
+        let owner = create_user(&pool, "guildowner", "Guild Owner", None, "hash")
+            .await
+            .expect("create owner");
+
+        let guild_id = uuid::Uuid::new_v4();
+        sqlx::query("INSERT INTO guilds (id, name, owner_id) VALUES ($1, $2, $3)")
+            .bind(guild_id)
+            .bind("Test Guild")
+            .bind(owner.id)
+            .execute(&pool)
+            .await
+            .expect("create guild");
+
+        // Add owner as guild member
+        sqlx::query("INSERT INTO guild_members (guild_id, user_id) VALUES ($1, $2)")
+            .bind(guild_id)
+            .bind(owner.id)
+            .execute(&pool)
+            .await
+            .expect("join guild");
+
+        // Create a text channel in the guild
+        let channel = create_channel(
+            &pool,
+            "general",
+            &ChannelType::Text,
+            None,
+            Some(guild_id),
+            None,
+            None,
+            None,
+        )
+        .await
+        .expect("create channel");
+
+        // Create another user who posts messages
+        let sender = create_user(&pool, "sender", "Sender", None, "hash")
+            .await
+            .expect("create sender");
+
+        // Post 3 messages from sender
+        for i in 1..=3 {
+            create_message(
+                &pool,
+                channel.id,
+                sender.id,
+                &format!("Message {i}"),
+                false,
+                None,
+                None,
+            )
+            .await
+            .expect("create message");
+        }
+
+        // Owner has never read the channel, so all 3 should be unread
+        let result = get_unread_aggregate(&pool, owner.id)
+            .await
+            .expect("get_unread_aggregate");
+
+        assert_eq!(result.guilds.len(), 1);
+        assert_eq!(result.guilds[0].guild_id, guild_id);
+        assert_eq!(result.guilds[0].guild_name, "Test Guild");
+        assert_eq!(result.guilds[0].channels.len(), 1);
+        assert_eq!(result.guilds[0].channels[0].channel_id, channel.id);
+        assert_eq!(result.guilds[0].channels[0].unread_count, 3);
+        assert_eq!(result.guilds[0].total_unread, 3);
+        assert_eq!(result.total, 3);
+        assert!(result.dms.is_empty());
+    }
+
+    #[sqlx::test]
+    async fn test_get_unread_aggregate_no_unreads_after_read(pool: PgPool) {
+        // Create owner and guild
+        let owner = create_user(&pool, "reader", "Reader", None, "hash")
+            .await
+            .expect("create owner");
+
+        let guild_id = uuid::Uuid::new_v4();
+        sqlx::query("INSERT INTO guilds (id, name, owner_id) VALUES ($1, $2, $3)")
+            .bind(guild_id)
+            .bind("Read Guild")
+            .bind(owner.id)
+            .execute(&pool)
+            .await
+            .expect("create guild");
+
+        sqlx::query("INSERT INTO guild_members (guild_id, user_id) VALUES ($1, $2)")
+            .bind(guild_id)
+            .bind(owner.id)
+            .execute(&pool)
+            .await
+            .expect("join guild");
+
+        let channel = create_channel(
+            &pool,
+            "updates",
+            &ChannelType::Text,
+            None,
+            Some(guild_id),
+            None,
+            None,
+            None,
+        )
+        .await
+        .expect("create channel");
+
+        // Another user sends messages
+        let sender = create_user(&pool, "sender2", "Sender 2", None, "hash")
+            .await
+            .expect("create sender");
+
+        for i in 1..=2 {
+            create_message(
+                &pool,
+                channel.id,
+                sender.id,
+                &format!("Update {i}"),
+                false,
+                None,
+                None,
+            )
+            .await
+            .expect("create message");
+        }
+
+        // Mark channel as read by inserting a channel_read_state with current timestamp
+        sqlx::query(
+            "INSERT INTO channel_read_state (user_id, channel_id, last_read_at) VALUES ($1, $2, NOW())",
+        )
+        .bind(owner.id)
+        .bind(channel.id)
+        .execute(&pool)
+        .await
+        .expect("mark as read");
+
+        // After marking as read, no unreads should appear
+        let result = get_unread_aggregate(&pool, owner.id)
+            .await
+            .expect("get_unread_aggregate");
+
+        assert!(result.guilds.is_empty());
+        assert_eq!(result.total, 0);
+    }
+
+    #[sqlx::test]
+    async fn test_get_unread_aggregate_dm_unreads(pool: PgPool) {
+        // Create two users
+        let user_a = create_user(&pool, "usera", "User A", None, "hash")
+            .await
+            .expect("create user_a");
+        let user_b = create_user(&pool, "userb", "User B", None, "hash")
+            .await
+            .expect("create user_b");
+
+        // Create a DM channel
+        let dm_channel = create_channel(
+            &pool,
+            "dm-channel",
+            &ChannelType::Dm,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .await
+        .expect("create dm channel");
+
+        // Add both users as DM participants
+        sqlx::query("INSERT INTO dm_participants (channel_id, user_id) VALUES ($1, $2)")
+            .bind(dm_channel.id)
+            .bind(user_a.id)
+            .execute(&pool)
+            .await
+            .expect("add participant a");
+
+        sqlx::query("INSERT INTO dm_participants (channel_id, user_id) VALUES ($1, $2)")
+            .bind(dm_channel.id)
+            .bind(user_b.id)
+            .execute(&pool)
+            .await
+            .expect("add participant b");
+
+        // User B sends 2 messages to the DM
+        for i in 1..=2 {
+            create_message(
+                &pool,
+                dm_channel.id,
+                user_b.id,
+                &format!("DM from B {i}"),
+                false,
+                None,
+                None,
+            )
+            .await
+            .expect("create dm message from B");
+        }
+
+        // User A sends 1 message (should NOT count as unread for user A)
+        create_message(
+            &pool,
+            dm_channel.id,
+            user_a.id,
+            "DM from A",
+            false,
+            None,
+            None,
+        )
+        .await
+        .expect("create dm message from A");
+
+        // Check unreads for user A: should see 2 unread (only B's messages)
+        let result = get_unread_aggregate(&pool, user_a.id)
+            .await
+            .expect("get_unread_aggregate");
+
+        assert!(result.guilds.is_empty());
+        assert_eq!(result.dms.len(), 1);
+        assert_eq!(result.dms[0].channel_id, dm_channel.id);
+        assert_eq!(result.dms[0].unread_count, 2);
+        assert_eq!(result.total, 2);
+    }
 }
