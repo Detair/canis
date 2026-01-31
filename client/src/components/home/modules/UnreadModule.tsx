@@ -35,13 +35,25 @@ const UnreadModule: Component = () => {
     }
   };
 
+  // Refresh when window gains focus (throttled to once per 30s)
+  let lastFetchTime = 0;
+  const FOCUS_REFRESH_INTERVAL_MS = 30_000;
+
+  const throttledFetch = () => {
+    const now = Date.now();
+    if (now - lastFetchTime >= FOCUS_REFRESH_INTERVAL_MS) {
+      lastFetchTime = now;
+      fetchUnreads();
+    }
+  };
+
   onMount(() => {
+    lastFetchTime = Date.now();
     fetchUnreads();
   });
 
-  // Refresh when window gains focus
   createEffect(() => {
-    const handleFocus = () => fetchUnreads();
+    const handleFocus = () => throttledFetch();
     window.addEventListener("focus", handleFocus);
     return () => window.removeEventListener("focus", handleFocus);
   });
