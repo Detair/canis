@@ -8,31 +8,7 @@
 import { describe, it, expect } from "vitest";
 import DOMPurify from "dompurify";
 import { marked } from "marked";
-
-// Spoiler extension (copied from MessageItem.tsx)
-const spoilerExtension = {
-  name: 'spoiler',
-  level: 'inline' as const,
-  start(src: string) {
-    const index = src.indexOf('||');
-    return index >= 0 ? index : undefined;
-  },
-  tokenizer(src: string) {
-    // Limit spoiler content to 500 chars to prevent ReDoS
-    const match = /^\|\|(.{1,500}?)\|\|/.exec(src);
-    if (match) {
-      return {
-        type: 'spoiler',
-        raw: match[0],
-        text: match[1],
-      };
-    }
-    return undefined;
-  },
-  renderer(token: { text: string }) {
-    return `<span class="spoiler" data-spoiler="true">${token.text}</span>`;
-  },
-};
+import { spoilerExtension } from "@/lib/markdown/spoilerExtension";
 
 // Configure marked for GitHub Flavored Markdown
 marked.setOptions({
