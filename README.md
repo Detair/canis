@@ -2,7 +2,8 @@
 
 A self-hosted voice and text chat platform for gaming communities.
 
-[![CI](https://github.com/yourorg/voicechat/actions/workflows/ci.yml/badge.svg)](https://github.com/yourorg/voicechat/actions/workflows/ci.yml)
+<!-- CI badge: configure after GitHub Actions setup -->
+<!-- [![CI](https://github.com/OWNER/REPO/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/REPO/actions/workflows/ci.yml) -->
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](LICENSE-MIT)
 
 ## Features
@@ -30,7 +31,6 @@ All documentation is located in the [`docs/`](docs/) directory.
 ### Architecture & Security
 - [Architecture Overview](docs/architecture/overview.md)
 - [Encryption Architecture](docs/security/encryption.md)
-- [Dependency Review](docs/security/dependency-review.md)
 
 ### Project
 - [Roadmap](docs/project/roadmap.md)

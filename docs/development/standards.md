@@ -67,19 +67,8 @@ This document lists all open standards, protocols, and libraries used. The goal 
 |----------|------|
 | **Standard** | IETF RFC 6455 |
 | **Purpose** | Bidirectional Real-Time Communication |
-| **Rust Library** | `tokio-tungstenite` (0.21) |
+| **Rust Library** | `tokio-tungstenite` (0.28) |
 | **License** | MIT |
-
-### JSON-RPC 2.0
-
-| Attribute | Value |
-|----------|------|
-| **Standard** | jsonrpc.org Specification |
-| **Purpose** | Structured Signaling Format |
-| **Rust Library** | `jsonrpsee` (0.22) |
-| **License** | MIT |
-
-**Usage:** WebRTC Signaling and Real-Time Events over WebSocket.
 
 ### REST API
 
@@ -87,7 +76,7 @@ This document lists all open standards, protocols, and libraries used. The goal 
 |----------|------|
 | **Standard** | OpenAPI 3.1 |
 | **Purpose** | API Documentation and Validation |
-| **Rust Library** | `utoipa` (4.2) |
+| **Rust Library** | `utoipa` (5) |
 | **License** | MIT/Apache 2.0 |
 
 ---
@@ -125,8 +114,7 @@ This document lists all open standards, protocols, and libraries used. The goal 
 |---------|------------------|--------|
 | Echo Cancellation | WebRTC AEC (in webrtc-rs) | MIT/Apache 2.0 |
 | Noise Suppression | WebRTC NS (in webrtc-rs) | MIT/Apache 2.0 |
-| Noise Cancellation (AI) | `nnnoiseless` (RNNoise Port) | BSD-3 |
-| Audio I/O | `cpal` | Apache 2.0 |
+| Audio I/O | `cpal` (0.17) | Apache 2.0 |
 
 ---
 
@@ -138,7 +126,7 @@ This document lists all open standards, protocols, and libraries used. The goal 
 |----------|------|
 | **Standard** | TLS 1.3 (IETF RFC 8446) |
 | **Purpose** | Encryption of all HTTP/WebSocket connections |
-| **Rust Library** | `rustls` (0.22) |
+| **Rust Library** | `rustls` (0.23) |
 | **License** | MIT/Apache 2.0/ISC |
 
 **Configuration:**
@@ -169,7 +157,7 @@ This document lists all open standards, protocols, and libraries used. The goal 
 |----------|------|
 | **Protocol** | Olm (1:1) + Megolm (Groups) |
 | **Basis** | Double Ratchet Algorithm |
-| **Rust Library** | `vodozemac` (0.5) |
+| **Rust Library** | `vodozemac` (0.9) |
 | **License** | Apache 2.0 |
 | **Developer** | Matrix.org / Element |
 
@@ -190,8 +178,8 @@ This document lists all open standards, protocols, and libraries used. The goal 
 | Algorithm | Standard | Rust Library | License | Usage |
 |-------------|----------|--------------|--------|------------|
 | AES-256-GCM | NIST FIPS 197 | `aes-gcm` | MIT/Apache 2.0 | Data at-rest |
-| X25519 | IETF RFC 7748 | `x25519-dalek` | BSD-3 | Key Exchange |
-| Ed25519 | IETF RFC 8032 | `ed25519-dalek` | BSD-3 | Signatures |
+| X25519 | IETF RFC 7748 | via `vodozemac` | Apache 2.0 | Key Exchange |
+| Ed25519 | IETF RFC 8032 | via `vodozemac` | Apache 2.0 | Signatures |
 | SHA-256 | NIST FIPS 180-4 | `sha2` | MIT/Apache 2.0 | Hashing |
 | HKDF | IETF RFC 5869 | `hkdf` | MIT/Apache 2.0 | Key Derivation |
 | Argon2id | IETF RFC 9106 | `argon2` | MIT/Apache 2.0 | Password Hashing |
@@ -289,7 +277,7 @@ This document lists all open standards, protocols, and libraries used. The goal 
 |----------|------|
 | **Standard** | commonmark.org |
 | **Purpose** | Rich text in messages |
-| **Rust Library** | `pulldown-cmark` (0.10) |
+| **Rust Library** | `pulldown-cmark` (0.13) |
 | **License** | MIT |
 
 ---
@@ -302,7 +290,7 @@ This document lists all open standards, protocols, and libraries used. The goal 
 |----------|------|
 | **Version** | 16.x |
 | **Purpose** | Persistent data storage |
-| **Rust Library** | `sqlx` (0.7) |
+| **Rust Library** | `sqlx` (0.8) |
 | **License** | PostgreSQL License (MIT-like) |
 
 **Features Used:**
@@ -317,7 +305,7 @@ This document lists all open standards, protocols, and libraries used. The goal 
 |----------|------|
 | **Version** | 8.x |
 | **Purpose** | Sessions, Caching, Pub/Sub, Presence |
-| **Rust Library** | `fred` (8.x) - Redis protocol compatible |
+| **Rust Library** | `fred` (10.x) - Redis protocol compatible |
 | **License** | BSD-3-Clause |
 
 **Note:** Valkey is a BSD-3-Clause licensed fork of Redis, fully API-compatible.
@@ -362,15 +350,6 @@ This document lists all open standards, protocols, and libraries used. The goal 
 ```json
 {"timestamp":"2024-01-15T14:30:00Z","level":"INFO","target":"voicechat_api","message":"User logged in","user_id":"..."}
 ```
-
-### Metrics
-
-| Attribute | Value |
-|----------|------|
-| **Standard** | OpenMetrics (Prometheus-compatible) |
-| **Rust Library** | `metrics` + `metrics-exporter-prometheus` |
-| **License** | MIT |
-| **Endpoint** | `/metrics` |
 
 ---
 
@@ -454,24 +433,24 @@ This document lists all open standards, protocols, and libraries used. The goal 
 ```toml
 [dependencies]
 # Web Framework - MIT
-axum = "0.7"
-tower = "0.4"
-tower-http = { version = "0.5", features = ["cors", "trace", "compression-gzip"] }
+axum = "0.8"
+tower = "0.5"
+tower-http = { version = "0.6", features = ["cors", "trace", "compression-gzip", "request-id", "util"] }
 
 # Async Runtime - MIT
 tokio = { version = "1", features = ["full"] }
 
 # WebSocket - MIT
-tokio-tungstenite = "0.21"
+tokio-tungstenite = "0.28"
 
 # WebRTC - MIT/Apache 2.0
 webrtc = "0.11"
 
 # Database - MIT/Apache 2.0
-sqlx = { version = "0.7", features = ["postgres", "runtime-tokio", "uuid", "chrono", "json"] }
+sqlx = { version = "0.8.6", features = ["postgres", "runtime-tokio", "uuid", "chrono", "json", "macros", "migrate"] }
 
 # Redis - MIT
-fred = "8"
+fred = "10"
 
 # Auth - MIT/Apache 2.0
 jsonwebtoken = "9"
@@ -479,16 +458,14 @@ argon2 = "0.5"
 totp-rs = "5"
 openidconnect = "3"
 
-# Crypto - MIT/Apache 2.0 + BSD-3
-rustls = "0.22"
-x25519-dalek = "2"
-ed25519-dalek = "2"
+# Crypto - MIT/Apache 2.0
+rustls = "0.23"
 aes-gcm = "0.10"
 hkdf = "0.12"
 sha2 = "0.10"
 
 # Text E2EE - Apache 2.0
-vodozemac = "0.5"
+vodozemac = "0.9"
 
 # Serialization - MIT/Apache 2.0
 serde = { version = "1", features = ["derive"] }
@@ -499,7 +476,7 @@ uuid = { version = "1", features = ["v7", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["json", "env-filter"] }
-thiserror = "1"
+thiserror = "2"
 anyhow = "1"
 
 # S3 - Apache 2.0
@@ -507,14 +484,17 @@ aws-sdk-s3 = "1"
 aws-config = "1"
 
 # API Documentation - MIT/Apache 2.0
-utoipa = { version = "4", features = ["axum_extras"] }
-utoipa-swagger-ui = { version = "6", features = ["axum"] }
+utoipa = { version = "5", features = ["axum_extras"] }
+utoipa-swagger-ui = { version = "9", features = ["axum"] }
 
 # Markdown - MIT
-pulldown-cmark = "0.10"
+pulldown-cmark = "0.13"
 
 # Validation - MIT
-validator = { version = "0.16", features = ["derive"] }
+validator = { version = "0.20", features = ["derive"] }
+
+# HTTP Client - MIT/Apache 2.0
+reqwest = { version = "0.13", features = ["json"] }
 ```
 
 ### Client Backend (Cargo.toml)
@@ -531,12 +511,11 @@ tokio = { version = "1", features = ["full"] }
 webrtc = "0.11"
 
 # Audio - Apache 2.0 + MIT
-cpal = "0.15"
+cpal = "0.17"
 opus = "0.3"
-nnnoiseless = "0.5"
 
 # Crypto - Apache 2.0
-vodozemac = "0.5"
+vodozemac = "0.9"
 
 # Secure Storage - MIT/Apache 2.0
 keyring = "2"
@@ -546,7 +525,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
 # HTTP Client - MIT/Apache 2.0
-reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
+reqwest = { version = "0.13", features = ["json"] }
 ```
 
 ### Frontend (package.json)
@@ -554,7 +533,14 @@ reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
 ```json
 {
   "dependencies": {
-    "solid-js": "^1.8.0"
+    "@floating-ui/dom": "^1.7.5",
+    "@solidjs/router": "^0.10.0",
+    "@tauri-apps/api": "^2.0.0",
+    "@tauri-apps/plugin-shell": "^2.0.0",
+    "dompurify": "^3.3.1",
+    "highlight.js": "^11.11.1",
+    "marked": "^17.0.1",
+    "solid-js": "^1.9.10"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.0.0",
@@ -562,7 +548,8 @@ reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
     "vite": "^5.0.0",
     "vite-plugin-solid": "^2.8.0",
     "unocss": "^0.58.0",
-    "lucide-solid": "^0.300.0"
+    "lucide-solid": "^0.300.0",
+    "vitest": "^4.0.18"
   }
 }
 ```
@@ -621,4 +608,4 @@ cargo deny check licenses
 
 - [PROJECT_SPEC.md](../project/specification.md) - Project Requirements
 - [ARCHITECTURE.md](../architecture/overview.md) - Technical Architecture
-- [LICENSE_COMPLIANCE.md](../ops/license-compliance.md) - Detailed License Review
+- [LICENSE_COMPLIANCE.md](../../LICENSE_COMPLIANCE.md) - Detailed License Review

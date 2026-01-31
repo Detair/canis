@@ -567,6 +567,17 @@ This roadmap outlines the development path from the current prototype to a produ
 
 ## Recent Changes
 
+### 2026-01-31
+- **Toast Component Tests** - Created comprehensive test suite for toast notification system (16 passing tests, 5 skipped timing tests). Tests verify API behavior including deduplication, max visible limit (5), dismissal, and toast types. Added duration: 0 workaround for vitest window.setTimeout issues.
+- **Tauri WebSocket Event Parity Phase 1** (Issue #132) - Added 11 ServerEvent variants to Rust backend: Call events (IncomingCall, CallStarted, CallEnded, CallParticipantJoined, CallParticipantLeft, CallDeclined), Read sync (ChannelRead, DmRead, DmNameUpdated), and Reactions (ReactionAdd, ReactionRemove). Added corresponding Tauri event listeners in frontend. Progress: 11/22 events completed.
+- **Clippy Warning Cleanup** - Fixed 169 clippy warnings across the codebase (186 → 17 remaining):
+  - doc_markdown: 50 fixes (added backticks around technical terms)
+  - Automatic fixes: 111 warnings (use_self, uninlined_format_args)
+  - or_fun_call: 8 fixes (replaced closures with function pointers)
+  - format_push_string: 2 fixes (replaced push_str(format!()) with write!/writeln!)
+  - collection_is_never_read: 1 fix (scoped unused variable locally)
+  - items_after_statements: 1 fix (moved imports to module level)
+
 ### 2026-01-30
 - Completed **Content Spoilers & Enhanced Mentions** (PR #128) - Content spoilers with `||text||` syntax for hiding sensitive information, MENTION_EVERYONE permission (bit 23) for controlling @everyone/@here mentions, server-side permission validation, ReDoS protection (500 char limit), XSS prevention via DOMPurify, 3 integration tests and 9 unit tests.
 - Completed **Home Page Unread Aggregator** (PR #127) - Centralized view of unread messages across all guilds and DMs in modular sidebar with optimized database queries, direct navigation, comprehensive error handling with toast notifications, and automatic refresh on window focus.

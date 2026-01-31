@@ -4,7 +4,7 @@
 
 A self-hosted voice and text chat platform for gaming communities, optimized for low latency, high voice quality, and maximum security.
 
-**Project Status:** Planning Phase
+**Project Status:** Phase 4 (Advanced Features)
 **License:** MIT OR Apache-2.0 (Dual License)
 **Target Audience:** Gaming communities, self-hosters, organizations with privacy requirements
 
@@ -91,7 +91,7 @@ A self-hosted voice and text chat platform for gaming communities, optimized for
 |--------|--------|-------|
 | Voice Latency | <50ms | End-to-end |
 | Client RAM | <100MB | Idle |
-| Client CPU | <5% | With active voice |
+| Client CPU | <1% | Idle |
 | Server: 100 Users | 4 vCPU, 8GB RAM | Concurrent in voice |
 | Client Startup Time | <3s | Until usable |
 
@@ -166,7 +166,7 @@ A self-hosted voice and text chat platform for gaming communities, optimized for
 
 ### E-001: Encryption Strategy
 
-**Date:** [Current Date]
+**Date:** 2024
 **Status:** Decided
 
 **Context:** Selection of encryption method for voice and text.
@@ -191,7 +191,7 @@ A self-hosted voice and text chat platform for gaming communities, optimized for
 
 ### E-002: SSO Handling
 
-**Date:** [Current Date]
+**Date:** 2024
 **Status:** Decided
 
 **Context:** Integration of local users and SSO users.
@@ -211,7 +211,7 @@ A self-hosted voice and text chat platform for gaming communities, optimized for
 
 ### E-003: Client Framework
 
-**Date:** [Current Date]
+**Date:** 2024
 **Status:** Decided
 
 **Context:** Selection of framework for desktop clients.
@@ -235,7 +235,7 @@ A self-hosted voice and text chat platform for gaming communities, optimized for
 
 ### E-004: Project License
 
-**Date:** [Current Date]
+**Date:** 2024
 **Status:** Decided
 
 **Context:** Choice of open-source license for the project.
@@ -260,7 +260,7 @@ A self-hosted voice and text chat platform for gaming communities, optimized for
 
 ### E-005: Text E2EE Library
 
-**Date:** [Current Date]
+**Date:** 2024
 **Status:** Decided
 
 **Context:** libsignal is AGPL-licensed, which would force project license.
@@ -284,7 +284,7 @@ A self-hosted voice and text chat platform for gaming communities, optimized for
 
 ### E-006: Scaling Strategy
 
-**Date:** [Current Date]
+**Date:** 2024
 **Status:** Decided
 
 **Context:** Design for different user counts.
@@ -316,20 +316,8 @@ A self-hosted voice and text chat platform for gaming communities, optimized for
 
 ---
 
-## Next Steps
-
-1. [ ] Finalize data model
-2. [ ] API design (OpenAPI Spec)
-3. [ ] Docker-Compose development environment
-4. [ ] Project skeleton (Rust Workspace)
-5. [ ] CI/CD pipeline setup
-6. [ ] Define MVP feature scope
-7. [ ] Milestones and timeline
-
----
-
 ## References
 
 - [ARCHITECTURE.md](../architecture/overview.md) - Technical Architecture
 - [STANDARDS.md](../development/standards.md) - Standards and Protocols Used
-- [LICENSE_COMPLIANCE.md](../ops/license-compliance.md) - License Compliance for All Dependencies
+- [LICENSE_COMPLIANCE.md](../../LICENSE_COMPLIANCE.md) - License Compliance for All Dependencies

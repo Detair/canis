@@ -144,26 +144,6 @@ docker exec -it voicechat-postgres-dev psql -U voicechat -d voicechat
 PGPASSWORD=voicechat_dev_pass psql -h localhost -p 5433 -U voicechat -d voicechat
 ```
 
-## Phase 3 Development Status
-
-The following Phase 3 features are currently implemented:
-
-✅ **Backend (Tasks 1-3):**
-- Database migration with guild tables
-- Complete guild REST API (8 endpoints)
-- Channel guild scope integration
-
-✅ **Frontend (Task 6):**
-- Guild store with CRUD operations
-- API integration (Tauri + browser HTTP fallback)
-- Guild-scoped channel management
-
-🚧 **In Progress:**
-- Task 7: Server Rail UI
-- Task 8: Context switching
-- Tasks 4-5: Friends and DM backend
-- Tasks 9-11: Friends UI, Home view, Rate limiting
-
 ## API Endpoints
 
 ### Guild Management
@@ -218,4 +198,4 @@ curl http://localhost:8080/api/guilds \
 
 - [Project Specification](../project/specification.md)
 - [Architecture Documentation](../architecture/overview.md)
-- [Phase 3 Implementation Plan](docs/plans/PHASE_3_IMPLEMENTATION.md)
+- [Standards & Protocols](standards.md)
