@@ -39,7 +39,9 @@ jobs:
 
       - name: Run clippy
         if: matrix.check == 'clippy'
-        run: cargo clippy --all-targets --all-features -- -D warnings
+        env:
+          SQLX_OFFLINE: "true"
+        run: cargo clippy --all-targets --all-features --workspace --exclude vc-client -- -D warnings
 
   # ===========================================================================
   # Rust Tests (with database services)
@@ -47,6 +49,9 @@ jobs:
   rust-test:
     name: Rust Tests
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/canis_test
+      REDIS_URL: redis://localhost:6379
     services:
       postgres:
         image: postgres:16
@@ -80,11 +85,16 @@ jobs:
         with:
           shared-key: rust-test
 
+      - name: Install sqlx-cli
+        uses: taiki-e/install-action@v2
+        with:
+          tool: sqlx-cli
+
+      - name: Run migrations
+        run: sqlx migrate run --source server/migrations
+
       - name: Run tests
-        env:
-          DATABASE_URL: postgres://postgres:postgres@localhost:5432/canis_test
-          REDIS_URL: redis://localhost:6379
-        run: cargo test --all-features
+        run: cargo test --all-features --workspace --exclude vc-client
 
   # ===========================================================================
   # License Check

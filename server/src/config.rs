@@ -209,19 +209,19 @@ impl Config {
 
     /// Create a default configuration for testing.
     ///
-    /// Uses Docker test containers:
-    /// - `PostgreSQL`: `docker run -d --name canis-test-postgres -e POSTGRESQL_USERNAME=test -e POSTGRESQL_PASSWORD=test -e POSTGRESQL_DATABASE=test -p 5434:5432 bitnami/postgresql:latest`
-    /// - Redis: `docker run -d --name canis-test-redis -e ALLOW_EMPTY_PASSWORD=yes -p 6380:6379 bitnami/redis:latest`
-    ///
-    /// Run migrations: `DATABASE_URL="postgresql://test:test@localhost:5434/test" sqlx migrate run --source server/migrations`
+    /// Respects `DATABASE_URL` and `REDIS_URL` environment variables (for CI),
+    /// falling back to local dev defaults.
     #[must_use]
     pub fn default_for_test() -> Self {
+        let database_url = std::env::var("DATABASE_URL")
+            .unwrap_or_else(|_| "postgresql://voicechat:voicechat_dev@localhost:5433/voicechat".into());
+        let redis_url = std::env::var("REDIS_URL")
+            .unwrap_or_else(|_| "redis://localhost:6379".into());
+
         Self {
             bind_address: "127.0.0.1:8080".into(),
-            // Uses dev database - sqlx::test creates isolated DBs automatically
-            database_url: "postgresql://voicechat:voicechat_dev@localhost:5433/voicechat".into(),
-            // Uses dev Redis
-            redis_url: "redis://localhost:6379".into(),
+            database_url,
+            redis_url,
             // Test RSA key pair (2048-bit, generated for testing only)
             jwt_private_key: TEST_JWT_PRIVATE_KEY.into(),
             jwt_public_key: TEST_JWT_PUBLIC_KEY.into(),
