@@ -1,0 +1,618 @@
+//! Integration tests for bot ecosystem (applications, commands, gateway).
+
+mod helpers;
+
+use axum::{body::Body, http::Method};
+use helpers::{create_test_user, delete_user, generate_access_token, TestApp};
+use http_body_util::BodyExt;
+use serde_json::json;
+
+/// Test creating a bot application.
+#[tokio::test]
+async fn test_create_bot_application() {
+    let app = TestApp::new().await;
+    let (user_id, _) = create_test_user(&app.pool).await;
+    let token = generate_access_token(&app.config, user_id);
+
+    let request = TestApp::request(Method::POST, "/api/applications")
+        .header("Authorization", format!("Bearer {}", token))
+        .header("Content-Type", "application/json")
+        .body(Body::from(
+            serde_json::to_string(&json!({
+                "name": "Test Bot",
+                "description": "A test bot application"
+            }))
+            .unwrap(),
+        ))
+        .unwrap();
+
+    let response = app.oneshot(request).await;
+    assert_eq!(response.status(), 201);
+
+    let body = response.into_body().collect().await.unwrap().to_bytes();
+    let app_response: serde_json::Value = serde_json::from_slice(&body).unwrap();
+
+    assert_eq!(app_response["name"], "Test Bot");
+    assert_eq!(app_response["description"], "A test bot application");
+    assert!(app_response["id"].is_string());
+
+    delete_user(&app.pool, user_id).await;
+}
+
+/// Test creating application with invalid name.
+#[tokio::test]
+async fn test_create_bot_application_invalid_name() {
+    let app = TestApp::new().await;
+    let (user_id, _) = create_test_user(&app.pool).await;
+    let token = generate_access_token(&app.config, user_id);
+
+    // Name too short
+    let request = TestApp::request(Method::POST, "/api/applications")
+        .header("Authorization", format!("Bearer {}", token))
+        .header("Content-Type", "application/json")
+        .body(Body::from(
+            serde_json::to_string(&json!({
+                "name": "A"
+            }))
+            .unwrap(),
+        ))
+        .unwrap();
+
+    let response = app.oneshot(request).await;
+    assert_eq!(response.status(), 400);
+
+    delete_user(&app.pool, user_id).await;
+}
+
+/// Test listing bot applications.
+#[tokio::test]
+async fn test_list_bot_applications() {
+    let app = TestApp::new().await;
+    let (user_id, _) = create_test_user(&app.pool).await;
+    let token = generate_access_token(&app.config, user_id);
+
+    // Create two applications
+    for i in 1..=2 {
+        let request = TestApp::request(Method::POST, "/api/applications")
+            .header("Authorization", format!("Bearer {}", token))
+            .header("Content-Type", "application/json")
+            .body(Body::from(
+                serde_json::to_string(&json!({
+                    "name": format!("Bot {}", i)
+                }))
+                .unwrap(),
+            ))
+            .unwrap();
+        let response = app.oneshot(request).await;
+        assert_eq!(response.status(), 201);
+    }
+
+    // List applications
+    let request = TestApp::request(Method::GET, "/api/applications")
+        .header("Authorization", format!("Bearer {}", token))
+        .body(Body::empty())
+        .unwrap();
+
+    let response = app.oneshot(request).await;
+    assert_eq!(response.status(), 200);
+
+    let body = response.into_body().collect().await.unwrap().to_bytes();
+    let apps: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+
+    assert_eq!(apps.len(), 2);
+    assert_eq!(apps[0]["name"], "Bot 2"); // Ordered by created_at DESC
+    assert_eq!(apps[1]["name"], "Bot 1");
+
+    delete_user(&app.pool, user_id).await;
+}
+
+/// Test creating a bot user for an application.
+#[tokio::test]
+async fn test_create_bot_user() {
+    let app = TestApp::new().await;
+    let (user_id, _) = create_test_user(&app.pool).await;
+    let token = generate_access_token(&app.config, user_id);
+
+    // Create application
+    let create_req = TestApp::request(Method::POST, "/api/applications")
+        .header("Authorization", format!("Bearer {}", token))
+        .header("Content-Type", "application/json")
+        .body(Body::from(
+            serde_json::to_string(&json!({
+                "name": "Test Bot"
+            }))
+            .unwrap(),
+        ))
+        .unwrap();
+
+    let create_resp = app.oneshot(create_req).await;
+    let body = create_resp.into_body().collect().await.unwrap().to_bytes();
+    let app_data: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    let app_id = app_data["id"].as_str().unwrap();
+
+    // Create bot user
+    let bot_req = TestApp::request(Method::POST, &format!("/api/applications/{}/bot", app_id))
+        .header("Authorization", format!("Bearer {}", token))
+        .body(Body::empty())
+        .unwrap();
+
+    let bot_resp = app.oneshot(bot_req).await;
+    assert_eq!(bot_resp.status(), 201);
+
+    let body = bot_resp.into_body().collect().await.unwrap().to_bytes();
+    let bot_data: serde_json::Value = serde_json::from_slice(&body).unwrap();
+
+    assert!(bot_data["token"].is_string());
+    assert!(bot_data["bot_user_id"].is_string());
+
+    // Verify bot user exists in database
+    let bot_user_id = bot_data["bot_user_id"].as_str().unwrap();
+    let bot_user_id = uuid::Uuid::parse_str(bot_user_id).unwrap();
+
+    let bot_user = sqlx::query!(
+        "SELECT is_bot, bot_owner_id FROM users WHERE id = $1",
+        bot_user_id
+    )
+    .fetch_one(&app.pool)
+    .await
+    .unwrap();
+
+    assert!(bot_user.is_bot);
+    assert_eq!(bot_user.bot_owner_id, Some(user_id));
+
+    delete_user(&app.pool, user_id).await;
+}
+
+/// Test that creating bot user twice fails.
+#[tokio::test]
+async fn test_create_bot_user_twice_fails() {
+    let app = TestApp::new().await;
+    let (user_id, _) = create_test_user(&app.pool).await;
+    let token = generate_access_token(&app.config, user_id);
+
+    // Create application
+    let create_req = TestApp::request(Method::POST, "/api/applications")
+        .header("Authorization", format!("Bearer {}", token))
+        .header("Content-Type", "application/json")
+        .body(Body::from(
+            serde_json::to_string(&json!({
+                "name": "Test Bot"
+            }))
+            .unwrap(),
+        ))
+        .unwrap();
+
+    let create_resp = app.oneshot(create_req).await;
+    let body = create_resp.into_body().collect().await.unwrap().to_bytes();
+    let app_data: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    let app_id = app_data["id"].as_str().unwrap();
+
+    // Create bot user first time
+    let bot_req1 = TestApp::request(Method::POST, &format!("/api/applications/{}/bot", app_id))
+        .header("Authorization", format!("Bearer {}", token))
+        .body(Body::empty())
+        .unwrap();
+    let bot_resp1 = app.oneshot(bot_req1).await;
+    assert_eq!(bot_resp1.status(), 201);
+
+    // Try to create bot user second time
+    let bot_req2 = TestApp::request(Method::POST, &format!("/api/applications/{}/bot", app_id))
+        .header("Authorization", format!("Bearer {}", token))
+        .body(Body::empty())
+        .unwrap();
+    let bot_resp2 = app.oneshot(bot_req2).await;
+    assert_eq!(bot_resp2.status(), 409); // Conflict
+
+    delete_user(&app.pool, user_id).await;
+}
+
+/// Test resetting bot token.
+#[tokio::test]
+async fn test_reset_bot_token() {
+    let app = TestApp::new().await;
+    let (user_id, _) = create_test_user(&app.pool).await;
+    let token = generate_access_token(&app.config, user_id);
+
+    // Create application and bot user
+    let create_req = TestApp::request(Method::POST, "/api/applications")
+        .header("Authorization", format!("Bearer {}", token))
+        .header("Content-Type", "application/json")
+        .body(Body::from(
+            serde_json::to_string(&json!({
+                "name": "Test Bot"
+            }))
+            .unwrap(),
+        ))
+        .unwrap();
+
+    let create_resp = app.oneshot(create_req).await;
+    let body = create_resp.into_body().collect().await.unwrap().to_bytes();
+    let app_data: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    let app_id = app_data["id"].as_str().unwrap();
+
+    let bot_req = TestApp::request(Method::POST, &format!("/api/applications/{}/bot", app_id))
+        .header("Authorization", format!("Bearer {}", token))
+        .body(Body::empty())
+        .unwrap();
+    let bot_resp = app.oneshot(bot_req).await;
+    let body = bot_resp.into_body().collect().await.unwrap().to_bytes();
+    let bot_data: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    let original_token = bot_data["token"].as_str().unwrap();
+
+    // Reset token
+    let reset_req = TestApp::request(
+        Method::POST,
+        &format!("/api/applications/{}/reset-token", app_id),
+    )
+    .header("Authorization", format!("Bearer {}", token))
+    .body(Body::empty())
+    .unwrap();
+
+    let reset_resp = app.oneshot(reset_req).await;
+    assert_eq!(reset_resp.status(), 200);
+
+    let body = reset_resp.into_body().collect().await.unwrap().to_bytes();
+    let new_data: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    let new_token = new_data["token"].as_str().unwrap();
+
+    assert_ne!(original_token, new_token);
+
+    delete_user(&app.pool, user_id).await;
+}
+
+/// Test deleting a bot application.
+#[tokio::test]
+async fn test_delete_bot_application() {
+    let app = TestApp::new().await;
+    let (user_id, _) = create_test_user(&app.pool).await;
+    let token = generate_access_token(&app.config, user_id);
+
+    // Create application
+    let create_req = TestApp::request(Method::POST, "/api/applications")
+        .header("Authorization", format!("Bearer {}", token))
+        .header("Content-Type", "application/json")
+        .body(Body::from(
+            serde_json::to_string(&json!({
+                "name": "Test Bot"
+            }))
+            .unwrap(),
+        ))
+        .unwrap();
+
+    let create_resp = app.oneshot(create_req).await;
+    let body = create_resp.into_body().collect().await.unwrap().to_bytes();
+    let app_data: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    let app_id = app_data["id"].as_str().unwrap();
+
+    // Delete application
+    let delete_req = TestApp::request(Method::DELETE, &format!("/api/applications/{}", app_id))
+        .header("Authorization", format!("Bearer {}", token))
+        .body(Body::empty())
+        .unwrap();
+
+    let delete_resp = app.oneshot(delete_req).await;
+    assert_eq!(delete_resp.status(), 204);
+
+    // Verify it's gone
+    let list_req = TestApp::request(Method::GET, "/api/applications")
+        .header("Authorization", format!("Bearer {}", token))
+        .body(Body::empty())
+        .unwrap();
+
+    let list_resp = app.oneshot(list_req).await;
+    let body = list_resp.into_body().collect().await.unwrap().to_bytes();
+    let apps: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+
+    assert_eq!(apps.len(), 0);
+
+    delete_user(&app.pool, user_id).await;
+}
+
+/// Test registering slash commands.
+#[tokio::test]
+async fn test_register_slash_commands() {
+    let app = TestApp::new().await;
+    let (user_id, _) = create_test_user(&app.pool).await;
+    let token = generate_access_token(&app.config, user_id);
+
+    // Create application
+    let create_req = TestApp::request(Method::POST, "/api/applications")
+        .header("Authorization", format!("Bearer {}", token))
+        .header("Content-Type", "application/json")
+        .body(Body::from(
+            serde_json::to_string(&json!({
+                "name": "Test Bot"
+            }))
+            .unwrap(),
+        ))
+        .unwrap();
+
+    let create_resp = app.oneshot(create_req).await;
+    let body = create_resp.into_body().collect().await.unwrap().to_bytes();
+    let app_data: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    let app_id = app_data["id"].as_str().unwrap();
+
+    // Register commands
+    let register_req = TestApp::request(
+        Method::PUT,
+        &format!("/api/applications/{}/commands", app_id),
+    )
+    .header("Authorization", format!("Bearer {}", token))
+    .header("Content-Type", "application/json")
+    .body(Body::from(
+        serde_json::to_string(&json!({
+            "commands": [
+                {
+                    "name": "hello",
+                    "description": "Says hello",
+                    "options": []
+                },
+                {
+                    "name": "ping",
+                    "description": "Pong!",
+                    "options": []
+                }
+            ]
+        }))
+        .unwrap(),
+    ))
+    .unwrap();
+
+    let register_resp = app.oneshot(register_req).await;
+    assert_eq!(register_resp.status(), 200);
+
+    let body = register_resp
+        .into_body()
+        .collect()
+        .await
+        .unwrap()
+        .to_bytes();
+    let commands: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+
+    assert_eq!(commands.len(), 2);
+    assert_eq!(commands[0]["name"], "hello");
+    assert_eq!(commands[1]["name"], "ping");
+
+    delete_user(&app.pool, user_id).await;
+}
+
+/// Test command name validation.
+#[tokio::test]
+async fn test_register_command_invalid_name() {
+    let app = TestApp::new().await;
+    let (user_id, _) = create_test_user(&app.pool).await;
+    let token = generate_access_token(&app.config, user_id);
+
+    // Create application
+    let create_req = TestApp::request(Method::POST, "/api/applications")
+        .header("Authorization", format!("Bearer {}", token))
+        .header("Content-Type", "application/json")
+        .body(Body::from(
+            serde_json::to_string(&json!({
+                "name": "Test Bot"
+            }))
+            .unwrap(),
+        ))
+        .unwrap();
+
+    let create_resp = app.oneshot(create_req).await;
+    let body = create_resp.into_body().collect().await.unwrap().to_bytes();
+    let app_data: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    let app_id = app_data["id"].as_str().unwrap();
+
+    // Try to register command with uppercase (invalid)
+    let register_req = TestApp::request(
+        Method::PUT,
+        &format!("/api/applications/{}/commands", app_id),
+    )
+    .header("Authorization", format!("Bearer {}", token))
+    .header("Content-Type", "application/json")
+    .body(Body::from(
+        serde_json::to_string(&json!({
+            "commands": [
+                {
+                    "name": "HelloWorld",
+                    "description": "Invalid name",
+                    "options": []
+                }
+            ]
+        }))
+        .unwrap(),
+    ))
+    .unwrap();
+
+    let register_resp = app.oneshot(register_req).await;
+    assert_eq!(register_resp.status(), 400);
+
+    delete_user(&app.pool, user_id).await;
+}
+
+/// Test listing slash commands.
+#[tokio::test]
+async fn test_list_slash_commands() {
+    let app = TestApp::new().await;
+    let (user_id, _) = create_test_user(&app.pool).await;
+    let token = generate_access_token(&app.config, user_id);
+
+    // Create application
+    let create_req = TestApp::request(Method::POST, "/api/applications")
+        .header("Authorization", format!("Bearer {}", token))
+        .header("Content-Type", "application/json")
+        .body(Body::from(
+            serde_json::to_string(&json!({
+                "name": "Test Bot"
+            }))
+            .unwrap(),
+        ))
+        .unwrap();
+
+    let create_resp = app.oneshot(create_req).await;
+    let body = create_resp.into_body().collect().await.unwrap().to_bytes();
+    let app_data: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    let app_id = app_data["id"].as_str().unwrap();
+
+    // Register commands
+    let register_req = TestApp::request(
+        Method::PUT,
+        &format!("/api/applications/{}/commands", app_id),
+    )
+    .header("Authorization", format!("Bearer {}", token))
+    .header("Content-Type", "application/json")
+    .body(Body::from(
+        serde_json::to_string(&json!({
+            "commands": [
+                {
+                    "name": "test",
+                    "description": "Test command",
+                    "options": []
+                }
+            ]
+        }))
+        .unwrap(),
+    ))
+    .unwrap();
+    app.oneshot(register_req).await;
+
+    // List commands
+    let list_req = TestApp::request(
+        Method::GET,
+        &format!("/api/applications/{}/commands", app_id),
+    )
+    .header("Authorization", format!("Bearer {}", token))
+    .body(Body::empty())
+    .unwrap();
+
+    let list_resp = app.oneshot(list_req).await;
+    assert_eq!(list_resp.status(), 200);
+
+    let body = list_resp.into_body().collect().await.unwrap().to_bytes();
+    let commands: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+
+    assert_eq!(commands.len(), 1);
+    assert_eq!(commands[0]["name"], "test");
+
+    delete_user(&app.pool, user_id).await;
+}
+
+/// Test deleting a slash command.
+#[tokio::test]
+async fn test_delete_slash_command() {
+    let app = TestApp::new().await;
+    let (user_id, _) = create_test_user(&app.pool).await;
+    let token = generate_access_token(&app.config, user_id);
+
+    // Create application and command
+    let create_req = TestApp::request(Method::POST, "/api/applications")
+        .header("Authorization", format!("Bearer {}", token))
+        .header("Content-Type", "application/json")
+        .body(Body::from(
+            serde_json::to_string(&json!({
+                "name": "Test Bot"
+            }))
+            .unwrap(),
+        ))
+        .unwrap();
+
+    let create_resp = app.oneshot(create_req).await;
+    let body = create_resp.into_body().collect().await.unwrap().to_bytes();
+    let app_data: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    let app_id = app_data["id"].as_str().unwrap();
+
+    let register_req = TestApp::request(
+        Method::PUT,
+        &format!("/api/applications/{}/commands", app_id),
+    )
+    .header("Authorization", format!("Bearer {}", token))
+    .header("Content-Type", "application/json")
+    .body(Body::from(
+        serde_json::to_string(&json!({
+            "commands": [
+                {
+                    "name": "test",
+                    "description": "Test command",
+                    "options": []
+                }
+            ]
+        }))
+        .unwrap(),
+    ))
+    .unwrap();
+
+    let register_resp = app.oneshot(register_req).await;
+    let body = register_resp
+        .into_body()
+        .collect()
+        .await
+        .unwrap()
+        .to_bytes();
+    let commands: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+    let cmd_id = commands[0]["id"].as_str().unwrap();
+
+    // Delete command
+    let delete_req = TestApp::request(
+        Method::DELETE,
+        &format!("/api/applications/{}/commands/{}", app_id, cmd_id),
+    )
+    .header("Authorization", format!("Bearer {}", token))
+    .body(Body::empty())
+    .unwrap();
+
+    let delete_resp = app.oneshot(delete_req).await;
+    assert_eq!(delete_resp.status(), 204);
+
+    // Verify it's gone
+    let list_req = TestApp::request(
+        Method::GET,
+        &format!("/api/applications/{}/commands", app_id),
+    )
+    .header("Authorization", format!("Bearer {}", token))
+    .body(Body::empty())
+    .unwrap();
+
+    let list_resp = app.oneshot(list_req).await;
+    let body = list_resp.into_body().collect().await.unwrap().to_bytes();
+    let commands: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+
+    assert_eq!(commands.len(), 0);
+
+    delete_user(&app.pool, user_id).await;
+}
+
+/// Test that non-owners cannot access applications.
+#[tokio::test]
+async fn test_application_ownership() {
+    let app = TestApp::new().await;
+    let (owner_id, _) = create_test_user(&app.pool).await;
+    let (other_id, _) = create_test_user(&app.pool).await;
+    let owner_token = generate_access_token(&app.config, owner_id);
+    let other_token = generate_access_token(&app.config, other_id);
+
+    // Owner creates application
+    let create_req = TestApp::request(Method::POST, "/api/applications")
+        .header("Authorization", format!("Bearer {}", owner_token))
+        .header("Content-Type", "application/json")
+        .body(Body::from(
+            serde_json::to_string(&json!({
+                "name": "Owner's Bot"
+            }))
+            .unwrap(),
+        ))
+        .unwrap();
+
+    let create_resp = app.oneshot(create_req).await;
+    let body = create_resp.into_body().collect().await.unwrap().to_bytes();
+    let app_data: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    let app_id = app_data["id"].as_str().unwrap();
+
+    // Other user tries to access it
+    let get_req = TestApp::request(Method::GET, &format!("/api/applications/{}", app_id))
+        .header("Authorization", format!("Bearer {}", other_token))
+        .body(Body::empty())
+        .unwrap();
+
+    let get_resp = app.oneshot(get_req).await;
+    assert_eq!(get_resp.status(), 403); // Forbidden
+
+    delete_user(&app.pool, owner_id).await;
+    delete_user(&app.pool, other_id).await;
+}

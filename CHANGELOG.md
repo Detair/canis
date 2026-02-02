@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Bot token authentication for gateway connections
   - Separate event system for bots (CommandInvoked, MessageCreated, GuildJoined/Left)
   - Redis pub/sub on `bot:{bot_id}` channels for bot-specific events
+  - Comprehensive integration tests (14 tests covering applications, commands, auth, ownership)
 
 ### Changed
 - Documentation audit and cleanup
