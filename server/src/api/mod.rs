@@ -2,6 +2,7 @@
 //!
 //! Central routing configuration and shared state.
 
+pub mod bots;
 pub mod favorites;
 pub mod pins;
 pub mod preferences;
@@ -190,6 +191,20 @@ pub fn create_router(state: AppState) -> Router {
         .route("/api/me/unread", get(unread::get_unread_aggregate))
         .nest("/api/keys", crypto::router())
         .nest("/api/users/{user_id}/keys", crypto::user_keys_router())
+        // Bot management routes
+        .route(
+            "/api/applications",
+            get(bots::list_applications).post(bots::create_application),
+        )
+        .route(
+            "/api/applications/{id}",
+            get(bots::get_application).delete(bots::delete_application),
+        )
+        .route("/api/applications/{id}/bot", post(bots::create_bot))
+        .route(
+            "/api/applications/{id}/reset-token",
+            post(bots::reset_bot_token),
+        )
         // Message reactions
         .route(
             "/api/channels/{channel_id}/messages/{message_id}/reactions",

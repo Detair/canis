@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Bot ecosystem infrastructure (Phase 5)
+  - Database schema for bot users, applications, and slash commands
+  - Bot application management API (create, list, get, delete)
+  - Bot user creation with secure token generation (Argon2id)
+  - Token reset functionality for bot applications
+  - Guild bot installation tracking
+  - Support for guild-specific and global slash commands
+
 ### Changed
 - Documentation audit and cleanup
   - Updated all version numbers in standards.md to match actual dependencies
