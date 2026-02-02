@@ -23,6 +23,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Separate event system for bots (CommandInvoked, MessageCreated, GuildJoined/Left)
   - Redis pub/sub on `bot:{bot_id}` channels for bot-specific events
   - Comprehensive integration tests (14 tests covering applications, commands, auth, ownership)
+  - Bot applications management UI in settings
+  - API client library for bot operations (applications, commands, tokens)
+  - Token display modal with copy functionality and security warnings
+  - Application CRUD interface with validation
 
 ### Changed
 - Documentation audit and cleanup
