@@ -237,11 +237,11 @@ pub struct OidcProviderRow {
     pub token_url: Option<String>,
     /// Manual userinfo endpoint.
     pub userinfo_url: Option<String>,
-    /// OAuth2 client ID.
+    /// `OAuth2` client ID.
     pub client_id: String,
     /// Encrypted client secret (AES-256-GCM).
     pub client_secret_encrypted: String,
-    /// OAuth2 scopes (space or comma separated).
+    /// `OAuth2` scopes (space or comma separated).
     pub scopes: String,
     /// Whether this provider is enabled.
     pub enabled: bool,

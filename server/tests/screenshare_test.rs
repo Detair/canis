@@ -53,7 +53,7 @@ fn test_screen_share_error_into_response_status_codes() {
 
     for (error, expected_str) in test_cases {
         let json = serde_json::to_string(&error).unwrap();
-        assert_eq!(json, format!("\"{}\"", expected_str));
+        assert_eq!(json, format!("\"{expected_str}\""));
     }
 }
 
@@ -110,8 +110,8 @@ fn test_server_event_screen_share_started_serialization() {
 
     let json = serde_json::to_string(&event).unwrap();
     assert!(json.contains("\"type\":\"screen_share_started\""));
-    assert!(json.contains(&format!("\"channel_id\":\"{}\"", channel_id)));
-    assert!(json.contains(&format!("\"user_id\":\"{}\"", user_id)));
+    assert!(json.contains(&format!("\"channel_id\":\"{channel_id}\"")));
+    assert!(json.contains(&format!("\"user_id\":\"{user_id}\"")));
     assert!(json.contains("\"username\":\"alice\""));
     assert!(json.contains("\"source_label\":\"Display 1\""));
     assert!(json.contains("\"has_audio\":true"));
@@ -170,7 +170,7 @@ async fn test_screen_share_check_requires_auth() {
     // 2. Expect 401 Unauthorized
 }
 
-/// Screen share check endpoint requires SCREEN_SHARE permission.
+/// Screen share check endpoint requires `SCREEN_SHARE` permission.
 #[tokio::test]
 #[ignore]
 async fn test_screen_share_check_requires_permission() {
@@ -223,7 +223,7 @@ async fn test_screen_share_start_limit_enforcement() {
     // 3. User B starts screen share → expect LimitReached error
 }
 
-/// Duplicate screen share start returns AlreadySharing.
+/// Duplicate screen share start returns `AlreadySharing`.
 #[tokio::test]
 #[ignore]
 async fn test_screen_share_start_already_sharing() {

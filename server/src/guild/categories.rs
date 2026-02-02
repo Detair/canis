@@ -276,45 +276,43 @@ pub async fn update_category(
     }
 
     // If changing parent_id, validate nesting constraint
-    if let Some(new_parent_id) = &body.parent_id {
-        if let Some(parent_id) = new_parent_id {
-            // Check that the new parent exists and is top-level
-            let parent_check: Option<(Option<Uuid>,)> = sqlx::query_as(
-                "SELECT parent_id FROM channel_categories WHERE id = $1 AND guild_id = $2",
-            )
-            .bind(parent_id)
-            .bind(guild_id)
-            .fetch_optional(&state.db)
-            .await?;
+    if let Some(Some(parent_id)) = &body.parent_id {
+        // Check that the new parent exists and is top-level
+        let parent_check: Option<(Option<Uuid>,)> = sqlx::query_as(
+            "SELECT parent_id FROM channel_categories WHERE id = $1 AND guild_id = $2",
+        )
+        .bind(parent_id)
+        .bind(guild_id)
+        .fetch_optional(&state.db)
+        .await?;
 
-            match parent_check {
-                None => {
-                    return Err(CategoryError::Validation(
-                        "Parent category not found".to_string(),
-                    ))
-                }
-                Some((Some(_),)) => {
-                    return Err(CategoryError::Validation(
-                        "Cannot nest more than 2 levels".to_string(),
-                    ))
-                }
-                Some((None,)) => {} // OK
-            }
-
-            // Check that the category being updated doesn't have children
-            // (can't make a parent category into a subcategory)
-            let has_children = sqlx::query_scalar::<_, bool>(
-                "SELECT EXISTS(SELECT 1 FROM channel_categories WHERE parent_id = $1)",
-            )
-            .bind(category_id)
-            .fetch_one(&state.db)
-            .await?;
-
-            if has_children {
+        match parent_check {
+            None => {
                 return Err(CategoryError::Validation(
-                    "Cannot make a category with subcategories into a subcategory".to_string(),
-                ));
+                    "Parent category not found".to_string(),
+                ))
             }
+            Some((Some(_),)) => {
+                return Err(CategoryError::Validation(
+                    "Cannot nest more than 2 levels".to_string(),
+                ))
+            }
+            Some((None,)) => {} // OK
+        }
+
+        // Check that the category being updated doesn't have children
+        // (can't make a parent category into a subcategory)
+        let has_children = sqlx::query_scalar::<_, bool>(
+            "SELECT EXISTS(SELECT 1 FROM channel_categories WHERE parent_id = $1)",
+        )
+        .bind(category_id)
+        .fetch_one(&state.db)
+        .await?;
+
+        if has_children {
+            return Err(CategoryError::Validation(
+                "Cannot make a category with subcategories into a subcategory".to_string(),
+            ));
         }
     }
 

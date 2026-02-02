@@ -1,6 +1,6 @@
 //! Integration tests for the message search system.
 //!
-//! These tests require a running PostgreSQL instance with the schema applied.
+//! These tests require a running `PostgreSQL` instance with the schema applied.
 //! Run with: `cargo test search --ignored -- --nocapture`
 
 use sqlx::PgPool;
@@ -22,15 +22,15 @@ async fn create_test_user(pool: &PgPool) -> Uuid {
     let username = format!("testuser_{}", &user_id.to_string()[..8]);
 
     sqlx::query(
-        r#"
+        r"
         INSERT INTO users (id, username, display_name, password_hash, email)
         VALUES ($1, $2, $3, 'fake_hash', $4)
-        "#,
+        ",
     )
     .bind(user_id)
     .bind(&username)
     .bind(&username)
-    .bind(format!("{}@test.com", username))
+    .bind(format!("{username}@test.com"))
     .execute(pool)
     .await
     .expect("Failed to create test user");
@@ -44,10 +44,10 @@ async fn create_test_guild(pool: &PgPool, owner_id: Uuid) -> Uuid {
     let guild_name = format!("Test Guild {}", &guild_id.to_string()[..8]);
 
     sqlx::query(
-        r#"
+        r"
         INSERT INTO guilds (id, name, owner_id)
         VALUES ($1, $2, $3)
-        "#,
+        ",
     )
     .bind(guild_id)
     .bind(&guild_name)
@@ -58,10 +58,10 @@ async fn create_test_guild(pool: &PgPool, owner_id: Uuid) -> Uuid {
 
     // Add owner as guild member
     sqlx::query(
-        r#"
+        r"
         INSERT INTO guild_members (guild_id, user_id)
         VALUES ($1, $2)
-        "#,
+        ",
     )
     .bind(guild_id)
     .bind(owner_id)
@@ -77,10 +77,10 @@ async fn create_test_channel(pool: &PgPool, guild_id: Uuid, name: &str) -> Uuid 
     let channel_id = Uuid::new_v4();
 
     sqlx::query(
-        r#"
+        r"
         INSERT INTO channels (id, guild_id, name, channel_type)
         VALUES ($1, $2, $3, 'text')
-        "#,
+        ",
     )
     .bind(channel_id)
     .bind(guild_id)
@@ -102,10 +102,10 @@ async fn create_test_message(
     let message_id = Uuid::new_v4();
 
     sqlx::query(
-        r#"
+        r"
         INSERT INTO messages (id, channel_id, user_id, content)
         VALUES ($1, $2, $3, $4)
-        "#,
+        ",
     )
     .bind(message_id)
     .bind(channel_id)
@@ -175,7 +175,7 @@ async fn test_search_messages_basic() {
 
     // Search for "test"
     let results: Vec<(Uuid, String)> = sqlx::query_as(
-        r#"
+        r"
         SELECT m.id, m.content
         FROM messages m
         JOIN channels c ON m.channel_id = c.id
@@ -183,7 +183,7 @@ async fn test_search_messages_basic() {
           AND m.deleted_at IS NULL
           AND m.content_search @@ websearch_to_tsquery('english', $2)
         ORDER BY m.created_at DESC
-        "#,
+        ",
     )
     .bind(guild_id)
     .bind("test")
@@ -209,14 +209,14 @@ async fn test_search_messages_no_results() {
 
     // Search for something that doesn't exist
     let results: Vec<(Uuid,)> = sqlx::query_as(
-        r#"
+        r"
         SELECT m.id
         FROM messages m
         JOIN channels c ON m.channel_id = c.id
         WHERE c.guild_id = $1
           AND m.deleted_at IS NULL
           AND m.content_search @@ websearch_to_tsquery('english', $2)
-        "#,
+        ",
     )
     .bind(guild_id)
     .bind("nonexistent")
@@ -243,14 +243,14 @@ async fn test_search_messages_pagination() {
             &pool,
             channel_id,
             user_id,
-            &format!("Test message number {}", i),
+            &format!("Test message number {i}"),
         )
         .await;
     }
 
     // Get first page (limit 5)
     let page1: Vec<(Uuid,)> = sqlx::query_as(
-        r#"
+        r"
         SELECT m.id
         FROM messages m
         JOIN channels c ON m.channel_id = c.id
@@ -259,7 +259,7 @@ async fn test_search_messages_pagination() {
           AND m.content_search @@ websearch_to_tsquery('english', $2)
         ORDER BY m.created_at DESC
         LIMIT $3 OFFSET $4
-        "#,
+        ",
     )
     .bind(guild_id)
     .bind("test")
@@ -273,7 +273,7 @@ async fn test_search_messages_pagination() {
 
     // Get second page
     let page2: Vec<(Uuid,)> = sqlx::query_as(
-        r#"
+        r"
         SELECT m.id
         FROM messages m
         JOIN channels c ON m.channel_id = c.id
@@ -282,7 +282,7 @@ async fn test_search_messages_pagination() {
           AND m.content_search @@ websearch_to_tsquery('english', $2)
         ORDER BY m.created_at DESC
         LIMIT $3 OFFSET $4
-        "#,
+        ",
     )
     .bind(guild_id)
     .bind("test")
@@ -317,7 +317,7 @@ async fn test_search_messages_count() {
 
     // Create messages
     for i in 0..15 {
-        create_test_message(&pool, channel_id, user_id, &format!("Test message {}", i)).await;
+        create_test_message(&pool, channel_id, user_id, &format!("Test message {i}")).await;
     }
     // Create some non-matching messages
     create_test_message(&pool, channel_id, user_id, "Hello world").await;
@@ -325,14 +325,14 @@ async fn test_search_messages_count() {
 
     // Count matching messages
     let count: (i64,) = sqlx::query_as(
-        r#"
+        r"
         SELECT COUNT(*)
         FROM messages m
         JOIN channels c ON m.channel_id = c.id
         WHERE c.guild_id = $1
           AND m.deleted_at IS NULL
           AND m.content_search @@ websearch_to_tsquery('english', $2)
-        "#,
+        ",
     )
     .bind(guild_id)
     .bind("test")
@@ -368,14 +368,14 @@ async fn test_search_excludes_deleted_messages() {
 
     // Search should only find the non-deleted message
     let results: Vec<(Uuid,)> = sqlx::query_as(
-        r#"
+        r"
         SELECT m.id
         FROM messages m
         JOIN channels c ON m.channel_id = c.id
         WHERE c.guild_id = $1
           AND m.deleted_at IS NULL
           AND m.content_search @@ websearch_to_tsquery('english', $2)
-        "#,
+        ",
     )
     .bind(guild_id)
     .bind("test")
@@ -411,14 +411,14 @@ async fn test_search_websearch_syntax() {
 
     // Search with AND (implicit in websearch_to_tsquery)
     let and_results: Vec<(Uuid,)> = sqlx::query_as(
-        r#"
+        r"
         SELECT m.id
         FROM messages m
         JOIN channels c ON m.channel_id = c.id
         WHERE c.guild_id = $1
           AND m.deleted_at IS NULL
           AND m.content_search @@ websearch_to_tsquery('english', $2)
-        "#,
+        ",
     )
     .bind(guild_id)
     .bind("quick brown")
@@ -430,14 +430,14 @@ async fn test_search_websearch_syntax() {
 
     // Search with OR
     let or_results: Vec<(Uuid,)> = sqlx::query_as(
-        r#"
+        r"
         SELECT m.id
         FROM messages m
         JOIN channels c ON m.channel_id = c.id
         WHERE c.guild_id = $1
           AND m.deleted_at IS NULL
           AND m.content_search @@ websearch_to_tsquery('english', $2)
-        "#,
+        ",
     )
     .bind(guild_id)
     .bind("quick OR lazy")

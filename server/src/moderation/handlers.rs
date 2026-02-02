@@ -72,9 +72,9 @@ pub async fn create_report(
 
     // Insert report (unique index will catch duplicates)
     let report = sqlx::query_as::<_, Report>(
-        r#"INSERT INTO user_reports (reporter_id, target_type, target_user_id, target_message_id, category, description)
+        r"INSERT INTO user_reports (reporter_id, target_type, target_user_id, target_message_id, category, description)
            VALUES ($1, $2, $3, $4, $5, $6)
-           RETURNING *"#,
+           RETURNING *",
     )
     .bind(auth.id)
     .bind(body.target_type)

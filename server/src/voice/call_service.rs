@@ -400,7 +400,7 @@ mod tests {
     fn test_error_debug_trait() {
         let err = CallError::CallNotFound;
         // Debug trait should be implemented
-        let debug_str = format!("{:?}", err);
+        let debug_str = format!("{err:?}");
         assert!(debug_str.contains("CallNotFound"));
     }
 }

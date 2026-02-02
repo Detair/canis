@@ -7,7 +7,7 @@ use vc_server::{
     permissions::GuildPermissions,
 };
 
-/// Test that users without MENTION_EVERYONE permission cannot use @everyone or @here.
+/// Test that users without `MENTION_EVERYONE` permission cannot use @everyone or @here.
 #[sqlx::test]
 async fn test_mention_everyone_blocked_without_permission(pool: PgPool) -> sqlx::Result<()> {
     // Create guild owner
@@ -84,7 +84,7 @@ async fn test_mention_everyone_blocked_without_permission(pool: PgPool) -> sqlx:
     Ok(())
 }
 
-/// Test that users with MENTION_EVERYONE permission can use @everyone and @here.
+/// Test that users with `MENTION_EVERYONE` permission can use @everyone and @here.
 #[sqlx::test]
 async fn test_mention_everyone_allowed_with_permission(pool: PgPool) -> sqlx::Result<()> {
     // Create test user
@@ -168,7 +168,7 @@ async fn test_mention_everyone_allowed_with_permission(pool: PgPool) -> sqlx::Re
     Ok(())
 }
 
-/// Test that guild owner always has MENTION_EVERYONE permission.
+/// Test that guild owner always has `MENTION_EVERYONE` permission.
 #[sqlx::test]
 async fn test_guild_owner_can_mention_everyone(pool: PgPool) -> sqlx::Result<()> {
     // Create test user

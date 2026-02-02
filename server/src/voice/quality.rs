@@ -197,8 +197,7 @@ mod tests {
         for quality in Quality::all() {
             assert!(
                 quality.target_bitrate() < quality.max_bitrate(),
-                "Target bitrate should be less than max for {:?}",
-                quality
+                "Target bitrate should be less than max for {quality:?}"
             );
         }
     }

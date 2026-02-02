@@ -390,7 +390,7 @@ fn test_google_preset_constants() {
 #[test]
 fn test_manager_creation() {
     let key = test_encryption_key();
-    let manager = OidcProviderManager::new(key.clone());
+    let manager = OidcProviderManager::new(key);
 
     // Manager should be created with the given key
     // Verify by encrypting and decrypting
@@ -640,15 +640,15 @@ async fn test_load_providers_from_database() {
 // Redirect URI Validation Tests (Unit tests - no database required)
 // ============================================================================
 
-/// These tests document which redirect_uri values the server's validation
+/// These tests document which `redirect_uri` values the server's validation
 /// accepts or rejects. The server uses `Url::parse()` + pattern matching on
 /// `(scheme(), host_str())` against `("http", Some("localhost" | "127.0.0.1"))`.
 ///
 /// We test the validation contract by examining URL host parsing behavior.
 /// The `url` crate's `Url::parse("http://X").host_str()` returns:
-///   - "localhost" for "http://localhost:1234/path"
-///   - "localhost.evil.com" for "http://localhost.evil.com" (NOT "localhost")
-///   - "evil.com" for "http://localhost@evil.com" (userinfo, NOT host)
+///   - "localhost" for "<http://localhost:1234/path>"
+///   - "localhost.evil.com" for "<http://localhost.evil.com>" (NOT "localhost")
+///   - "evil.com" for "<http://localhost@evil.com>" (userinfo, NOT host)
 
 #[test]
 fn test_redirect_uri_valid_patterns() {

@@ -418,6 +418,7 @@ pub async fn find_channel_by_id(pool: &PgPool, id: Uuid) -> sqlx::Result<Option<
 }
 
 /// Create a new channel.
+#[allow(clippy::too_many_arguments)]
 pub async fn create_channel(
     pool: &PgPool,
     name: &str,

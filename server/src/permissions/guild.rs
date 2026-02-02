@@ -473,8 +473,7 @@ mod tests {
             let perms = GuildPermissions::SEND_MESSAGES | forbidden;
             assert!(
                 !perms.validate_for_everyone(),
-                "{:?} should be forbidden for @everyone",
-                forbidden
+                "{forbidden:?} should be forbidden for @everyone"
             );
         }
     }
@@ -550,7 +549,7 @@ mod tests {
     #[test]
     fn test_debug_format() {
         let perms = GuildPermissions::SEND_MESSAGES | GuildPermissions::VOICE_CONNECT;
-        let debug_str = format!("{:?}", perms);
+        let debug_str = format!("{perms:?}");
 
         assert!(debug_str.contains("SEND_MESSAGES"));
         assert!(debug_str.contains("VOICE_CONNECT"));

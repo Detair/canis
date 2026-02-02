@@ -36,8 +36,7 @@ pub async fn send_friend_request(
     }
 
     // Check block in either direction via Redis cache
-    if let Ok(true) =
-        block_cache::is_blocked_either_direction(&state.redis, auth.id, target_id).await
+    if matches!(block_cache::is_blocked_either_direction(&state.redis, auth.id, target_id).await, Ok(true))
     {
         return Err(SocialError::Blocked);
     }

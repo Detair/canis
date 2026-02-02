@@ -113,8 +113,7 @@ mod tests {
             let name = perm.action_name();
             assert!(
                 name.chars().all(|c| c.is_ascii_lowercase() || c == '_'),
-                "Action name '{}' should be snake_case",
-                name
+                "Action name '{name}' should be snake_case"
             );
         }
     }
@@ -127,7 +126,7 @@ mod tests {
         for (i, name) in names.iter().enumerate() {
             for (j, other_name) in names.iter().enumerate() {
                 if i != j {
-                    assert_ne!(name, other_name, "Duplicate action name found: {}", name);
+                    assert_ne!(name, other_name, "Duplicate action name found: {name}");
                 }
             }
         }
@@ -243,8 +242,7 @@ mod tests {
             let desc = perm.description();
             assert!(
                 !desc.is_empty(),
-                "Description for {:?} should not be empty",
-                perm
+                "Description for {perm:?} should not be empty"
             );
         }
     }
@@ -259,7 +257,7 @@ mod tests {
     #[test]
     fn test_debug_format() {
         let perm = SystemPermission::GlobalBanUser;
-        let debug_str = format!("{:?}", perm);
+        let debug_str = format!("{perm:?}");
         assert_eq!(debug_str, "GlobalBanUser");
     }
 
@@ -304,8 +302,7 @@ mod tests {
             let json_str = json.trim_matches('"');
             assert!(
                 json_str.chars().all(|c| c.is_ascii_lowercase() || c == '_'),
-                "Serialized permission '{}' should be snake_case",
-                json_str
+                "Serialized permission '{json_str}' should be snake_case"
             );
         }
     }
@@ -334,8 +331,7 @@ mod tests {
             let expected = format!("\"{}\"", perm.action_name());
             assert_eq!(
                 json, expected,
-                "Serialized form should match action_name() for {:?}",
-                perm
+                "Serialized form should match action_name() for {perm:?}"
             );
         }
     }

@@ -129,10 +129,12 @@ fn test_claimed_prekey_fields() {
     let key_id = "test_key_1";
     let public_key = STANDARD.encode([1u8; 32]);
 
-    assert!(!key_id.is_empty());
-    assert!(!public_key.is_empty());
-    assert!(key_id.len() <= 64);
-    assert!(public_key.len() <= 64);
+    let key_len = key_id.len();
+    let pk_len = public_key.len();
+    assert!(key_len > 0);
+    assert!(pk_len > 0);
+    assert!(key_len <= 64);
+    assert!(pk_len <= 64);
 }
 
 // ============================================================================
@@ -236,7 +238,7 @@ fn generate_mock_identity_keys() -> (String, String) {
 fn generate_mock_prekeys(count: usize) -> Vec<(String, String)> {
     (0..count)
         .map(|i| {
-            let key_id = format!("prekey_{}", i);
+            let key_id = format!("prekey_{i}");
             let mut public_key_bytes = [0u8; 32];
             public_key_bytes[0] = i as u8;
             (key_id, STANDARD.encode(public_key_bytes))
@@ -790,7 +792,7 @@ async fn test_get_user_device_keys() {
              VALUES ($1, $2, $3, $4)",
         )
         .bind(user.id)
-        .bind(format!("Device {}", i))
+        .bind(format!("Device {i}"))
         .bind(&identity_ed25519)
         .bind(&identity_curve25519)
         .execute(&pool)

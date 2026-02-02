@@ -389,8 +389,8 @@ pub async fn create(
         .map_err(MessageError::Database)?;
 
         for &participant_id in &participants {
-            if participant_id != auth_user.id {
-                if block_cache::is_blocked_either_direction(
+            if participant_id != auth_user.id
+                && block_cache::is_blocked_either_direction(
                     &state.redis,
                     auth_user.id,
                     participant_id,
@@ -400,7 +400,6 @@ pub async fn create(
                 {
                     return Err(MessageError::Blocked);
                 }
-            }
         }
     }
 

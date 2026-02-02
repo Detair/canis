@@ -448,7 +448,7 @@ async fn handle_voice_stats(
     stats: VoiceStats,
 ) -> Result<(), VoiceError> {
     // Rate limit check
-    if let Err(_) = sfu.check_stats_rate_limit(user_id).await {
+    if sfu.check_stats_rate_limit(user_id).await.is_err() {
         warn!(user_id = %user_id, "User sent voice stats too frequently, dropping");
         return Ok(());
     }
@@ -492,6 +492,7 @@ async fn handle_voice_stats(
 const DEFAULT_MAX_SCREEN_SHARES: u32 = 2;
 
 /// Handle starting a screen share.
+#[allow(clippy::too_many_arguments)]
 async fn handle_screen_share_start(
     sfu: &Arc<SfuServer>,
     _pool: &PgPool, // Will be used for channel settings lookup

@@ -3,6 +3,7 @@
 //! Tests for the admin elevation system including:
 //! - Elevation request/approval flow
 //! - Elevation expiry after 15 minutes
+#![allow(clippy::items_after_statements)]
 //! - Elevation required for ban/suspend operations
 //! - Elevation cache behavior
 //!
@@ -111,7 +112,7 @@ fn test_elevation_expiry_calculation() {
 fn test_elevation_cache_key_format() {
     // Test the cache key format used for elevation status
     let user_id = Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap();
-    let cache_key = format!("admin:elevated:{}", user_id);
+    let cache_key = format!("admin:elevated:{user_id}");
 
     assert_eq!(
         cache_key,

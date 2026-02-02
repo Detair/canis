@@ -250,14 +250,13 @@ pub async fn join_call(
 
     // Check block status with other participants
     for &participant_id in &participants {
-        if participant_id != auth.id {
-            if block_cache::is_blocked_either_direction(&state.redis, auth.id, participant_id)
+        if participant_id != auth.id
+            && block_cache::is_blocked_either_direction(&state.redis, auth.id, participant_id)
                 .await
                 .unwrap_or(false)
             {
                 return Err(CallHandlerError::Blocked);
             }
-        }
     }
 
     let call_service = CallService::new(state.redis.clone());

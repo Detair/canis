@@ -24,11 +24,11 @@ pub async fn list_reports(
     let offset = query.offset.max(0);
 
     let reports = sqlx::query_as::<_, Report>(
-        r#"SELECT * FROM user_reports
+        r"SELECT * FROM user_reports
            WHERE ($1::report_status IS NULL OR status = $1)
              AND ($2::report_category IS NULL OR category = $2)
            ORDER BY created_at DESC
-           LIMIT $3 OFFSET $4"#,
+           LIMIT $3 OFFSET $4",
     )
     .bind(query.status)
     .bind(query.category)
@@ -38,9 +38,9 @@ pub async fn list_reports(
     .await?;
 
     let total: i64 = sqlx::query_scalar::<_, Option<i64>>(
-        r#"SELECT COUNT(*) FROM user_reports
+        r"SELECT COUNT(*) FROM user_reports
            WHERE ($1::report_status IS NULL OR status = $1)
-             AND ($2::report_category IS NULL OR category = $2)"#,
+             AND ($2::report_category IS NULL OR category = $2)",
     )
     .bind(query.status)
     .bind(query.category)
@@ -79,10 +79,10 @@ pub async fn claim_report(
     Path(report_id): Path<Uuid>,
 ) -> Result<Json<ReportResponse>, ReportError> {
     let report = sqlx::query_as::<_, Report>(
-        r#"UPDATE user_reports
+        r"UPDATE user_reports
            SET status = 'reviewing', assigned_admin_id = $2, updated_at = NOW()
            WHERE id = $1 AND status = 'pending'
-           RETURNING *"#,
+           RETURNING *",
     )
     .bind(report_id)
     .bind(elevated.user_id)
@@ -110,14 +110,14 @@ pub async fn resolve_report(
     }
 
     let report = sqlx::query_as::<_, Report>(
-        r#"UPDATE user_reports
+        r"UPDATE user_reports
            SET status = CASE WHEN $2 = 'dismissed' THEN 'dismissed'::report_status ELSE 'resolved'::report_status END,
                resolution_action = $2,
                resolution_note = $3,
                resolved_at = NOW(),
                updated_at = NOW()
            WHERE id = $1 AND status IN ('pending', 'reviewing')
-           RETURNING *"#,
+           RETURNING *",
     )
     .bind(report_id)
     .bind(&body.resolution_action)

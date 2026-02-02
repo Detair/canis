@@ -156,7 +156,7 @@ mod tests {
     fn test_activity_validation_empty_name() {
         let activity = Activity {
             activity_type: ActivityType::Game,
-            name: "".to_string(),
+            name: String::new(),
             started_at: Utc::now(),
             details: None,
         };

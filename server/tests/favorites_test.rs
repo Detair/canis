@@ -1,6 +1,6 @@
 //! Integration tests for the favorites system.
 //!
-//! These tests require a running PostgreSQL instance with the schema applied.
+//! These tests require a running `PostgreSQL` instance with the schema applied.
 //! Run with: `cargo test favorites --ignored -- --nocapture`
 
 use sqlx::PgPool;
@@ -22,15 +22,15 @@ async fn create_test_user(pool: &PgPool) -> Uuid {
     let username = format!("testuser_{}", &user_id.to_string()[..8]);
 
     sqlx::query(
-        r#"
+        r"
         INSERT INTO users (id, username, display_name, password_hash, email)
         VALUES ($1, $2, $3, 'fake_hash', $4)
-        "#,
+        ",
     )
     .bind(user_id)
     .bind(&username)
     .bind(&username)
-    .bind(format!("{}@test.com", username))
+    .bind(format!("{username}@test.com"))
     .execute(pool)
     .await
     .expect("Failed to create test user");
@@ -44,10 +44,10 @@ async fn create_test_guild(pool: &PgPool, owner_id: Uuid) -> Uuid {
     let guild_name = format!("Test Guild {}", &guild_id.to_string()[..8]);
 
     sqlx::query(
-        r#"
+        r"
         INSERT INTO guilds (id, name, owner_id)
         VALUES ($1, $2, $3)
-        "#,
+        ",
     )
     .bind(guild_id)
     .bind(&guild_name)
@@ -58,10 +58,10 @@ async fn create_test_guild(pool: &PgPool, owner_id: Uuid) -> Uuid {
 
     // Add owner as guild member
     sqlx::query(
-        r#"
+        r"
         INSERT INTO guild_members (guild_id, user_id)
         VALUES ($1, $2)
-        "#,
+        ",
     )
     .bind(guild_id)
     .bind(owner_id)
@@ -82,10 +82,10 @@ async fn create_test_channel(
     let channel_id = Uuid::new_v4();
 
     sqlx::query(
-        r#"
+        r"
         INSERT INTO channels (id, guild_id, name, channel_type)
         VALUES ($1, $2, $3, $4)
-        "#,
+        ",
     )
     .bind(channel_id)
     .bind(guild_id)
@@ -102,11 +102,11 @@ async fn create_test_channel(
 async fn add_favorite(pool: &PgPool, user_id: Uuid, guild_id: Uuid, channel_id: Uuid) {
     // First insert guild entry
     sqlx::query(
-        r#"
+        r"
         INSERT INTO user_favorite_guilds (user_id, guild_id, position)
         SELECT $1, $2, COALESCE((SELECT MAX(position) + 1 FROM user_favorite_guilds WHERE user_id = $1), 0)
         ON CONFLICT (user_id, guild_id) DO NOTHING
-        "#,
+        ",
     )
     .bind(user_id)
     .bind(guild_id)
@@ -116,10 +116,10 @@ async fn add_favorite(pool: &PgPool, user_id: Uuid, guild_id: Uuid, channel_id: 
 
     // Then insert channel entry
     sqlx::query(
-        r#"
+        r"
         INSERT INTO user_favorite_channels (user_id, channel_id, guild_id, position)
         VALUES ($1, $2, $3, COALESCE((SELECT MAX(position) + 1 FROM user_favorite_channels WHERE user_id = $1 AND guild_id = $3), 0))
-        "#,
+        ",
     )
     .bind(user_id)
     .bind(channel_id)

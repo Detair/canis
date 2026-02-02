@@ -63,8 +63,7 @@ fn test_everyone_role_validation_logic() {
         // Assert it fails validation
         assert!(
             !perms.validate_for_everyone(),
-            "Permission {:?} should be forbidden for @everyone",
-            perm
+            "Permission {perm:?} should be forbidden for @everyone"
         );
     }
 

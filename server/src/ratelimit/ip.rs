@@ -129,7 +129,7 @@ mod tests {
     fn test_extract_client_ip_fallback_to_localhost() {
         let headers = HeaderMap::new();
         let ip = extract_client_ip(&headers, None, false);
-        assert_eq!(ip, IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)));
+        assert_eq!(ip, IpAddr::V4(Ipv4Addr::LOCALHOST));
     }
 
     #[test]

@@ -477,7 +477,7 @@ mod tests {
 
         for (error, expected) in test_cases {
             let json = serde_json::to_string(&error).unwrap();
-            assert_eq!(json, format!("\"{}\"", expected));
+            assert_eq!(json, format!("\"{expected}\""));
         }
     }
 
@@ -528,8 +528,7 @@ mod tests {
 
         for (quality_str, expected_quality) in qualities.iter().zip(expected.iter()) {
             let json = format!(
-                r#"{{"quality":"{}","has_audio":false,"source_label":"test"}}"#,
-                quality_str
+                r#"{{"quality":"{quality_str}","has_audio":false,"source_label":"test"}}"#
             );
             let req: ScreenShareStartRequest = serde_json::from_str(&json).unwrap();
             assert_eq!(req.quality, *expected_quality);

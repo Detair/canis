@@ -262,8 +262,7 @@ async fn test_failed_auth_blocks_ip_after_threshold() {
     );
 
     println!(
-        "Failed auth test passed: IP blocked after 3 failures, TTL = {:?}s",
-        ttl
+        "Failed auth test passed: IP blocked after 3 failures, TTL = {ttl:?}s"
     );
 }
 
@@ -632,18 +631,15 @@ async fn test_concurrent_requests_are_atomic() {
     // Exactly 10 should be allowed (the limit)
     assert_eq!(
         allowed_count, 10,
-        "Exactly 10 requests should be allowed (got {})",
-        allowed_count
+        "Exactly 10 requests should be allowed (got {allowed_count})"
     );
     assert_eq!(
         blocked_count, 10,
-        "Exactly 10 requests should be blocked (got {})",
-        blocked_count
+        "Exactly 10 requests should be blocked (got {blocked_count})"
     );
 
     println!(
-        "Concurrent requests test passed: {} allowed, {} blocked",
-        allowed_count, blocked_count
+        "Concurrent requests test passed: {allowed_count} allowed, {blocked_count} blocked"
     );
 }
 
@@ -651,7 +647,7 @@ async fn test_concurrent_requests_are_atomic() {
 ///
 /// This verifies that the failed auth Lua script correctly handles concurrent
 /// requests without race conditions. The IP should be blocked after exactly
-/// max_failures attempts.
+/// `max_failures` attempts.
 #[tokio::test]
 #[ignore] // Requires Redis
 async fn test_concurrent_failed_auth_is_atomic() {
@@ -707,8 +703,7 @@ async fn test_concurrent_failed_auth_is_atomic() {
     // At least 6 should report blocked (those that pushed count to >= 5)
     assert!(
         blocked_count >= 6,
-        "At least 6 requests should report blocked (got {})",
-        blocked_count
+        "At least 6 requests should report blocked (got {blocked_count})"
     );
 
     // IP should definitely be blocked now
@@ -716,12 +711,11 @@ async fn test_concurrent_failed_auth_is_atomic() {
     assert!(blocked, "IP should be blocked after concurrent failures");
 
     println!(
-        "Concurrent failed auth test passed: {} reported blocked, IP is blocked",
-        blocked_count
+        "Concurrent failed auth test passed: {blocked_count} reported blocked, IP is blocked"
     );
 }
 
-/// Test that rate limit response includes correct reset_at timestamp.
+/// Test that rate limit response includes correct `reset_at` timestamp.
 #[tokio::test]
 #[ignore] // Requires Redis
 async fn test_reset_at_is_in_future() {
@@ -786,13 +780,11 @@ async fn test_all_categories_work() {
 
         assert!(
             result.allowed,
-            "First request for {:?} should be allowed",
-            category
+            "First request for {category:?} should be allowed"
         );
         assert!(
             result.limit > 0,
-            "Limit for {:?} should be positive",
-            category
+            "Limit for {category:?} should be positive"
         );
     }
 

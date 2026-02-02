@@ -19,7 +19,7 @@ pub struct ServerSettingsResponse {
     pub oidc_providers: Vec<PublicOidcProvider>,
     /// Which auth methods are enabled.
     pub auth_methods: AuthMethodsConfig,
-    /// Registration policy: "open", "invite_only", or "closed".
+    /// Registration policy: "open", "`invite_only`", or "closed".
     pub registration_policy: String,
 }
 

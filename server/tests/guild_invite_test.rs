@@ -59,8 +59,7 @@ fn test_invite_code_uniqueness() {
     for code in &codes {
         assert!(
             seen.insert(code.clone()),
-            "Code collision detected: {}",
-            code
+            "Code collision detected: {code}"
         );
     }
 }
@@ -74,8 +73,7 @@ fn test_invite_code_charset() {
         let ch = c as char;
         assert!(
             ch.is_ascii_alphanumeric(),
-            "Non-alphanumeric character in charset: {}",
-            ch
+            "Non-alphanumeric character in charset: {ch}"
         );
     }
 

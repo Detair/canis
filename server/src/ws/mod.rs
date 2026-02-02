@@ -1173,7 +1173,7 @@ async fn handle_client_message(
 
             // Update state for rate limiting and deduplication
             activity_state.last_update = Some(now);
-            activity_state.last_activity = activity.clone();
+            activity.clone_into(&mut activity_state.last_activity);
 
             // Broadcast to user's presence subscribers
             let event = ServerEvent::RichPresenceUpdate { user_id, activity };
@@ -1207,6 +1207,7 @@ async fn handle_client_message(
 }
 
 /// Handle Redis pub/sub messages.
+#[allow(clippy::too_many_arguments)]
 async fn handle_pubsub(
     redis: Client,
     tx: mpsc::Sender<ServerEvent>,
@@ -1319,11 +1320,10 @@ async fn handle_pubsub(
                                 _ => false,
                             };
 
-                            if !should_filter {
-                                if tx.send(event).await.is_err() {
+                            if !should_filter
+                                && tx.send(event).await.is_err() {
                                     break;
                                 }
-                            }
                         }
                     }
                 }
@@ -1381,11 +1381,10 @@ async fn handle_pubsub(
                         _ => false,
                     };
 
-                    if !should_filter {
-                        if tx.send(event).await.is_err() {
+                    if !should_filter
+                        && tx.send(event).await.is_err() {
                             break;
                         }
-                    }
                 }
             }
         }

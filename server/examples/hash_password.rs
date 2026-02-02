@@ -13,5 +13,5 @@ fn main() {
         .hash_password(password.as_bytes(), &salt)
         .expect("Failed to hash password")
         .to_string();
-    println!("{}", hash);
+    println!("{hash}");
 }

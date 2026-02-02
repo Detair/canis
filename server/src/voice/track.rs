@@ -182,6 +182,50 @@ impl Default for TrackRouter {
     }
 }
 
+/// Spawn a task to read RTP packets from a track and forward them.
+pub fn spawn_rtp_forwarder(
+    source_user_id: Uuid,
+    source_type: TrackSource,
+    track: Arc<TrackRemote>,
+    router: Arc<TrackRouter>,
+) {
+    tokio::spawn(async move {
+        let mut buf = vec![0u8; 1500]; // MTU size
+
+        loop {
+            match track.read(&mut buf).await {
+                Ok((packet, _attributes)) => {
+                    // Forward the RTP packet to all subscribers
+                    router
+                        .forward_rtp(source_user_id, source_type, &packet)
+                        .await;
+                }
+                Err(e) => {
+                    debug!(
+                        source = %source_user_id,
+                        source_type = ?source_type,
+                        error = %e,
+                        "Track read ended"
+                    );
+                    break;
+                }
+            }
+        }
+
+        // Clean up this specific track when it ends
+        // We can't use remove_source because that removes ALL tracks for the user
+        // We need a way to remove just this track from subscriptions?
+        // Actually, remove_source is fine if the user disconnects, but if they just stop screen sharing?
+        // We should probably just let the subscriptions stick around or clean them up specifically.
+        // For now, let's just log. The Peer cleanup handles the main removal.
+        debug!(
+             source = %source_user_id,
+             source_type = ?source_type,
+             "RTP forwarder stopped"
+        );
+    });
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -363,48 +407,4 @@ mod tests {
             handle.await.unwrap();
         }
     }
-}
-
-/// Spawn a task to read RTP packets from a track and forward them.
-pub fn spawn_rtp_forwarder(
-    source_user_id: Uuid,
-    source_type: TrackSource,
-    track: Arc<TrackRemote>,
-    router: Arc<TrackRouter>,
-) {
-    tokio::spawn(async move {
-        let mut buf = vec![0u8; 1500]; // MTU size
-
-        loop {
-            match track.read(&mut buf).await {
-                Ok((packet, _attributes)) => {
-                    // Forward the RTP packet to all subscribers
-                    router
-                        .forward_rtp(source_user_id, source_type, &packet)
-                        .await;
-                }
-                Err(e) => {
-                    debug!(
-                        source = %source_user_id,
-                        source_type = ?source_type,
-                        error = %e,
-                        "Track read ended"
-                    );
-                    break;
-                }
-            }
-        }
-
-        // Clean up this specific track when it ends
-        // We can't use remove_source because that removes ALL tracks for the user
-        // We need a way to remove just this track from subscriptions?
-        // Actually, remove_source is fine if the user disconnects, but if they just stop screen sharing?
-        // We should probably just let the subscriptions stick around or clean them up specifically.
-        // For now, let's just log. The Peer cleanup handles the main removal.
-        debug!(
-             source = %source_user_id,
-             source_type = ?source_type,
-             "RTP forwarder stopped"
-        );
-    });
 }

@@ -2,6 +2,7 @@
 //!
 //! Provides `TestApp` for building and sending requests through the full axum router,
 //! plus utilities for user creation, admin grants, and JWT generation.
+#![allow(dead_code)]
 
 use axum::{
     body::Body,

@@ -2,7 +2,7 @@
 //!
 //! Unit tests for config parsing and response structures.
 
-/// Test that REQUIRE_E2EE_SETUP parses correctly from environment.
+/// Test that `REQUIRE_E2EE_SETUP` parses correctly from environment.
 #[test]
 fn test_require_e2ee_setup_parsing_true() {
     // Test "true" value
@@ -28,7 +28,7 @@ fn test_require_e2ee_setup_parsing_false() {
     assert!(!parse_require_e2ee("random"));
 }
 
-/// Helper to parse the REQUIRE_E2EE_SETUP value the same way config.rs does.
+/// Helper to parse the `REQUIRE_E2EE_SETUP` value the same way config.rs does.
 fn parse_require_e2ee(value: &str) -> bool {
     value.to_lowercase() == "true" || value == "1"
 }
@@ -79,7 +79,7 @@ fn test_server_settings_response() {
     assert!(!settings_optional.oidc_enabled);
 }
 
-/// Test struct matching the actual ServerSettingsResponse.
+/// Test struct matching the actual `ServerSettingsResponse`.
 struct ServerSettingsTest {
     require_e2ee_setup: bool,
     oidc_enabled: bool,
@@ -89,9 +89,9 @@ struct ServerSettingsTest {
 #[test]
 fn test_backup_salt_validation() {
     // Salt must be exactly 16 bytes
-    let valid_salt = vec![0u8; 16];
-    let invalid_salt_short = vec![0u8; 15];
-    let invalid_salt_long = vec![0u8; 17];
+    let valid_salt = [0u8; 16];
+    let invalid_salt_short = [0u8; 15];
+    let invalid_salt_long = [0u8; 17];
 
     assert_eq!(valid_salt.len(), 16);
     assert_ne!(invalid_salt_short.len(), 16);
@@ -101,9 +101,9 @@ fn test_backup_salt_validation() {
 #[test]
 fn test_backup_nonce_validation() {
     // Nonce must be exactly 12 bytes
-    let valid_nonce = vec![0u8; 12];
-    let invalid_nonce_short = vec![0u8; 11];
-    let invalid_nonce_long = vec![0u8; 13];
+    let valid_nonce = [0u8; 12];
+    let invalid_nonce_short = [0u8; 11];
+    let invalid_nonce_long = [0u8; 13];
 
     assert_eq!(valid_nonce.len(), 12);
     assert_ne!(invalid_nonce_short.len(), 12);

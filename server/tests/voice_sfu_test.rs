@@ -262,10 +262,10 @@ async fn test_room_multiple_screen_shares() {
     for (i, quality) in qualities.iter().enumerate() {
         let share_info = ScreenShareInfo {
             user_id: Uuid::new_v4(),
-            username: format!("user{}", i),
-            source_label: format!("Display {}", i),
+            username: format!("user{i}"),
+            source_label: format!("Display {i}"),
             has_audio: false,
-            quality: quality.clone(),
+            quality: *quality,
         };
         room.add_screen_share(share_info).await;
     }
@@ -421,8 +421,8 @@ async fn test_screen_share_limit_per_channel() {
     for i in 0..max_screen_shares {
         let share = ScreenShareInfo {
             user_id: Uuid::new_v4(),
-            username: format!("user{}", i),
-            source_label: format!("Display {}", i),
+            username: format!("user{i}"),
+            source_label: format!("Display {i}"),
             has_audio: false,
             quality: Quality::Medium,
         };

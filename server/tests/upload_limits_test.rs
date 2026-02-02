@@ -15,7 +15,7 @@
 //! - Authorization checks before size validation
 //! - Middleware interaction with handlers
 //!
-//! **TODO:** Add HTTP-level integration tests using axum::test or similar to:
+//! **TODO:** Add HTTP-level integration tests using `axum::test` or similar to:
 //! 1. POST oversized files to /auth/me/avatar and verify 413 + error format
 //! 2. Test unauthenticated upload attempts return 401 (not 413)
 //! 3. Test guild membership checks run before size validation
@@ -142,7 +142,7 @@ async fn test_emoji_size_validation_logic() {
     pool.close().await;
 }
 
-/// Test that avatar validation uses correct config field (max_avatar_size, not max_upload_size)
+/// Test that avatar validation uses correct config field (`max_avatar_size`, not `max_upload_size`)
 #[tokio::test]
 #[serial]
 async fn test_avatar_uses_avatar_limit_not_attachment_limit() {
@@ -193,7 +193,7 @@ async fn test_dm_icon_uses_avatar_limit_not_attachment_limit() {
     pool.close().await;
 }
 
-/// Test that emoji validation uses correct config field (max_emoji_size)
+/// Test that emoji validation uses correct config field (`max_emoji_size`)
 #[tokio::test]
 #[serial]
 async fn test_emoji_uses_emoji_limit_not_attachment_limit() {
@@ -346,15 +346,15 @@ fn test_config_default_upload_limits_are_sensible() {
 ///
 /// This test serves as documentation for how size validation should work
 /// when proper HTTP integration tests are added. It shows:
-/// 1. The validation happens on data.len() after multipart parsing
-/// 2. The check is: if data.len() > max_size { reject }
+/// 1. The validation happens on `data.len()` after multipart parsing
+/// 2. The check is: if `data.len()` > `max_size` { reject }
 /// 3. This means files exactly at the limit are accepted
 ///
 /// Future HTTP tests should:
 /// - Create actual multipart/form-data requests
 /// - Send to POST /auth/me/avatar, POST /api/guilds/{id}/emojis, etc.
 /// - Verify HTTP 413 Payload Too Large status
-/// - Check error response format: { "error": "...", "message": "...", "max_size_bytes": ... }
+/// - Check error response format: { "error": "...", "message": "...", "`max_size_bytes"`: ... }
 /// - Test authorization (401) takes precedence over size validation (413)
 #[test]
 fn test_validation_pattern_documentation() {

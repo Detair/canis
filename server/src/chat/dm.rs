@@ -303,8 +303,8 @@ pub async fn create_dm(
     }
 
     // For 1:1 DMs, check if either user has blocked the other
-    if body.participant_ids.len() == 1 {
-        if block_cache::is_blocked_either_direction(&state.redis, auth.id, body.participant_ids[0])
+    if body.participant_ids.len() == 1
+        && block_cache::is_blocked_either_direction(&state.redis, auth.id, body.participant_ids[0])
             .await
             .unwrap_or(false)
         {
@@ -312,7 +312,6 @@ pub async fn create_dm(
                 "Cannot create DM with this user".to_string(),
             ));
         }
-    }
 
     let channel = if body.participant_ids.len() == 1 {
         // 1:1 DM

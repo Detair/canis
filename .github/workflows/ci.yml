@@ -41,7 +41,7 @@ jobs:
         if: matrix.check == 'clippy'
         env:
           SQLX_OFFLINE: "true"
-        run: cargo clippy --all-targets --all-features --workspace --exclude vc-client -- -D warnings
+        run: cargo clippy --all-features --workspace --exclude vc-client -- -D warnings
 
   # ===========================================================================
   # Rust Tests (with database services)

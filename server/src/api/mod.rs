@@ -68,6 +68,7 @@ pub struct AppState {
 impl AppState {
     /// Create new application state.
     #[must_use]
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         db: PgPool,
         redis: fred::clients::Client,

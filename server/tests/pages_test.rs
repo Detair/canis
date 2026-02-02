@@ -1,6 +1,6 @@
 //! Integration tests for the information pages system.
 //!
-//! These tests require a running PostgreSQL instance.
+//! These tests require a running `PostgreSQL` instance.
 //! Run with: `cargo test pages --ignored -- --nocapture`
 
 use chrono::Utc;
@@ -23,7 +23,7 @@ async fn create_test_pool() -> PgPool {
 
 /// Helper to create a unique test slug.
 fn test_slug() -> String {
-    format!("test-page-{}", Uuid::new_v4().to_string()[..8].to_string())
+    format!("test-page-{}", &Uuid::new_v4().to_string()[..8])
 }
 
 /// Test that content hashing produces consistent results.
@@ -102,7 +102,7 @@ async fn test_count_platform_pages() {
         .expect("Failed to count platform pages");
 
     assert!(count >= 0, "Count should be non-negative");
-    println!("Platform pages count: {}", count);
+    println!("Platform pages count: {count}");
 }
 
 /// Test page count for guild pages.
@@ -118,7 +118,7 @@ async fn test_count_guild_pages() {
         .expect("Failed to count guild pages");
 
     assert_eq!(count, 0, "Non-existent guild should have 0 pages");
-    println!("Guild pages count for random guild: {}", count);
+    println!("Guild pages count for random guild: {count}");
 }
 
 /// Test slug existence check for non-existent slug.
@@ -135,7 +135,7 @@ async fn test_slug_not_exists() {
     assert!(!exists, "Random slug should not exist");
 }
 
-/// Test CreatePageRequest validation.
+/// Test `CreatePageRequest` validation.
 #[test]
 fn test_create_page_request_structure() {
     let request = CreatePageRequest {
@@ -150,7 +150,7 @@ fn test_create_page_request_structure() {
     assert_eq!(request.requires_acceptance, Some(false));
 }
 
-/// Test UpdatePageRequest validation.
+/// Test `UpdatePageRequest` validation.
 #[test]
 fn test_update_page_request_structure() {
     let request = UpdatePageRequest {
@@ -165,7 +165,7 @@ fn test_update_page_request_structure() {
     assert_eq!(request.requires_acceptance, Some(true));
 }
 
-/// Test PageListItem structure.
+/// Test `PageListItem` structure.
 #[test]
 fn test_page_list_item_structure() {
     let now = Utc::now();
@@ -237,22 +237,18 @@ fn test_slugify_no_leading_trailing_dashes() {
 #[test]
 fn test_max_pages_constant() {
     use vc_server::pages::MAX_PAGES_PER_SCOPE;
-    assert!(MAX_PAGES_PER_SCOPE >= 10, "Should allow at least 10 pages");
-    assert!(
-        MAX_PAGES_PER_SCOPE <= 1000,
-        "Should not allow more than 1000 pages"
-    );
+    let max = MAX_PAGES_PER_SCOPE;
+    assert!(max >= 10, "Should allow at least 10 pages");
+    assert!(max <= 1000, "Should not allow more than 1000 pages");
 }
 
 /// Test that max content size constant is reasonable.
 #[test]
 fn test_max_content_size_constant() {
     use vc_server::pages::MAX_CONTENT_SIZE;
-    assert!(MAX_CONTENT_SIZE >= 1024, "Should allow at least 1KB");
-    assert!(
-        MAX_CONTENT_SIZE <= 1024 * 1024,
-        "Should not allow more than 1MB"
-    );
+    let max = MAX_CONTENT_SIZE;
+    assert!(max >= 1024, "Should allow at least 1KB");
+    assert!(max <= 1024 * 1024, "Should not allow more than 1MB");
 }
 
 /// Test reserved slugs constant contains expected values.
