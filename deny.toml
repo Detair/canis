@@ -11,7 +11,12 @@ all-features = true
 [advisories]
 yanked = "deny"
 unmaintained = "workspace"
-ignore = []
+ignore = [
+    # openh264-sys2 heap overflow - only affects vc-client, fix requires major version bump
+    "RUSTSEC-2025-0008",
+    # rsa crate Marvin Attack - no safe upgrade available, used by openidconnect
+    "RUSTSEC-2023-0071",
+]
 
 # =============================================================================
 # Licenses - Only allow permissive licenses
