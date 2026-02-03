@@ -363,8 +363,7 @@ async fn test_websocket_subscribe_denied_without_permission() {
     let ctx = PermissionTestContext::setup().await;
 
     let (tx, mut rx) = mpsc::channel(10);
-    let subscribed_channels =
-        Arc::new(tokio::sync::RwLock::new(std::collections::HashSet::new()));
+    let subscribed_channels = Arc::new(tokio::sync::RwLock::new(std::collections::HashSet::new()));
     let admin_subscribed = Arc::new(tokio::sync::RwLock::new(false));
     let mut activity_state = vc_server::ws::ActivityState::default();
 
@@ -420,8 +419,7 @@ async fn test_websocket_subscribe_allowed_with_permission() {
     let ctx = PermissionTestContext::setup().await;
 
     let (tx, mut rx) = mpsc::channel(10);
-    let subscribed_channels =
-        Arc::new(tokio::sync::RwLock::new(std::collections::HashSet::new()));
+    let subscribed_channels = Arc::new(tokio::sync::RwLock::new(std::collections::HashSet::new()));
     let admin_subscribed = Arc::new(tokio::sync::RwLock::new(false));
     let mut activity_state = vc_server::ws::ActivityState::default();
 
@@ -475,8 +473,7 @@ async fn test_websocket_subscribe_owner_bypass() {
     let ctx = PermissionTestContext::setup().await;
 
     let (tx, mut rx) = mpsc::channel(10);
-    let subscribed_channels =
-        Arc::new(tokio::sync::RwLock::new(std::collections::HashSet::new()));
+    let subscribed_channels = Arc::new(tokio::sync::RwLock::new(std::collections::HashSet::new()));
     let admin_subscribed = Arc::new(tokio::sync::RwLock::new(false));
     let mut activity_state = vc_server::ws::ActivityState::default();
 
