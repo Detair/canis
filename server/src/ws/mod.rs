@@ -1320,10 +1320,9 @@ async fn handle_pubsub(
                                 _ => false,
                             };
 
-                            if !should_filter
-                                && tx.send(event).await.is_err() {
-                                    break;
-                                }
+                            if !should_filter && tx.send(event).await.is_err() {
+                                break;
+                            }
                         }
                     }
                 }
@@ -1381,10 +1380,9 @@ async fn handle_pubsub(
                         _ => false,
                     };
 
-                    if !should_filter
-                        && tx.send(event).await.is_err() {
-                            break;
-                        }
+                    if !should_filter && tx.send(event).await.is_err() {
+                        break;
+                    }
                 }
             }
         }
