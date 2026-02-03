@@ -1042,6 +1042,7 @@ async fn handle_socket(socket: WebSocket, state: AppState, user_id: Uuid) {
 /// Handle a client message.
 ///
 /// **Internal:** Exposed for integration tests only.
+#[allow(clippy::implicit_hasher)]
 pub async fn handle_client_message(
     text: &str,
     user_id: Uuid,
