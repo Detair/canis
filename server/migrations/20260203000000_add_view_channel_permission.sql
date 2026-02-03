@@ -14,18 +14,16 @@
 -- Security Note: This migration is idempotent (uses bitwise OR) and can be run multiple times safely.
 
 -- Add VIEW_CHANNEL (bit 24 = 1 << 24 = 16777216) to all guild roles
-UPDATE roles
-SET permissions = permissions | (1::bigint << 24)
-WHERE guild_id IS NOT NULL;
+UPDATE guild_roles
+SET permissions = permissions | (1::bigint << 24);
 
--- Ensure @everyone role in all guilds has VIEW_CHANNEL
--- (This is redundant with the above but explicit for clarity)
-UPDATE roles
-SET permissions = permissions | (1::bigint << 24)
-WHERE name = '@everyone';
+-- Note: All guild_roles receive VIEW_CHANNEL for backward compatibility
+-- Guild admins can then opt-in to restricting channel visibility by:
+-- 1. Removing VIEW_CHANNEL from specific roles
+-- 2. Using channel-specific permission overrides
 
 -- Migration Notes:
--- - This migration does NOT add VIEW_CHANNEL to system-level roles (where guild_id IS NULL)
--- - To rollback: UPDATE roles SET permissions = permissions & ~(1::bigint << 24)
+-- - Updates guild_roles table (not the system-level roles table)
+-- - To rollback: UPDATE guild_roles SET permissions = permissions & ~(1::bigint << 24)
 -- - Expected execution time: <1 second for 1000 guilds
 -- - No data loss occurs if this migration is rolled back
