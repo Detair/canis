@@ -21,6 +21,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed stale scripts (resume-session.sh, update-deps.sh)
 
 ### Added
+- PostgreSQL native full-text search for guild messages
+  - Backend: tsvector column with GIN index for fast full-text search using `websearch_to_tsquery`
+  - Backend: Guild-scoped search API with permission validation and pagination (`GET /api/guilds/:id/search`)
+  - Backend: Bulk user/channel lookup optimization to prevent N+1 queries
+  - Frontend: Search panel overlay with debounced input (300ms) and XSS-safe result highlighting
+  - Frontend: Click-to-navigate to messages with highlight parameter support
+  - Migration: `content_search` generated column with automatic updates on message edits
 - Absolute user blocking with server-side enforcement
   - Block/unblock via context menu with confirmation modal
   - Blocked users cannot send DMs, friend requests, or initiate calls
