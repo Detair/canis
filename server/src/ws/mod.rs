@@ -1338,11 +1338,11 @@ async fn handle_pubsub(
                                         .and_then(|id| id.as_str())
                                         .and_then(|id| Uuid::parse_str(id).ok())
                                         .is_some_and(|author_id| {
-                                            // Use try_read to avoid deadlocks in hot path
+                                            // Block check must not fail open
+                                            // Use blocking_read since we're in a sync closure within async context
                                             blocked_users
-                                                .try_read()
-                                                .map(|set| set.contains(&author_id))
-                                                .unwrap_or(false)
+                                                .blocking_read()
+                                                .contains(&author_id)
                                         })
                                 }
                                 ServerEvent::TypingStart { user_id: uid, .. }
@@ -1351,10 +1351,11 @@ async fn handle_pubsub(
                                 | ServerEvent::VoiceUserLeft { user_id: uid, .. }
                                 | ServerEvent::CallParticipantJoined { user_id: uid, .. }
                                 | ServerEvent::CallParticipantLeft { user_id: uid, .. } => {
+                                    // Block check must not fail open
+                                    // Use blocking_read since we're in a sync closure within async context
                                     blocked_users
-                                        .try_read()
-                                        .map(|set| set.contains(uid))
-                                        .unwrap_or(false)
+                                        .blocking_read()
+                                        .contains(uid)
                                 }
                                 _ => false,
                             };
@@ -1412,10 +1413,11 @@ async fn handle_pubsub(
                 if let Ok(event) = serde_json::from_str::<ServerEvent>(&payload) {
                     let should_filter = match &event {
                         ServerEvent::PresenceUpdate { user_id: uid, .. }
-                        | ServerEvent::RichPresenceUpdate { user_id: uid, .. } => blocked_users
-                            .try_read()
-                            .map(|set| set.contains(uid))
-                            .unwrap_or(false),
+                        | ServerEvent::RichPresenceUpdate { user_id: uid, .. } => {
+                            // Block check must not fail open
+                            // Use blocking_read since we're in a sync closure within async context
+                            blocked_users.blocking_read().contains(uid)
+                        }
                         _ => false,
                     };
 
