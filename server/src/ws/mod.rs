@@ -1340,9 +1340,7 @@ async fn handle_pubsub(
                                         .is_some_and(|author_id| {
                                             // Block check must not fail open
                                             // Use blocking_read since we're in a sync closure within async context
-                                            blocked_users
-                                                .blocking_read()
-                                                .contains(&author_id)
+                                            blocked_users.blocking_read().contains(&author_id)
                                         })
                                 }
                                 ServerEvent::TypingStart { user_id: uid, .. }
@@ -1353,9 +1351,7 @@ async fn handle_pubsub(
                                 | ServerEvent::CallParticipantLeft { user_id: uid, .. } => {
                                     // Block check must not fail open
                                     // Use blocking_read since we're in a sync closure within async context
-                                    blocked_users
-                                        .blocking_read()
-                                        .contains(uid)
+                                    blocked_users.blocking_read().contains(uid)
                                 }
                                 _ => false,
                             };

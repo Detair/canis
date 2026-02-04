@@ -29,6 +29,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Comprehensive integration tests (18 tests covering all permission scenarios)
   - Detailed documentation with mermaid diagrams (docs/features/channel-permissions.md)
 
+### Added
+- New `BLOCK_CHECK_FAIL_OPEN` configuration option for Redis block check behavior
+  - When false (default, recommended): Block checks fail-closed, rejecting DMs/calls if Redis is unavailable (secure default)
+  - When true: Block checks fail-open, allowing actions if Redis is unavailable (prioritizes availability over security)
+  - Affects DM creation, DM message sending, call initiation, and call joining
+  - Provides explicit control over availability vs security tradeoff during Redis outages
+
 ### Changed
 - Documentation audit and cleanup
   - Updated all version numbers in standards.md to match actual dependencies

@@ -411,7 +411,7 @@ pub async fn create(
                     participant_id,
                 )
                 .await
-                .unwrap_or(false)
+                .unwrap_or(!state.config.block_check_fail_open)
             {
                 return Err(MessageError::Blocked);
             }
