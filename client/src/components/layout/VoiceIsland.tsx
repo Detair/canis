@@ -266,15 +266,15 @@ const VoiceIsland: Component = () => {
       onMouseDown={handleMouseDown}
     >
       {/* Drag Handle */}
-      <div class="text-text-secondary/40 hover:text-text-secondary transition-colors cursor-grab active:cursor-grabbing">
+      <div class="text-text-secondary/60 hover:text-text-secondary transition-colors cursor-grab active:cursor-grabbing">
         <GripVertical class="w-4 h-4" />
       </div>
 
       {/* Connection Status Indicator */}
       <div class="flex items-center gap-2">
-        {/* Connection dot - only pulses when speaking */}
+        {/* Connection dot - subtle glow when idle, pulses when speaking */}
         <div
-          class="w-2 h-2 bg-accent-primary rounded-full"
+          class="w-2.5 h-2.5 bg-accent-success rounded-full shadow-[0_0_4px_rgba(163,190,140,0.6)]"
           classList={{
             "animate-pulse": voiceState.speaking,
           }}
@@ -371,7 +371,7 @@ const VoiceIsland: Component = () => {
 
         {/* Disconnect */}
         <button
-          class="w-10 h-10 flex items-center justify-center rounded-full bg-accent-danger/20 text-accent-danger transition-all duration-200 hover:bg-accent-danger hover:text-white"
+          class="w-10 h-10 flex items-center justify-center rounded-full bg-accent-danger/40 text-white transition-all duration-200 hover:bg-accent-danger hover:text-white hover:shadow-[0_0_12px_rgba(191,97,106,0.5)]"
           onClick={disconnect}
           title="Disconnect"
         >

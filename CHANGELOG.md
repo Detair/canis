@@ -19,6 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Drops messages far from viewport, re-fetches on scroll back
 
 ### Fixed
+- Voice island visibility and contrast issues (#151)
+  - Disconnect button now uses higher contrast background and white icon for better visibility
+  - Drag handle opacity increased from 40% to 60%
+  - Connection status dot enlarged and changed to green with subtle glow
+  - Quality indicator now uses theme colors instead of hardcoded values
 - Potential message loss when WebSocket message arrives during pagination load
   - `addMessage` now re-reads store state after async decryption to avoid overwriting concurrent prepends
 - File attachment uploads in text chat (#149)
