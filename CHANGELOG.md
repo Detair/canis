@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- Sound notification testing now plays audio in browser/webview mode (#145)
+  - Added missing sound .wav files to `public/sounds/` for static serving
+  - Previously only embedded in Tauri binary, causing 404 for browser fetch
 - File attachment uploads in text chat (#149)
   - Fixed AWS SDK panic when initializing S3 client (missing tokio sleep implementation)
   - MinIO bucket now automatically initialized in development environment
