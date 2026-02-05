@@ -32,7 +32,7 @@ export const QualityIndicator: Component<QualityIndicatorProps> = (props) => {
       <Show
         when={!isLoading()}
         fallback={
-          <div class="w-2 h-2 rounded-full bg-gray-500 animate-pulse" />
+          <div class="w-2 h-2 rounded-full bg-text-secondary animate-pulse" />
         }
       >
         <Show
