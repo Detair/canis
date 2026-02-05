@@ -27,6 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Favorite star button not responding to clicks in channel list (#152)
   - Fixed invalid nested `<button>` HTML structure in ChannelItem that prevented click events from reaching the star toggle
   - Converted outer channel button to a `<div>` with proper `role="button"` and keyboard accessibility
+- Avatar and file uploads in Tauri desktop app (#150)
+  - Added `get_auth_info` Tauri command to expose auth credentials to the webview
+  - Upload functions now properly retrieve auth token and server URL in Tauri mode
+  - Also fixes file attachment and emoji uploads in the desktop client
 - Potential message loss when WebSocket message arrives during pagination load
   - `addMessage` now re-reads store state after async decryption to avoid overwriting concurrent prepends
 - File attachment uploads in text chat (#149)
