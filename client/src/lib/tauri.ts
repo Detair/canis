@@ -818,14 +818,14 @@ export async function sendMessageWithStatus(
 
   if (!response.ok) {
     let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+    const rawErrorBody = await response.text();
 
     try {
-      const errorBody = await response.json();
+      const errorBody = rawErrorBody ? JSON.parse(rawErrorBody) : null;
       errorMessage = errorBody.message || errorBody.error || errorMessage;
     } catch (_parseError) {
-      const text = await response.text();
-      if (text.length > 0 && text.length < 500) {
-        errorMessage = text;
+      if (rawErrorBody.length > 0 && rawErrorBody.length < 500) {
+        errorMessage = rawErrorBody;
       }
     }
 

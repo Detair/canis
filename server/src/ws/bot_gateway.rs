@@ -23,6 +23,7 @@ use tracing::{error, info, instrument, warn};
 use uuid::Uuid;
 
 use crate::api::AppState;
+use crate::ratelimit::RateLimitCategory;
 
 /// Events that bots can send to the server.
 #[derive(Debug, Deserialize)]
@@ -301,6 +302,24 @@ async fn handle_bot_event(
     bot_user_id: Uuid,
     _application_id: Uuid,
 ) -> Result<(), String> {
+    if let Some(rate_limiter) = &state.rate_limiter {
+        let identifier = format!("bot_ws:{}", bot_user_id);
+        let rate_result = rate_limiter
+            .check(RateLimitCategory::WsMessage, &identifier)
+            .await
+            .map_err(|e| {
+                warn!(error = %e, bot_user_id = %bot_user_id, "Bot WS rate limit check failed");
+                "Bot rate limiting unavailable".to_string()
+            })?;
+
+        if !rate_result.allowed {
+            return Err(format!(
+                "Rate limit exceeded; retry after {} seconds",
+                rate_result.retry_after
+            ));
+        }
+    }
+
     match event {
         BotClientEvent::MessageCreate {
             channel_id,
@@ -402,6 +421,32 @@ async fn handle_bot_event(
                 ephemeral = ephemeral,
                 "Bot responding to command"
             );
+
+            let owner_key = format!("interaction:{}:owner", interaction_id);
+            let expected_owner = state
+                .redis
+                .get::<Option<String>, _>(&owner_key)
+                .await
+                .map_err(|e| {
+                    error!(
+                        interaction_id = %interaction_id,
+                        error = %e,
+                        "Failed to fetch interaction owner"
+                    );
+                    "Failed to validate interaction ownership".to_string()
+                })?
+                .ok_or_else(|| "Interaction not found or expired".to_string())?;
+
+            let bot_user_id_str = bot_user_id.to_string();
+            if expected_owner != bot_user_id_str {
+                warn!(
+                    interaction_id = %interaction_id,
+                    bot_user_id = %bot_user_id,
+                    expected_owner = %expected_owner,
+                    "Bot attempted to respond to interaction it does not own"
+                );
+                return Err("Interaction does not belong to this bot".to_string());
+            }
 
             // Store command response in Redis with expiry (5 minutes)
             // The command invoker's WebSocket client will poll/listen for this

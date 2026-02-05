@@ -7,7 +7,7 @@ use axum::{
     Json,
 };
 use chrono::{DateTime, Utc};
-use fred::interfaces::PubsubInterface;
+use fred::interfaces::{KeysInterface, PubsubInterface};
 use serde::{Deserialize, Serialize};
 use tracing::warn;
 use uuid::Uuid;
@@ -498,8 +498,9 @@ pub async fn create(
                             }
                         }
 
+                        let interaction_id = Uuid::new_v4();
                         let event = crate::ws::bot_gateway::BotServerEvent::CommandInvoked {
-                            interaction_id: Uuid::new_v4(),
+                            interaction_id,
                             command_name,
                             guild_id: Some(guild_id),
                             channel_id,
@@ -511,6 +512,24 @@ pub async fn create(
                             warn!(error = %e, "Failed to serialize slash command payload");
                             MessageError::Validation("Invalid slash command payload".to_string())
                         })?;
+
+                        let owner_key = format!("interaction:{}:owner", interaction_id);
+                        state
+                            .redis
+                            .set::<(), _, _>(
+                                &owner_key,
+                                bot_user_id.to_string(),
+                                Some(fred::types::Expiration::EX(300)),
+                                None,
+                                false,
+                            )
+                            .await
+                            .map_err(|e| {
+                                warn!(error = %e, "Failed to store command interaction owner");
+                                MessageError::Validation(
+                                    "Bot command routing unavailable".to_string(),
+                                )
+                            })?;
 
                         state
                             .redis

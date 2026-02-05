@@ -43,6 +43,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Replaced weak UUID salt with proper CSPRNG (SaltString + OsRng) for Argon2 password hashing
 - Added channel membership authorization for bot message creation
 - Added content length validation for command responses to prevent Redis exhaustion
+- Added inbound bot gateway rate limiting to reduce abuse risk from compromised bot tokens
+- Bound command response interactions to the invoking bot identity before accepting responses
 
 ### Changed
 - Documentation audit and cleanup

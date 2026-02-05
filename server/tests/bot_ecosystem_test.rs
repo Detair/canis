@@ -3,11 +3,12 @@
 mod helpers;
 
 use axum::{body::Body, http::Method};
-use fred::interfaces::{ClientLike, EventInterface, PubsubInterface};
+use fred::interfaces::{ClientLike, EventInterface, KeysInterface, PubsubInterface};
 use helpers::{create_test_user, delete_user, generate_access_token, TestApp};
 use http_body_util::BodyExt;
 use serde_json::json;
 use std::time::Duration;
+use vc_server::db;
 
 /// Test creating a bot application.
 #[tokio::test]
@@ -1054,6 +1055,15 @@ async fn test_slash_command_invocation_publishes_to_bot_channel() {
     assert_eq!(event["guild_id"], guild_id.to_string());
     assert_eq!(event["channel_id"], channel_id.to_string());
     assert_eq!(event["user_id"], user_id.to_string());
+
+    let interaction_id = event["interaction_id"].as_str().unwrap();
+    let owner_key = format!("interaction:{}:owner", interaction_id);
+    let redis = db::create_redis_client(&app.config.redis_url)
+        .await
+        .unwrap();
+    let stored_owner = redis.get::<Option<String>, _>(&owner_key).await.unwrap();
+    let bot_user_id_str = bot_user_id.to_string();
+    assert_eq!(stored_owner.as_deref(), Some(bot_user_id_str.as_str()));
 
     sqlx::query("DELETE FROM guild_bot_installations WHERE guild_id = $1")
         .bind(guild_id)
