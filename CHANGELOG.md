@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- File attachment uploads in text chat (#149)
+  - MinIO bucket now automatically initialized in development environment
+  - Added comprehensive file uploads documentation (docs/development/file-uploads.md)
+  - Added MinIO initialization script (scripts/init-minio.sh)
+  - Updated setup guide with file upload configuration steps
+
 ### Added
 - Message input enhancements for improved UX
   - Multi-line textarea with auto-resize (min 1 line, max 8 lines)
