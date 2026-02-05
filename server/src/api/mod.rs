@@ -13,8 +13,7 @@ mod setup;
 pub mod unread;
 
 use axum::{
-    extract::DefaultBodyLimit,
-    extract::State,
+    extract::{DefaultBodyLimit, FromRef, State},
     middleware::from_fn,
     middleware::from_fn_with_state,
     routing::{delete, get, post, put},
@@ -65,6 +64,12 @@ pub struct AppState {
     pub email: Option<Arc<EmailService>>,
     /// OIDC provider manager (optional, requires MFA encryption key)
     pub oidc_manager: Option<Arc<OidcProviderManager>>,
+}
+
+impl FromRef<AppState> for PgPool {
+    fn from_ref(state: &AppState) -> Self {
+        state.db.clone()
+    }
 }
 
 impl AppState {

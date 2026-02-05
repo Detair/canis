@@ -13,7 +13,7 @@ use thiserror::Error;
 use tracing::instrument;
 use uuid::Uuid;
 
-use crate::auth::Claims;
+use crate::auth::AuthUser;
 
 /// Errors that can occur during command operations.
 #[derive(Error, Debug)]
@@ -164,7 +164,7 @@ pub async fn register_commands(
     State(pool): State<PgPool>,
     Path(app_id): Path<Uuid>,
     Query(query): Query<ListCommandsQuery>,
-    claims: Claims,
+    claims: AuthUser,
     Json(req): Json<RegisterCommandsRequest>,
 ) -> Result<(StatusCode, Json<Vec<CommandResponse>>), (StatusCode, String)> {
     // Check if application exists and user owns it
@@ -182,7 +182,7 @@ pub async fn register_commands(
     .ok_or_else(|| CommandError::ApplicationNotFound)?;
 
     // Check ownership
-    if app.owner_id != claims.sub {
+    if app.owner_id != claims.id {
         return Err(CommandError::Forbidden.into());
     }
 
@@ -257,7 +257,7 @@ pub async fn list_commands(
     State(pool): State<PgPool>,
     Path(app_id): Path<Uuid>,
     Query(query): Query<ListCommandsQuery>,
-    claims: Claims,
+    claims: AuthUser,
 ) -> Result<Json<Vec<CommandResponse>>, (StatusCode, String)> {
     // Check if application exists and user owns it
     let app = sqlx::query!(
@@ -274,7 +274,7 @@ pub async fn list_commands(
     .ok_or_else(|| CommandError::ApplicationNotFound)?;
 
     // Check ownership
-    if app.owner_id != claims.sub {
+    if app.owner_id != claims.id {
         return Err(CommandError::Forbidden.into());
     }
 
@@ -321,7 +321,7 @@ pub async fn list_commands(
 pub async fn delete_command(
     State(pool): State<PgPool>,
     Path((app_id, cmd_id)): Path<(Uuid, Uuid)>,
-    claims: Claims,
+    claims: AuthUser,
 ) -> Result<StatusCode, (StatusCode, String)> {
     // Check if application exists and user owns it
     let app = sqlx::query!(
@@ -338,7 +338,7 @@ pub async fn delete_command(
     .ok_or_else(|| CommandError::ApplicationNotFound)?;
 
     // Check ownership
-    if app.owner_id != claims.sub {
+    if app.owner_id != claims.id {
         return Err(CommandError::Forbidden.into());
     }
 
@@ -368,7 +368,7 @@ pub async fn delete_all_commands(
     State(pool): State<PgPool>,
     Path(app_id): Path<Uuid>,
     Query(query): Query<ListCommandsQuery>,
-    claims: Claims,
+    claims: AuthUser,
 ) -> Result<StatusCode, (StatusCode, String)> {
     // Check if application exists and user owns it
     let app = sqlx::query!(
@@ -385,7 +385,7 @@ pub async fn delete_all_commands(
     .ok_or_else(|| CommandError::ApplicationNotFound)?;
 
     // Check ownership
-    if app.owner_id != claims.sub {
+    if app.owner_id != claims.id {
         return Err(CommandError::Forbidden.into());
     }
 

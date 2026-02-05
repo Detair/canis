@@ -22,6 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Bot token authentication for gateway connections
   - Separate event system for bots (CommandInvoked, MessageCreated, GuildJoined/Left)
   - Redis pub/sub on `bot:{bot_id}` channels for bot-specific events
+  - Slash command invocation routing from `/command` chat input to installed bots
+  - Guild bot install endpoint for admins (`POST /api/guilds/{id}/bots/{bot_id}/add`)
   - Comprehensive integration tests (14 tests covering applications, commands, auth, ownership)
   - Bot applications management UI in settings
   - API client library for bot operations (applications, commands, tokens)

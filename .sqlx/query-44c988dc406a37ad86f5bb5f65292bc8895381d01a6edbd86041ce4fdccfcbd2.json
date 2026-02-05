@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "INSERT INTO users (username, display_name, email, password_hash, auth_method)\n           VALUES ($1, $2, $3, $4, 'local')\n           RETURNING id, username, display_name, email, password_hash,\n                     auth_method as \"auth_method: _\", external_id, avatar_url,\n                     status as \"status: _\", mfa_secret, created_at, updated_at",
+  "query": "INSERT INTO users (username, display_name, password_hash, auth_method)\n           VALUES ($1, $2, $3, 'local')\n           RETURNING id, username, display_name, email, password_hash,\n                     auth_method as \"auth_method: _\", external_id, avatar_url,\n                     status as \"status: _\", mfa_secret, is_bot, bot_owner_id,\n                     created_at, updated_at",
   "describe": {
     "columns": [
       {
@@ -77,18 +77,27 @@
       },
       {
         "ordinal": 10,
+        "name": "is_bot",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 11,
+        "name": "bot_owner_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 12,
         "name": "created_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 11,
+        "ordinal": 13,
         "name": "updated_at",
         "type_info": "Timestamptz"
       }
     ],
     "parameters": {
       "Left": [
-        "Varchar",
         "Varchar",
         "Varchar",
         "Varchar"
@@ -106,8 +115,10 @@
       false,
       true,
       false,
+      true,
+      false,
       false
     ]
   },
-  "hash": "22bc6e67d5eca008679be104e334b195960ba96cc91bc8faa26d081142dc37a0"
+  "hash": "44c988dc406a37ad86f5bb5f65292bc8895381d01a6edbd86041ce4fdccfcbd2"
 }

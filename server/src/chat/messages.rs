@@ -7,6 +7,7 @@ use axum::{
     Json,
 };
 use chrono::{DateTime, Utc};
+use fred::interfaces::PubsubInterface;
 use serde::{Deserialize, Serialize};
 use tracing::warn;
 use uuid::Uuid;
@@ -436,6 +437,120 @@ pub async fn create(
             return Err(MessageError::Validation(
                 "Reply target not found".to_string(),
             ));
+        }
+    }
+
+    // Route slash command invocations to installed bots in guild channels.
+    if let Some(guild_id) = channel.guild_id {
+        if let Some(command_input) = body.content.trim().strip_prefix('/') {
+            let mut parts = command_input.split_whitespace();
+            if let Some(command_name) = parts.next() {
+                let command_name = command_name.to_lowercase();
+
+                let commands = sqlx::query!(
+                    r#"
+                    SELECT ba.bot_user_id, sc.options, (sc.guild_id IS NOT NULL) AS "guild_scoped!"
+                    FROM slash_commands sc
+                    JOIN bot_applications ba ON ba.id = sc.application_id
+                    JOIN guild_bot_installations gbi ON gbi.application_id = sc.application_id
+                    WHERE gbi.guild_id = $1
+                      AND sc.name = $2
+                      AND (sc.guild_id = $1 OR sc.guild_id IS NULL)
+                    ORDER BY (sc.guild_id IS NOT NULL) DESC, sc.created_at ASC, sc.id ASC
+                    "#,
+                    guild_id,
+                    command_name,
+                )
+                .fetch_all(&state.db)
+                .await
+                .map_err(|e| {
+                    tracing::error!("Failed to resolve slash command: {}", e);
+                    MessageError::Database(e)
+                })?;
+
+                if let Some(command) = commands.first() {
+                    let same_priority_matches = commands
+                        .iter()
+                        .filter(|candidate| candidate.guild_scoped == command.guild_scoped)
+                        .count();
+
+                    if same_priority_matches > 1 {
+                        return Err(MessageError::Validation(
+                            "Command is ambiguous: multiple bots provide this command".to_string(),
+                        ));
+                    }
+
+                    if let Some(bot_user_id) = command.bot_user_id {
+                        let mut option_map = serde_json::Map::new();
+                        let args: Vec<String> = parts.map(str::to_string).collect();
+
+                        if let Some(options) = command.options.as_ref().and_then(|v| v.as_array()) {
+                            for (idx, option_def) in options.iter().enumerate() {
+                                if let Some(name) = option_def.get("name").and_then(|n| n.as_str())
+                                {
+                                    if let Some(arg) = args.get(idx) {
+                                        option_map.insert(
+                                            name.to_string(),
+                                            serde_json::Value::String(arg.clone()),
+                                        );
+                                    }
+                                }
+                            }
+                        }
+
+                        let event = crate::ws::bot_gateway::BotServerEvent::CommandInvoked {
+                            interaction_id: Uuid::new_v4(),
+                            command_name,
+                            guild_id: Some(guild_id),
+                            channel_id,
+                            user_id: auth_user.id,
+                            options: serde_json::Value::Object(option_map),
+                        };
+
+                        let payload = serde_json::to_string(&event).map_err(|e| {
+                            warn!(error = %e, "Failed to serialize slash command payload");
+                            MessageError::Validation("Invalid slash command payload".to_string())
+                        })?;
+
+                        state
+                            .redis
+                            .publish::<(), _, _>(format!("bot:{}", bot_user_id), payload)
+                            .await
+                            .map_err(|e| {
+                                warn!(error = %e, "Failed to publish slash command invocation");
+                                MessageError::Validation(
+                                    "Bot command routing unavailable".to_string(),
+                                )
+                            })?;
+
+                        let author = db::find_user_by_id(&state.db, auth_user.id)
+                            .await?
+                            .map(AuthorProfile::from)
+                            .unwrap_or_else(|| AuthorProfile {
+                                id: auth_user.id,
+                                username: "unknown".to_string(),
+                                display_name: "Unknown User".to_string(),
+                                avatar_url: None,
+                                status: "offline".to_string(),
+                            });
+
+                        let accepted = MessageResponse {
+                            id: Uuid::new_v4(),
+                            channel_id,
+                            author,
+                            content: body.content.clone(),
+                            encrypted: false,
+                            attachments: vec![],
+                            reply_to: None,
+                            edited_at: None,
+                            created_at: Utc::now(),
+                            mention_type: None,
+                        };
+
+                        return Ok((StatusCode::ACCEPTED, Json(accepted)));
+                    }
+                }
+            }
         }
     }
 

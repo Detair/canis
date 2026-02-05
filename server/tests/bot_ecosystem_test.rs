@@ -3,9 +3,11 @@
 mod helpers;
 
 use axum::{body::Body, http::Method};
+use fred::interfaces::{ClientLike, EventInterface, PubsubInterface};
 use helpers::{create_test_user, delete_user, generate_access_token, TestApp};
 use http_body_util::BodyExt;
 use serde_json::json;
+use std::time::Duration;
 
 /// Test creating a bot application.
 #[tokio::test]
@@ -615,4 +617,501 @@ async fn test_application_ownership() {
 
     delete_user(&app.pool, owner_id).await;
     delete_user(&app.pool, other_id).await;
+}
+
+/// Test guild bot install endpoint requires guild management permissions.
+#[tokio::test]
+async fn test_add_bot_to_guild() {
+    let app = TestApp::new().await;
+    let (owner_id, _) = create_test_user(&app.pool).await;
+    let owner_token = generate_access_token(&app.config, owner_id);
+
+    let create_app_req = TestApp::request(Method::POST, "/api/applications")
+        .header("Authorization", format!("Bearer {}", owner_token))
+        .header("Content-Type", "application/json")
+        .body(Body::from(
+            serde_json::to_string(&json!({ "name": "Guild Bot" })).unwrap(),
+        ))
+        .unwrap();
+    let create_app_resp = app.oneshot(create_app_req).await;
+    assert_eq!(create_app_resp.status(), 201);
+    let app_body = create_app_resp
+        .into_body()
+        .collect()
+        .await
+        .unwrap()
+        .to_bytes();
+    let app_json: serde_json::Value = serde_json::from_slice(&app_body).unwrap();
+    let application_id = uuid::Uuid::parse_str(app_json["id"].as_str().unwrap()).unwrap();
+
+    let create_bot_req = TestApp::request(
+        Method::POST,
+        &format!("/api/applications/{}/bot", application_id),
+    )
+    .header("Authorization", format!("Bearer {}", owner_token))
+    .body(Body::empty())
+    .unwrap();
+    let create_bot_resp = app.oneshot(create_bot_req).await;
+    assert_eq!(create_bot_resp.status(), 201);
+    let bot_body = create_bot_resp
+        .into_body()
+        .collect()
+        .await
+        .unwrap()
+        .to_bytes();
+    let bot_json: serde_json::Value = serde_json::from_slice(&bot_body).unwrap();
+    let bot_user_id = uuid::Uuid::parse_str(bot_json["bot_user_id"].as_str().unwrap()).unwrap();
+
+    let create_guild_req = TestApp::request(Method::POST, "/api/guilds")
+        .header("Authorization", format!("Bearer {}", owner_token))
+        .header("Content-Type", "application/json")
+        .body(Body::from(
+            serde_json::to_string(&json!({ "name": "Bot Guild" })).unwrap(),
+        ))
+        .unwrap();
+    let create_guild_resp = app.oneshot(create_guild_req).await;
+    assert_eq!(create_guild_resp.status(), 200);
+    let guild_body = create_guild_resp
+        .into_body()
+        .collect()
+        .await
+        .unwrap()
+        .to_bytes();
+    let guild_json: serde_json::Value = serde_json::from_slice(&guild_body).unwrap();
+    let guild_id = uuid::Uuid::parse_str(guild_json["id"].as_str().unwrap()).unwrap();
+
+    let add_bot_req = TestApp::request(
+        Method::POST,
+        &format!("/api/guilds/{}/bots/{}/add", guild_id, bot_user_id),
+    )
+    .header("Authorization", format!("Bearer {}", owner_token))
+    .body(Body::empty())
+    .unwrap();
+    let add_bot_resp = app.oneshot(add_bot_req).await;
+    assert_eq!(add_bot_resp.status(), 204);
+
+    let installed = sqlx::query!(
+        "SELECT id FROM guild_bot_installations WHERE guild_id = $1 AND application_id = $2",
+        guild_id,
+        application_id
+    )
+    .fetch_optional(&app.pool)
+    .await
+    .unwrap();
+    assert!(installed.is_some());
+
+    sqlx::query!(
+        "UPDATE bot_applications SET public = false WHERE id = $1",
+        application_id
+    )
+    .execute(&app.pool)
+    .await
+    .unwrap();
+
+    let (other_user_id, _) = create_test_user(&app.pool).await;
+    let other_token = generate_access_token(&app.config, other_user_id);
+
+    let create_other_guild_req = TestApp::request(Method::POST, "/api/guilds")
+        .header("Authorization", format!("Bearer {}", other_token))
+        .header("Content-Type", "application/json")
+        .body(Body::from(
+            serde_json::to_string(&json!({ "name": "Other Guild" })).unwrap(),
+        ))
+        .unwrap();
+    let create_other_guild_resp = app.oneshot(create_other_guild_req).await;
+    assert_eq!(create_other_guild_resp.status(), 200);
+    let other_guild_body = create_other_guild_resp
+        .into_body()
+        .collect()
+        .await
+        .unwrap()
+        .to_bytes();
+    let other_guild_json: serde_json::Value = serde_json::from_slice(&other_guild_body).unwrap();
+    let other_guild_id = uuid::Uuid::parse_str(other_guild_json["id"].as_str().unwrap()).unwrap();
+
+    let private_bot_req = TestApp::request(
+        Method::POST,
+        &format!("/api/guilds/{}/bots/{}/add", other_guild_id, bot_user_id),
+    )
+    .header("Authorization", format!("Bearer {}", other_token))
+    .body(Body::empty())
+    .unwrap();
+    let private_bot_resp = app.oneshot(private_bot_req).await;
+    assert_eq!(private_bot_resp.status(), 404);
+
+    let forbidden_req = TestApp::request(
+        Method::POST,
+        &format!("/api/guilds/{}/bots/{}/add", guild_id, bot_user_id),
+    )
+    .header("Authorization", format!("Bearer {}", other_token))
+    .body(Body::empty())
+    .unwrap();
+    let forbidden_resp = app.oneshot(forbidden_req).await;
+    assert_eq!(forbidden_resp.status(), 403);
+
+    sqlx::query!(
+        "DELETE FROM guild_bot_installations WHERE guild_id = $1 AND application_id = $2",
+        guild_id,
+        application_id
+    )
+    .execute(&app.pool)
+    .await
+    .unwrap();
+    delete_user(&app.pool, owner_id).await;
+    delete_user(&app.pool, other_user_id).await;
+}
+
+/// Test slash command routing publishes invocation to bot gateway channel.
+#[tokio::test]
+async fn test_slash_command_invocation_publishes_to_bot_channel() {
+    let app = TestApp::new().await;
+    let (user_id, _) = create_test_user(&app.pool).await;
+    let token = generate_access_token(&app.config, user_id);
+
+    let create_app_req = TestApp::request(Method::POST, "/api/applications")
+        .header("Authorization", format!("Bearer {}", token))
+        .header("Content-Type", "application/json")
+        .body(Body::from(
+            serde_json::to_string(&json!({
+                "name": "Routing Bot"
+            }))
+            .unwrap(),
+        ))
+        .unwrap();
+    let create_app_resp = app.oneshot(create_app_req).await;
+    assert_eq!(create_app_resp.status(), 201);
+    let app_body = create_app_resp
+        .into_body()
+        .collect()
+        .await
+        .unwrap()
+        .to_bytes();
+    let app_json: serde_json::Value = serde_json::from_slice(&app_body).unwrap();
+    let application_id = uuid::Uuid::parse_str(app_json["id"].as_str().unwrap()).unwrap();
+
+    let create_bot_req = TestApp::request(
+        Method::POST,
+        &format!("/api/applications/{}/bot", application_id),
+    )
+    .header("Authorization", format!("Bearer {}", token))
+    .body(Body::empty())
+    .unwrap();
+    let create_bot_resp = app.oneshot(create_bot_req).await;
+    assert_eq!(create_bot_resp.status(), 201);
+    let bot_body = create_bot_resp
+        .into_body()
+        .collect()
+        .await
+        .unwrap()
+        .to_bytes();
+    let bot_json: serde_json::Value = serde_json::from_slice(&bot_body).unwrap();
+    let bot_user_id = uuid::Uuid::parse_str(bot_json["bot_user_id"].as_str().unwrap()).unwrap();
+
+    let register_cmd_req = TestApp::request(
+        Method::PUT,
+        &format!("/api/applications/{}/commands", application_id),
+    )
+    .header("Authorization", format!("Bearer {}", token))
+    .header("Content-Type", "application/json")
+    .body(Body::from(
+        serde_json::to_string(&json!({
+            "commands": [{
+                "name": "hello",
+                "description": "Say hello",
+                "options": []
+            }]
+        }))
+        .unwrap(),
+    ))
+    .unwrap();
+    let register_cmd_resp = app.oneshot(register_cmd_req).await;
+    assert_eq!(register_cmd_resp.status(), 200);
+
+    let guild_id = uuid::Uuid::new_v4();
+    let channel_id = uuid::Uuid::new_v4();
+
+    sqlx::query("INSERT INTO guilds (id, name, owner_id) VALUES ($1, $2, $3)")
+        .bind(guild_id)
+        .bind("Bot Routing Guild")
+        .bind(user_id)
+        .execute(&app.pool)
+        .await
+        .unwrap();
+
+    sqlx::query("INSERT INTO guild_members (guild_id, user_id) VALUES ($1, $2)")
+        .bind(guild_id)
+        .bind(user_id)
+        .execute(&app.pool)
+        .await
+        .unwrap();
+
+    sqlx::query(
+        "INSERT INTO channels (id, guild_id, name, channel_type) VALUES ($1, $2, $3, 'text')",
+    )
+    .bind(channel_id)
+    .bind(guild_id)
+    .bind("bot-commands")
+    .execute(&app.pool)
+    .await
+    .unwrap();
+
+    sqlx::query(
+        "INSERT INTO guild_bot_installations (guild_id, application_id, installed_by) VALUES ($1, $2, $3)",
+    )
+    .bind(guild_id)
+    .bind(application_id)
+    .bind(user_id)
+    .execute(&app.pool)
+    .await
+    .unwrap();
+
+    let subscriber = vc_server::db::create_redis_client(&app.config.redis_url)
+        .await
+        .unwrap();
+    let _connect_handle = subscriber.connect();
+    subscriber.wait_for_connect().await.unwrap();
+
+    let mut pubsub_stream = subscriber.message_rx();
+    subscriber
+        .subscribe(format!("bot:{}", bot_user_id))
+        .await
+        .unwrap();
+
+    let create_msg_req = TestApp::request(
+        Method::POST,
+        &format!("/api/messages/channel/{}", channel_id),
+    )
+    .header("Authorization", format!("Bearer {}", token))
+    .header("Content-Type", "application/json")
+    .body(Body::from(
+        serde_json::to_string(&json!({
+            "content": "/hello world"
+        }))
+        .unwrap(),
+    ))
+    .unwrap();
+
+    let create_msg_resp = app.oneshot(create_msg_req).await;
+    assert_eq!(create_msg_resp.status(), 202);
+
+    let persisted_count = sqlx::query_scalar!(
+        "SELECT COUNT(*) as \"count!\" FROM messages WHERE channel_id = $1",
+        channel_id
+    )
+    .fetch_one(&app.pool)
+    .await
+    .unwrap();
+    assert_eq!(persisted_count, 0);
+
+    let message = tokio::time::timeout(Duration::from_secs(2), pubsub_stream.recv())
+        .await
+        .expect("timed out waiting for bot command event")
+        .expect("bot pubsub stream closed unexpectedly");
+
+    let payload = String::from_utf8(message.value.as_bytes().unwrap().to_vec()).unwrap();
+    let event: serde_json::Value = serde_json::from_str(&payload).unwrap();
+
+    assert_eq!(event["type"], "command_invoked");
+    assert_eq!(event["command_name"], "hello");
+    assert_eq!(event["guild_id"], guild_id.to_string());
+    assert_eq!(event["channel_id"], channel_id.to_string());
+    assert_eq!(event["user_id"], user_id.to_string());
+
+    sqlx::query("DELETE FROM guild_bot_installations WHERE guild_id = $1")
+        .bind(guild_id)
+        .execute(&app.pool)
+        .await
+        .unwrap();
+    sqlx::query("DELETE FROM channels WHERE id = $1")
+        .bind(channel_id)
+        .execute(&app.pool)
+        .await
+        .unwrap();
+    sqlx::query("DELETE FROM guild_members WHERE guild_id = $1 AND user_id = $2")
+        .bind(guild_id)
+        .bind(user_id)
+        .execute(&app.pool)
+        .await
+        .unwrap();
+    sqlx::query("DELETE FROM guilds WHERE id = $1")
+        .bind(guild_id)
+        .execute(&app.pool)
+        .await
+        .unwrap();
+    delete_user(&app.pool, user_id).await;
+}
+
+/// Test slash command fails when multiple bots provide same command in same scope.
+#[tokio::test]
+async fn test_slash_command_invocation_ambiguous() {
+    let app = TestApp::new().await;
+    let (user_id, _) = create_test_user(&app.pool).await;
+    let token = generate_access_token(&app.config, user_id);
+
+    let create_app_1_req = TestApp::request(Method::POST, "/api/applications")
+        .header("Authorization", format!("Bearer {}", token))
+        .header("Content-Type", "application/json")
+        .body(Body::from(
+            serde_json::to_string(&json!({ "name": "Ambiguous Bot A" })).unwrap(),
+        ))
+        .unwrap();
+    let create_app_1_resp = app.oneshot(create_app_1_req).await;
+    assert_eq!(create_app_1_resp.status(), 201);
+    let app_1_body = create_app_1_resp
+        .into_body()
+        .collect()
+        .await
+        .unwrap()
+        .to_bytes();
+    let app_1_json: serde_json::Value = serde_json::from_slice(&app_1_body).unwrap();
+    let application_id_1 = uuid::Uuid::parse_str(app_1_json["id"].as_str().unwrap()).unwrap();
+
+    let create_app_2_req = TestApp::request(Method::POST, "/api/applications")
+        .header("Authorization", format!("Bearer {}", token))
+        .header("Content-Type", "application/json")
+        .body(Body::from(
+            serde_json::to_string(&json!({ "name": "Ambiguous Bot B" })).unwrap(),
+        ))
+        .unwrap();
+    let create_app_2_resp = app.oneshot(create_app_2_req).await;
+    assert_eq!(create_app_2_resp.status(), 201);
+    let app_2_body = create_app_2_resp
+        .into_body()
+        .collect()
+        .await
+        .unwrap()
+        .to_bytes();
+    let app_2_json: serde_json::Value = serde_json::from_slice(&app_2_body).unwrap();
+    let application_id_2 = uuid::Uuid::parse_str(app_2_json["id"].as_str().unwrap()).unwrap();
+
+    let create_bot_1_req = TestApp::request(
+        Method::POST,
+        &format!("/api/applications/{}/bot", application_id_1),
+    )
+    .header("Authorization", format!("Bearer {}", token))
+    .body(Body::empty())
+    .unwrap();
+    let create_bot_1_resp = app.oneshot(create_bot_1_req).await;
+    assert_eq!(create_bot_1_resp.status(), 201);
+
+    let create_bot_2_req = TestApp::request(
+        Method::POST,
+        &format!("/api/applications/{}/bot", application_id_2),
+    )
+    .header("Authorization", format!("Bearer {}", token))
+    .body(Body::empty())
+    .unwrap();
+    let create_bot_2_resp = app.oneshot(create_bot_2_req).await;
+    assert_eq!(create_bot_2_resp.status(), 201);
+
+    for app_id in [application_id_1, application_id_2] {
+        let register_cmd_req = TestApp::request(
+            Method::PUT,
+            &format!("/api/applications/{}/commands", app_id),
+        )
+        .header("Authorization", format!("Bearer {}", token))
+        .header("Content-Type", "application/json")
+        .body(Body::from(
+            serde_json::to_string(&json!({
+                "commands": [{
+                    "name": "hello",
+                    "description": "Say hello",
+                    "options": []
+                }]
+            }))
+            .unwrap(),
+        ))
+        .unwrap();
+        let register_cmd_resp = app.oneshot(register_cmd_req).await;
+        assert_eq!(register_cmd_resp.status(), 200);
+    }
+
+    let guild_id = uuid::Uuid::new_v4();
+    let channel_id = uuid::Uuid::new_v4();
+
+    sqlx::query("INSERT INTO guilds (id, name, owner_id) VALUES ($1, $2, $3)")
+        .bind(guild_id)
+        .bind("Ambiguous Command Guild")
+        .bind(user_id)
+        .execute(&app.pool)
+        .await
+        .unwrap();
+
+    sqlx::query("INSERT INTO guild_members (guild_id, user_id) VALUES ($1, $2)")
+        .bind(guild_id)
+        .bind(user_id)
+        .execute(&app.pool)
+        .await
+        .unwrap();
+
+    sqlx::query(
+        "INSERT INTO channels (id, guild_id, name, channel_type) VALUES ($1, $2, $3, 'text')",
+    )
+    .bind(channel_id)
+    .bind(guild_id)
+    .bind("bot-commands")
+    .execute(&app.pool)
+    .await
+    .unwrap();
+
+    for app_id in [application_id_1, application_id_2] {
+        sqlx::query(
+            "INSERT INTO guild_bot_installations (guild_id, application_id, installed_by) VALUES ($1, $2, $3)",
+        )
+        .bind(guild_id)
+        .bind(app_id)
+        .bind(user_id)
+        .execute(&app.pool)
+        .await
+        .unwrap();
+    }
+
+    let create_msg_req = TestApp::request(
+        Method::POST,
+        &format!("/api/messages/channel/{}", channel_id),
+    )
+    .header("Authorization", format!("Bearer {}", token))
+    .header("Content-Type", "application/json")
+    .body(Body::from(
+        serde_json::to_string(&json!({
+            "content": "/hello world"
+        }))
+        .unwrap(),
+    ))
+    .unwrap();
+
+    let create_msg_resp = app.oneshot(create_msg_req).await;
+    assert_eq!(create_msg_resp.status(), 400);
+
+    let persisted_count = sqlx::query_scalar!(
+        "SELECT COUNT(*) as \"count!\" FROM messages WHERE channel_id = $1",
+        channel_id
+    )
+    .fetch_one(&app.pool)
+    .await
+    .unwrap();
+    assert_eq!(persisted_count, 0);
+
+    sqlx::query("DELETE FROM guild_bot_installations WHERE guild_id = $1")
+        .bind(guild_id)
+        .execute(&app.pool)
+        .await
+        .unwrap();
+    sqlx::query("DELETE FROM channels WHERE id = $1")
+        .bind(channel_id)
+        .execute(&app.pool)
+        .await
+        .unwrap();
+    sqlx::query("DELETE FROM guild_members WHERE guild_id = $1 AND user_id = $2")
+        .bind(guild_id)
+        .bind(user_id)
+        .execute(&app.pool)
+        .await
+        .unwrap();
+    sqlx::query("DELETE FROM guilds WHERE id = $1")
+        .bind(guild_id)
+        .execute(&app.pool)
+        .await
+        .unwrap();
+    delete_user(&app.pool, user_id).await;
 }

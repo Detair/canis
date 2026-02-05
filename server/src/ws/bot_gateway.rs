@@ -12,16 +12,13 @@ use axum::{
         ws::{Message, WebSocket},
         State, WebSocketUpgrade,
     },
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
     response::Response,
-    Extension,
 };
-use fred::{interfaces::PubsubInterface, types::RedisValue};
-use futures::StreamExt;
+use fred::interfaces::{ClientLike, EventInterface, KeysInterface, PubsubInterface};
+use futures::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
-use std::sync::Arc;
-use tokio::sync::RwLock;
 use tracing::{error, info, instrument, warn};
 use uuid::Uuid;
 
@@ -50,7 +47,7 @@ pub enum BotClientEvent {
 }
 
 /// Events that the server sends to bots.
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum BotServerEvent {
     /// A slash command was invoked.
@@ -102,16 +99,6 @@ pub enum BotServerEvent {
     },
 }
 
-/// Bot WebSocket connection state.
-struct BotConnection {
-    /// Bot user ID.
-    bot_user_id: Uuid,
-    /// Application ID.
-    application_id: Uuid,
-    /// Redis subscriber handle.
-    _subscriber_handle: tokio::task::JoinHandle<()>,
-}
-
 /// Authenticate bot token and return bot user ID and application ID.
 ///
 /// Token format: "bot_user_id.secret" to enable indexed lookup
@@ -123,18 +110,11 @@ async fn authenticate_bot_token(
     // Parse token format: "bot_user_id.secret"
     let parts: Vec<&str> = token.split('.').collect();
     if parts.len() != 2 {
-        return Err((
-            StatusCode::UNAUTHORIZED,
-            "Invalid token format".to_string(),
-        ));
+        return Err((StatusCode::UNAUTHORIZED, "Invalid token format".to_string()));
     }
 
-    let bot_user_id = Uuid::parse_str(parts[0]).map_err(|_| {
-        (
-            StatusCode::UNAUTHORIZED,
-            "Invalid token format".to_string(),
-        )
-    })?;
+    let bot_user_id = Uuid::parse_str(parts[0])
+        .map_err(|_| (StatusCode::UNAUTHORIZED, "Invalid token format".to_string()))?;
 
     // Look up the specific bot application (indexed query)
     let app = sqlx::query!(
@@ -157,12 +137,9 @@ async fn authenticate_bot_token(
     .ok_or_else(|| (StatusCode::UNAUTHORIZED, "Invalid bot token".to_string()))?;
 
     // Verify the token hash (constant-time operation)
-    let token_hash_str = app.token_hash.ok_or_else(|| {
-        (
-            StatusCode::UNAUTHORIZED,
-            "Invalid bot token".to_string(),
-        )
-    })?;
+    let token_hash_str = app
+        .token_hash
+        .ok_or_else(|| (StatusCode::UNAUTHORIZED, "Invalid bot token".to_string()))?;
 
     let parsed_hash = PasswordHash::new(&token_hash_str).map_err(|e| {
         error!("Failed to parse token hash: {}", e);
@@ -192,13 +169,14 @@ fn extract_bot_token(headers: &axum::http::HeaderMap) -> Option<String> {
 }
 
 /// Bot gateway WebSocket handler.
-#[instrument(skip(state, ws))]
+#[instrument(skip(state, ws, headers))]
 pub async fn bot_gateway_handler(
-    State(state): State<AppState>,
     ws: WebSocketUpgrade,
+    State(state): State<AppState>,
+    headers: HeaderMap,
 ) -> Result<Response, (StatusCode, String)> {
     // Extract token from headers
-    let token = extract_bot_token(ws.headers()).ok_or_else(|| {
+    let token = extract_bot_token(&headers).ok_or_else(|| {
         (
             StatusCode::UNAUTHORIZED,
             "Missing or invalid Authorization header (expected: Bot <token>)".to_string(),
@@ -234,16 +212,18 @@ async fn handle_bot_socket(
     // Spawn subscriber task
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<BotServerEvent>();
     let subscriber_handle = tokio::spawn(async move {
-        // Subscribe to bot's Redis channel
-        let mut pubsub = match redis_client.pubsub_subscriber() {
-            Ok(sub) => sub,
-            Err(e) => {
-                error!("Failed to create Redis pubsub subscriber: {}", e);
-                return;
-            }
-        };
+        let subscriber = redis_client.clone_new();
+        let _connect_handle = subscriber.connect();
 
-        if let Err(e) = pubsub.subscribe(&bot_channel).await {
+        if let Err(e) = subscriber.wait_for_connect().await {
+            error!("Bot subscriber connection failed: {}", e);
+            return;
+        }
+
+        let mut pubsub_stream = subscriber.message_rx();
+
+        // Subscribe to bot's Redis channel
+        if let Err(e) = subscriber.subscribe(&bot_channel).await {
             error!("Failed to subscribe to bot channel: {}", e);
             return;
         }
@@ -251,28 +231,26 @@ async fn handle_bot_socket(
         info!("Bot subscribed to Redis channel: {}", bot_channel);
 
         // Listen for messages
-        let mut message_stream = pubsub.on_message();
-        while let Ok(msg) = message_stream.recv().await {
-            if let RedisValue::String(data) = msg.value {
-                match serde_json::from_str::<BotServerEvent>(&data) {
-                    Ok(event) => {
-                        if tx.send(event).is_err() {
-                            break; // Receiver dropped, connection closed
+        while let Ok(message) = pubsub_stream.recv().await {
+            if let Some(raw) = message.value.as_bytes() {
+                match String::from_utf8(raw.to_vec()) {
+                    Ok(payload) => match serde_json::from_str::<BotServerEvent>(&payload) {
+                        Ok(event) => {
+                            if tx.send(event).is_err() {
+                                break; // Receiver dropped, connection closed
+                            }
                         }
-                    }
+                        Err(e) => {
+                            warn!("Failed to deserialize bot event: {}", e);
+                        }
+                    },
                     Err(e) => {
-                        warn!("Failed to deserialize bot event: {}", e);
+                        warn!("Failed to decode bot event payload as UTF-8: {}", e);
                     }
                 }
             }
         }
     });
-
-    let _connection = Arc::new(RwLock::new(BotConnection {
-        bot_user_id,
-        application_id,
-        _subscriber_handle: subscriber_handle,
-    }));
 
     // Handle incoming messages from bot
     let state_clone = state.clone();
@@ -299,7 +277,7 @@ async fn handle_bot_socket(
     while let Some(event) = rx.recv().await {
         match serde_json::to_string(&event) {
             Ok(json) => {
-                if sender.send(Message::Text(json)).await.is_err() {
+                if sender.send(Message::Text(json.into())).await.is_err() {
                     break; // Connection closed
                 }
             }
@@ -311,6 +289,7 @@ async fn handle_bot_socket(
 
     // Cleanup
     bot_receiver.abort();
+    subscriber_handle.abort();
     info!(bot_user_id = %bot_user_id, "Bot disconnected from gateway");
 }
 
@@ -370,9 +349,9 @@ async fn handle_bot_event(
                 channel_id,
                 bot_user_id,
                 &content,
-                false,  // Not encrypted (bots send plain text)
-                None,   // No nonce
-                None,   // No reply_to
+                false, // Not encrypted (bots send plain text)
+                None,  // No nonce
+                None,  // No reply_to
             )
             .await
             .map_err(|e| {
@@ -384,15 +363,20 @@ async fn handle_bot_event(
             crate::ws::broadcast_to_channel(
                 &state.redis,
                 channel_id,
-                &crate::ws::ServerEvent::MessageCreated {
-                    message_id: message.id,
+                &crate::ws::ServerEvent::MessageNew {
                     channel_id,
-                    user_id: bot_user_id,
-                    content: message.content,
-                    encrypted: message.encrypted,
-                    nonce: message.nonce,
-                    reply_to: message.reply_to,
-                    created_at: message.created_at.to_rfc3339(),
+                    message: serde_json::json!({
+                        "id": message.id,
+                        "channel_id": channel_id,
+                        "author": {
+                            "id": bot_user_id,
+                        },
+                        "content": message.content,
+                        "encrypted": message.encrypted,
+                        "nonce": message.nonce,
+                        "reply_to": message.reply_to,
+                        "created_at": message.created_at.to_rfc3339(),
+                    }),
                 },
             )
             .await
@@ -430,7 +414,7 @@ async fn handle_bot_event(
 
             state
                 .redis
-                .set(
+                .set::<(), _, _>(
                     &response_key,
                     response_data.to_string(),
                     Some(fred::types::Expiration::EX(300)),
@@ -446,7 +430,7 @@ async fn handle_bot_event(
             // Publish event to notify waiting clients
             state
                 .redis
-                .publish(
+                .publish::<(), _, _>(
                     format!("interaction:{}", interaction_id),
                     response_data.to_string(),
                 )

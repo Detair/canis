@@ -3,7 +3,7 @@
 //! Handlers for creating and managing bot applications.
 
 use argon2::{
-    password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
+    password_hash::{rand_core::OsRng, PasswordHasher, SaltString},
     Argon2,
 };
 use axum::{
@@ -17,7 +17,7 @@ use thiserror::Error;
 use tracing::instrument;
 use uuid::Uuid;
 
-use crate::auth::Claims;
+use crate::auth::AuthUser;
 
 /// Errors that can occur during bot operations.
 #[derive(Error, Debug)]
@@ -96,7 +96,7 @@ pub struct BotTokenResponse {
 #[instrument(skip(pool, claims))]
 pub async fn create_application(
     State(pool): State<PgPool>,
-    claims: Claims,
+    claims: AuthUser,
     Json(req): Json<CreateApplicationRequest>,
 ) -> Result<(StatusCode, Json<ApplicationResponse>), (StatusCode, String)> {
     // Validate name length
@@ -120,7 +120,7 @@ pub async fn create_application(
         VALUES ($1, $2, $3)
         RETURNING id, name, description, bot_user_id, public, created_at
         "#,
-        claims.sub,
+        claims.id,
         req.name,
         req.description
     )
@@ -145,7 +145,7 @@ pub async fn create_application(
 #[instrument(skip(pool, claims))]
 pub async fn list_applications(
     State(pool): State<PgPool>,
-    claims: Claims,
+    claims: AuthUser,
 ) -> Result<Json<Vec<ApplicationResponse>>, (StatusCode, String)> {
     let apps = sqlx::query!(
         r#"
@@ -154,7 +154,7 @@ pub async fn list_applications(
         WHERE owner_id = $1
         ORDER BY created_at DESC
         "#,
-        claims.sub
+        claims.id
     )
     .fetch_all(&pool)
     .await
@@ -180,7 +180,7 @@ pub async fn list_applications(
 pub async fn get_application(
     State(pool): State<PgPool>,
     Path(app_id): Path<Uuid>,
-    claims: Claims,
+    claims: AuthUser,
 ) -> Result<Json<ApplicationResponse>, (StatusCode, String)> {
     let app = sqlx::query!(
         r#"
@@ -196,7 +196,7 @@ pub async fn get_application(
     .ok_or_else(|| BotError::NotFound)?;
 
     // Check ownership
-    if app.owner_id != claims.sub {
+    if app.owner_id != claims.id {
         return Err(BotError::Forbidden.into());
     }
 
@@ -215,7 +215,7 @@ pub async fn get_application(
 pub async fn create_bot(
     State(pool): State<PgPool>,
     Path(app_id): Path<Uuid>,
-    claims: Claims,
+    claims: AuthUser,
 ) -> Result<(StatusCode, Json<BotTokenResponse>), (StatusCode, String)> {
     // Start a transaction to prevent race conditions
     let mut tx = pool.begin().await.map_err(BotError::Database)?;
@@ -236,7 +236,7 @@ pub async fn create_bot(
     .ok_or_else(|| BotError::NotFound)?;
 
     // Check ownership
-    if app.owner_id != claims.sub {
+    if app.owner_id != claims.id {
         return Err(BotError::Forbidden.into());
     }
 
@@ -246,18 +246,19 @@ pub async fn create_bot(
     }
 
     // Create bot user first to get bot_user_id
-    let bot_username = format!("bot-{}", app.name.to_lowercase().replace(' ', "-"));
+    let bot_username = format!("bot_{}", &app.id.simple().to_string()[..12]);
     let bot_display_name = format!("{} (Bot)", app.name);
 
     let bot_user = sqlx::query!(
         r#"
-        INSERT INTO users (username, display_name, is_bot, bot_owner_id, status)
-        VALUES ($1, $2, true, $3, 'offline')
+        INSERT INTO users (username, display_name, password_hash, is_bot, bot_owner_id, status)
+        VALUES ($1, $2, $3, true, $4, 'offline')
         RETURNING id
         "#,
         bot_username,
         bot_display_name,
-        claims.sub
+        "bot_token_only",
+        claims.id
     )
     .fetch_one(&mut *tx)
     .await
@@ -314,7 +315,7 @@ pub async fn create_bot(
 pub async fn reset_bot_token(
     State(pool): State<PgPool>,
     Path(app_id): Path<Uuid>,
-    claims: Claims,
+    claims: AuthUser,
 ) -> Result<Json<BotTokenResponse>, (StatusCode, String)> {
     // Start transaction to prevent race conditions
     let mut tx = pool.begin().await.map_err(BotError::Database)?;
@@ -335,7 +336,7 @@ pub async fn reset_bot_token(
     .ok_or_else(|| BotError::NotFound)?;
 
     // Check ownership
-    if app.owner_id != claims.sub {
+    if app.owner_id != claims.id {
         return Err(BotError::Forbidden.into());
     }
 
@@ -391,7 +392,7 @@ pub async fn reset_bot_token(
 pub async fn delete_application(
     State(pool): State<PgPool>,
     Path(app_id): Path<Uuid>,
-    claims: Claims,
+    claims: AuthUser,
 ) -> Result<StatusCode, (StatusCode, String)> {
     // Check ownership and delete in one query
     let result = sqlx::query!(
@@ -400,7 +401,7 @@ pub async fn delete_application(
         WHERE id = $1 AND owner_id = $2
         "#,
         app_id,
-        claims.sub
+        claims.id
     )
     .execute(&pool)
     .await
