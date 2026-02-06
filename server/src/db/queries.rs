@@ -974,6 +974,7 @@ pub async fn search_messages_in_channels(
         FROM messages m
         WHERE m.channel_id = ANY($1)
           AND m.deleted_at IS NULL
+          AND m.encrypted = false
           AND m.content_search @@ websearch_to_tsquery('english', $2)
         ORDER BY m.created_at DESC
         LIMIT $3 OFFSET $4
@@ -1006,6 +1007,7 @@ pub async fn count_search_messages_in_channels(
         FROM messages m
         WHERE m.channel_id = ANY($1)
           AND m.deleted_at IS NULL
+          AND m.encrypted = false
           AND m.content_search @@ websearch_to_tsquery('english', $2)
         ",
     )
