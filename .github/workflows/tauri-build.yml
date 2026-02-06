@@ -19,7 +19,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-22.04
+          - os: ubuntu-24.04
             target: x86_64-unknown-linux-gnu
             artifact: linux
             allow_failure: true
@@ -77,9 +77,20 @@ jobs:
             libpipewire-0.3-dev \
             libssl-dev
 
-      - name: Install Windows build dependencies
+      - name: Setup MSYS2 (Windows libvpx)
         if: runner.os == 'Windows'
-        run: choco install -y pkgconfiglite
+        uses: msys2/setup-msys2@v2
+        with:
+          update: true
+          install: >-
+            mingw-w64-x86_64-libvpx
+            mingw-w64-x86_64-pkgconf
+
+      - name: Configure pkg-config (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          echo "PKG_CONFIG=C:/msys64/mingw64/bin/pkg-config.exe" >> "$GITHUB_ENV"
+          echo "PKG_CONFIG_PATH=C:/msys64/mingw64/lib/pkgconfig" >> "$GITHUB_ENV"
 
       - name: Set CMake policy floor for macOS
         if: runner.os == 'macOS'

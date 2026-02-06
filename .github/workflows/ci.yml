@@ -78,6 +78,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Free disk space
+        uses: jlumbroso/free-disk-space@main
+        with:
+          large-packages: true
+          docker-images: false
+          tool-cache: false
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
@@ -226,7 +233,18 @@ jobs:
 
       - name: Install dependencies (Windows)
         if: matrix.platform == 'windows-latest'
-        run: choco install -y pkgconfiglite
+        uses: msys2/setup-msys2@v2
+        with:
+          update: true
+          install: >-
+            mingw-w64-x86_64-libvpx
+            mingw-w64-x86_64-pkgconf
+
+      - name: Configure pkg-config (Windows)
+        if: matrix.platform == 'windows-latest'
+        run: |
+          echo "PKG_CONFIG=C:/msys64/mingw64/bin/pkg-config.exe" >> "$GITHUB_ENV"
+          echo "PKG_CONFIG_PATH=C:/msys64/mingw64/lib/pkgconfig" >> "$GITHUB_ENV"
 
       - name: Set CMake policy floor (macOS)
         if: matrix.platform == 'macos-latest'
