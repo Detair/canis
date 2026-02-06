@@ -70,6 +70,23 @@ export interface PermissionDefinition {
   forbiddenForEveryone: boolean;
 }
 
+export const CHANNEL_OVERRIDE_PERMISSION_KEYS = [
+  "VIEW_CHANNEL",
+  "SEND_MESSAGES",
+  "EMBED_LINKS",
+  "ATTACH_FILES",
+  "ADD_REACTIONS",
+  "USE_EMOJI",
+  "MANAGE_MESSAGES",
+  "MENTION_EVERYONE",
+  "VOICE_CONNECT",
+  "VOICE_SPEAK",
+  "VOICE_MUTE_OTHERS",
+  "VOICE_DEAFEN_OTHERS",
+  "VOICE_MOVE_MEMBERS",
+  "CREATE_INVITE",
+] as const;
+
 // All permissions with their definitions
 export const PERMISSIONS: PermissionDefinition[] = [
   // Content permissions
@@ -284,6 +301,14 @@ export const PERMISSIONS: PermissionDefinition[] = [
     forbiddenForEveryone: true,
   },
 ];
+
+const CHANNEL_OVERRIDE_PERMISSION_KEY_SET = new Set<string>(
+  CHANNEL_OVERRIDE_PERMISSION_KEYS
+);
+
+export const CHANNEL_OVERRIDE_PERMISSIONS = PERMISSIONS.filter((permission) =>
+  CHANNEL_OVERRIDE_PERMISSION_KEY_SET.has(permission.key)
+);
 
 // Category display names
 export const CATEGORY_NAMES: Record<PermissionCategory, string> = {
