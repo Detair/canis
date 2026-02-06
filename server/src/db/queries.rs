@@ -1082,9 +1082,8 @@ pub async fn search_messages_filtered(
     }
     // has_file is handled via the JOIN (ensures at least one attachment exists)
 
-    let _ = param_idx; // suppress unused warning
     sql.push_str(" ORDER BY m.created_at DESC");
-    write!(sql, " LIMIT {limit} OFFSET {offset}").unwrap();
+    write!(sql, " LIMIT ${param_idx} OFFSET ${}", param_idx + 1).unwrap();
 
     let mut q = sqlx::query_as::<_, Message>(&sql)
         .bind(channel_ids)
@@ -1100,7 +1099,7 @@ pub async fn search_messages_filtered(
         q = q.bind(author_id);
     }
 
-    q.fetch_all(pool).await
+    q.bind(limit).bind(offset).fetch_all(pool).await
 }
 
 /// Count search results with advanced filters using dynamic SQL.

@@ -155,14 +155,13 @@ pub async fn search_dm_messages(
 
     let mut dm_channel_ids: Vec<Uuid> = dm_channels.iter().map(|c| c.id).collect();
 
-    // If channel_id filter is provided, validate it's in user's DM set
+    // If channel_id filter is provided, restrict to that channel (or empty if not accessible)
     if let Some(filter_channel_id) = query.channel_id {
-        if !dm_channel_ids.contains(&filter_channel_id) {
-            return Err(DmSearchError::InvalidQuery(
-                "DM channel not found or not accessible".to_string(),
-            ));
+        if dm_channel_ids.contains(&filter_channel_id) {
+            dm_channel_ids = vec![filter_channel_id];
+        } else {
+            dm_channel_ids.clear();
         }
-        dm_channel_ids = vec![filter_channel_id];
     }
 
     // If no DM channels, return empty results

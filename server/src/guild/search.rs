@@ -189,14 +189,13 @@ pub async fn search_messages(
         }
     }
 
-    // If channel_id filter is provided, validate it's in accessible set
+    // If channel_id filter is provided, restrict to that channel (or empty if not accessible)
     if let Some(filter_channel_id) = query.channel_id {
-        if !accessible_channel_ids.contains(&filter_channel_id) {
-            return Err(SearchError::InvalidQuery(
-                "Channel not found or not accessible".to_string(),
-            ));
+        if accessible_channel_ids.contains(&filter_channel_id) {
+            accessible_channel_ids = vec![filter_channel_id];
+        } else {
+            accessible_channel_ids.clear();
         }
-        accessible_channel_ids = vec![filter_channel_id];
     }
 
     // If no channels, return empty results

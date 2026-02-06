@@ -5,7 +5,7 @@
  * Supports both guild and DM search modes.
  */
 
-import { Component, Show, For, createSignal, createEffect } from "solid-js";
+import { Component, Show, For, createSignal, onCleanup } from "solid-js";
 import { useNavigate } from "@solidjs/router";
 import { Search, X, Loader2, Hash, Filter, Link, Paperclip } from "lucide-solid";
 import { searchState, search, searchDMs, loadMore, clearSearch, hasMore } from "@/stores/search";
@@ -34,7 +34,11 @@ const SearchPanel: Component<SearchPanelProps> = (props) => {
   const buildFilters = (): SearchFilters => {
     const filters: SearchFilters = {};
     if (dateFrom()) filters.date_from = new Date(dateFrom()).toISOString();
-    if (dateTo()) filters.date_to = new Date(dateTo() + "T23:59:59").toISOString();
+    if (dateTo()) {
+      const endDate = new Date(dateTo());
+      endDate.setHours(23, 59, 59, 999);
+      filters.date_to = endDate.toISOString();
+    }
     if (authorFilter()) filters.author_id = authorFilter();
     if (hasFilter()) filters.has = hasFilter() as "link" | "file";
     return filters;
@@ -83,44 +87,46 @@ const SearchPanel: Component<SearchPanelProps> = (props) => {
     props.onClose();
   };
 
-  // Escape HTML to prevent XSS
-  const escapeHtml = (text: string): string => {
-    const div = document.createElement("div");
-    div.textContent = text;
-    return div.innerHTML;
-  };
-
   // Escape regex special characters
   const escapeRegex = (text: string): string => {
     return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   };
 
-  // Highlight search terms in content (XSS-safe)
-  const highlightMatches = (content: string) => {
+  // Split content into segments: plain text and highlighted matches
+  const highlightParts = (content: string): { text: string; highlight: boolean }[] => {
     const query = searchState.query.toLowerCase();
-    if (!query) return escapeHtml(content);
-
-    const safeContent = escapeHtml(content);
+    if (!query) return [{ text: content, highlight: false }];
 
     const words = query.split(/\s+/).filter(w => w.length >= 2);
-    let result = safeContent;
+    if (words.length === 0) return [{ text: content, highlight: false }];
 
-    for (const word of words) {
-      const safeWord = escapeRegex(word);
-      const regex = new RegExp(`(${safeWord})`, "gi");
-      result = result.replace(regex, '<mark class="bg-accent-primary/30 text-text-primary rounded px-0.5">$1</mark>');
+    const pattern = words.map(escapeRegex).join("|");
+    const regex = new RegExp(`(${pattern})`, "gi");
+
+    const parts: { text: string; highlight: boolean }[] = [];
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+
+    while ((match = regex.exec(content)) !== null) {
+      if (match.index > lastIndex) {
+        parts.push({ text: content.slice(lastIndex, match.index), highlight: false });
+      }
+      parts.push({ text: match[0], highlight: true });
+      lastIndex = regex.lastIndex;
     }
 
-    return result;
+    if (lastIndex < content.length) {
+      parts.push({ text: content.slice(lastIndex), highlight: false });
+    }
+
+    return parts.length > 0 ? parts : [{ text: content, highlight: false }];
   };
 
   // Cleanup on unmount
-  createEffect(() => {
-    return () => {
-      if (searchTimeout) {
-        clearTimeout(searchTimeout);
-      }
-    };
+  onCleanup(() => {
+    if (searchTimeout) {
+      clearTimeout(searchTimeout);
+    }
   });
 
   return (
@@ -287,10 +293,14 @@ const SearchPanel: Component<SearchPanelProps> = (props) => {
                   </div>
 
                   {/* Content Preview */}
-                  <p
-                    class="text-sm text-text-secondary line-clamp-2"
-                    innerHTML={highlightMatches(result.content.substring(0, 200))}
-                  />
+                  <p class="text-sm text-text-secondary line-clamp-2">
+                    <For each={highlightParts(result.content.substring(0, 200))}>
+                      {(part) => part.highlight
+                        ? <mark class="bg-accent-primary/30 text-text-primary rounded px-0.5">{part.text}</mark>
+                        : <>{part.text}</>
+                      }
+                    </For>
+                  </p>
                 </button>
               )}
             </For>
