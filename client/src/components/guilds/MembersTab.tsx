@@ -5,7 +5,13 @@
 import { Component, createSignal, createMemo, For, Show, onMount } from "solid-js";
 import { Search, Crown } from "lucide-solid";
 import { guildsState, loadGuildMembers, getGuildMembers } from "@/stores/guilds";
-import { loadGuildRoles, loadMemberRoles, getMemberRoles, memberHasPermission } from "@/stores/permissions";
+import {
+  loadGuildRoles,
+  loadMemberRoles,
+  getMemberRoles,
+  memberHasPermission,
+  getUserHighestRolePosition,
+} from "@/stores/permissions";
 import { getUserActivity } from "@/stores/presence";
 import { PermissionBits } from "@/lib/permissionConstants";
 import { authState } from "@/stores/auth";
@@ -37,6 +43,26 @@ const MembersTab: Component<MembersTabProps> = (props) => {
       props.isOwner,
       PermissionBits.MANAGE_ROLES
     );
+
+  const canKickMembers = () =>
+    props.isOwner ||
+    memberHasPermission(
+      props.guildId,
+      authState.user?.id || "",
+      props.isOwner,
+      PermissionBits.KICK_MEMBERS
+    );
+
+  const canModerateMember = (memberUserId: string): boolean => {
+    const currentUserId = authState.user?.id;
+    if (!currentUserId || memberUserId === currentUserId) return false;
+    if (props.isOwner) return true;
+    if (!canKickMembers()) return false;
+
+    const currentUserHighest = getUserHighestRolePosition(props.guildId, currentUserId);
+    const targetUserHighest = getUserHighestRolePosition(props.guildId, memberUserId);
+    return targetUserHighest > currentUserHighest;
+  };
 
   const guild = () => guildsState.guilds.find((g) => g.id === props.guildId);
   const members = () => getGuildMembers(props.guildId);
@@ -204,7 +230,7 @@ const MembersTab: Component<MembersTabProps> = (props) => {
                   </div>
 
                   {/* Manage dropdown - replaces kick button */}
-                  <Show when={canManageRoles() && !isMemberOwner()}>
+                  <Show when={!isMemberOwner() && (canManageRoles() || canModerateMember(member.user_id))}>
                     <MemberRoleDropdown
                       guildId={props.guildId}
                       userId={member.user_id}
