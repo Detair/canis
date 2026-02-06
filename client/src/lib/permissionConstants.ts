@@ -44,6 +44,9 @@ export const PermissionBits = {
 
   // Mentions (bit 23)
   MENTION_EVERYONE: 1 << 23,
+
+  // Channel access (bit 24)
+  VIEW_CHANNEL: 1 << 24,
 } as const;
 
 export type PermissionBit = (typeof PermissionBits)[keyof typeof PermissionBits];
@@ -70,6 +73,14 @@ export interface PermissionDefinition {
 // All permissions with their definitions
 export const PERMISSIONS: PermissionDefinition[] = [
   // Content permissions
+  {
+    key: "VIEW_CHANNEL",
+    bit: PermissionBits.VIEW_CHANNEL,
+    name: "View Channel",
+    description: "Allows viewing channels and reading their message history",
+    category: "content",
+    forbiddenForEveryone: false,
+  },
   {
     key: "SEND_MESSAGES",
     bit: PermissionBits.SEND_MESSAGES,
@@ -310,6 +321,7 @@ export function togglePermission(permissions: number, bit: number): number {
 
 // Default permission presets (matching server)
 export const EVERYONE_DEFAULT =
+  PermissionBits.VIEW_CHANNEL |
   PermissionBits.SEND_MESSAGES |
   PermissionBits.EMBED_LINKS |
   PermissionBits.ATTACH_FILES |
