@@ -107,7 +107,7 @@ jobs:
         run: sqlx migrate run --source server/migrations
 
       - name: Run tests
-        run: cargo nextest run --all-features --workspace --exclude vc-client
+        run: cargo nextest run --all-features --workspace --exclude vc-client -j 1 --slow-timeout 120s
 
   # ===========================================================================
   # @everyone Security Integration Test (Dockerized)
