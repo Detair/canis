@@ -358,7 +358,7 @@ This roadmap outlines the development path from the current prototype to a produ
 - [ ] **[Storage] SaaS Scaling Architecture**
   - Transition from Proxy Method to Signed URLs/Cookies.
   - CDN Integration with CloudFront/Cloudflare.
-- [ ] **[API] Bot Ecosystem** ⏳ ~90% Complete
+- [x] **[API] Bot Ecosystem** ✅
   - ✅ Database schema (bot_applications, slash_commands, guild_bot_installations, users.is_bot)
   - ✅ Bot application management API (create, list, get, delete, token reset)
   - ✅ Secure bot token auth (Argon2id, indexed O(1) lookup, TOCTOU protection)
@@ -373,8 +373,7 @@ This roadmap outlines the development path from the current prototype to a produ
   - ✅ 14 comprehensive integration tests
   - ✅ Frontend: Slash command management UI (register, view, delete commands with options)
   - ✅ Developer documentation / bot API guide (`docs/development/bot-system.md`)
-  - **Remaining:**
-    - [ ] Frontend: Guild bot installation UI in guild settings
+  - ✅ Frontend: Guild bot management UI in guild settings (list, remove)
 - [ ] **[Voice] Multi-Stream Support**
   - Simultaneous Webcam and Screen Sharing.
   - Implement Simulcast (quality tiers) for bandwidth management.
