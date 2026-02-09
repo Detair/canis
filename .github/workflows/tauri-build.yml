@@ -88,9 +88,11 @@ jobs:
         shell: pwsh
         run: |
           $root = "$env:VCPKG_INSTALLATION_ROOT\installed\x64-windows-static-md"
+          # env-libvpx-sys links "libvpx" but vcpkg names it "vpx.lib"
+          Copy-Item "$root\lib\vpx.lib" "$root\lib\libvpx.lib" -ErrorAction SilentlyContinue
           echo "VPX_LIB_DIR=$root\lib" >> $env:GITHUB_ENV
           echo "VPX_INCLUDE_DIR=$root\include" >> $env:GITHUB_ENV
-          echo "VPX_VERSION=1.14.1" >> $env:GITHUB_ENV
+          echo "VPX_VERSION=1.15.2" >> $env:GITHUB_ENV
           echo "VPX_STATIC=1" >> $env:GITHUB_ENV
 
       - name: Set CMake policy floor for macOS
