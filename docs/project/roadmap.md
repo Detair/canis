@@ -4,7 +4,7 @@ This roadmap outlines the development path from the current prototype to a produ
 
 **Current Phase:** Phase 4 (Advanced Features) - In Progress
 
-**Last Updated:** 2026-02-08
+**Last Updated:** 2026-02-10
 
 ## Quick Status Overview
 
@@ -462,21 +462,23 @@ This roadmap outlines the development path from the current prototype to a produ
     - ✅ **Frontend:** Search panel overlay (`SearchPanel.tsx`) with debounced input and pagination
     - ✅ **Frontend:** XSS-safe result highlighting and click-to-navigate with message highlight
     - ✅ **Performance:** Pagination implemented (limit/offset with clamping to max 100)
-    - [ ] **Backend:** Extend to DM message search
-    - [ ] **Backend:** Support advanced filters: date range, channel, author, has:link, has:file
-    - [ ] **Backend:** Add relevance ranking with `ts_rank` (currently sorted by date only)
-    - [ ] **Backend:** Use `ts_headline` for server-side context snippets (currently client-side highlighting)
-    - [ ] **Frontend:** Create global search UI with multi-guild/DM scope
-    - [ ] **Frontend:** Add search syntax help tooltip (AND, OR, quotes, negation)
+    - ✅ **Backend:** DM message search endpoint (`GET /api/dm/search`) with same filter support
+    - ✅ **Backend:** Advanced filters: date range, channel, author, has:link, has:file
+    - ✅ **Backend:** Relevance ranking with `ts_rank` and sort toggle (Relevance / Date)
+    - ✅ **Backend:** Server-side context snippets using `ts_headline` with `<mark>` tags
+    - ✅ **Backend:** Global search across all guilds and DMs (`GET /api/search`)
+    - ✅ **Frontend:** Global search UI with Ctrl+Shift+F shortcut and "Search Everywhere" in Command Palette
+    - ✅ **Frontend:** Search syntax help tooltip (AND, OR, "exact phrase", -exclude)
+    - ✅ **Backend:** Dedicated Search rate limit category (15 req/min)
+    - ✅ **Tests:** 29 integration tests (9 global search, 20 guild/DM search) covering auth, filters, ranking, headlines, sort, pagination, access control, validation
     - **Tech Debt:**
       - [ ] Implement channel-level permission filtering (currently all guild members see all channels)
-      - [ ] Add rate limiting to search endpoint (expensive queries need protection)
       - [ ] Add integration tests for search edge cases:
-        - Empty queries, special characters (`@#$%^&*()`), very long queries (>1000 chars)
+        - Special characters (`@#$%^&*()`), very long queries (>1000 chars)
         - Large result sets (10k+ messages), complex queries with multiple AND/OR operators
         - Deleted messages in results, concurrent searches from same user
       - [ ] Add security tests:
-        - Non-member search attempts, SQL injection via search query
+        - SQL injection via search query
         - XSS via malicious search result content
         - Channel permission bypass attempts (when private channels are implemented)
       - [ ] Add search query analytics logging for UX insights
@@ -580,6 +582,9 @@ This roadmap outlines the development path from the current prototype to a produ
 ---
 
 ## Recent Changes
+
+### 2026-02-10
+- **Search Integration Tests** - Added 14 new integration tests for search enhancements: 9 tests for global search endpoint (`GET /api/search`) covering auth, multi-guild results, DM inclusion, source types, access control, validation, and pagination; 5 tests for guild search covering `ts_headline` snippets with `<mark>` tags, `ts_rank` relevance scoring, sort parameter (relevance/date/invalid). Updated roadmap search checklist to reflect all completed items (DM search, filters, ranking, headlines, global search, syntax help, rate limiting).
 
 ### 2026-01-31
 - **Toast Component Tests** - Created comprehensive test suite for toast notification system (16 passing tests, 5 skipped timing tests). Tests verify API behavior including deduplication, max visible limit (5), dismissal, and toast types. Added duration: 0 workaround for vitest window.setTimeout issues.
