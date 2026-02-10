@@ -37,6 +37,12 @@ export interface CommandOption {
   required: boolean;
 }
 
+export interface GuildCommand {
+  name: string;
+  description: string;
+  bot_name: string;
+}
+
 export interface InstalledBot {
   application_id: string;
   bot_user_id: string;
@@ -319,4 +325,23 @@ export async function removeInstalledBot(guildId: string, botId: string): Promis
   if (!response.ok) {
     throw new Error('Failed to remove bot');
   }
+}
+
+/**
+ * List available slash commands in a guild (from installed bots).
+ */
+export async function listGuildCommands(guildId: string): Promise<GuildCommand[]> {
+  const token = getAccessToken();
+  const response = await fetch(`${API_BASE}/api/guilds/${guildId}/commands`, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to list guild commands');
+  }
+
+  return response.json();
 }

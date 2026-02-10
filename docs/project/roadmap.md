@@ -430,29 +430,17 @@ This roadmap outlines the development path from the current prototype to a produ
       - Queue management with automatic dismissal
       - Position control (top-right, bottom-right, etc.)
       - Action buttons for interactive notifications
-- [ ] **[UX] Friction-Reduction & Productivity**
+- [x] **[UX] Friction-Reduction & Productivity** ✅
   - **Context:** Streamline daily interactions to make the platform feel snappy and reliable.
-  - **Implementation:**
-    - **Persistent Drafts:**
-      - Add `drafts: Record<string, string>` to `MessagesState` in `client/src/stores/messages.ts`
-      - Update `setContent` to sync with store drafts automatically
-      - Restore draft when navigating back to channel
-      - Clear draft only on successful send
-    - **Quick Message Actions & Reactions:**
-      - Create `MessageActions.tsx` component with common emojis (👍, ❤️, 😂) and action buttons
-      - Mount toolbar in `MessageItem.tsx` on hover
-      - Position dynamically based on available space
-      - Support keyboard shortcuts for quick reactions
-    - **Smart Input Auto-complete:**
-      - Create `SuggestionPopup.tsx` component with fuzzy matching
-      - Trigger popup based on cursor position and prefixes: `@` (users), `#` (channels), `:` (emojis), `/` (commands)
-      - Support keyboard navigation (↑↓ + Enter)
-      - Cache recent mentions for faster access
-    - **Multi-line Input Upgrade:**
-      - Refactor: Replace `<input>` with `<textarea>` in `MessageInput.tsx`
-      - Implement auto-resize based on content height (max 8 lines)
-      - Support Shift+Enter for new lines, Enter for send
-      - Maintain cursor position on resize
+  - **Completed:**
+    - ✅ Persistent message drafts per channel with auto-restore on navigation
+    - ✅ Quick reaction toolbar on message hover (👍, ❤️, 😂, 😮) with full emoji picker
+    - ✅ Multi-line textarea input with auto-resize (max 8 lines), Shift+Enter for newlines
+    - ✅ @user and :emoji: autocomplete with keyboard navigation (↑↓ + Enter/Tab)
+    - ✅ #channel autocomplete for mentioning text channels in guild messages
+    - ✅ /command autocomplete for browsing slash commands from installed bots
+    - ✅ Alt+1..4 keyboard shortcuts for quick reactions on hovered messages
+    - ✅ Backend `GET /api/guilds/{id}/commands` endpoint for guild command listing
 - [ ] **[Growth] Discovery & Onboarding**
   - **Guild Discovery:**
     - **Backend:** Create public guild listing API with search and filters

@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- #channel autocomplete — type `#` in guild channels to mention text channels with fuzzy matching
+- /command autocomplete — type `/` at the start of a message to browse available slash commands from installed bots
+- Reaction keyboard shortcuts — press Alt+1 through Alt+4 while hovering a message to quick-react (👍, ❤️, 😂, 😮)
+- Guild commands API endpoint (`GET /api/guilds/{id}/commands`) listing available slash commands from installed bots
+
 - Native webcam capture pipeline for Tauri desktop client using `nokhwa` (camera enumeration, RGB→I420 conversion, VP9 encoding, RTP sending)
 - Webcam video support in voice channels with camera toggle button
 - Simultaneous webcam and screen sharing (multi-stream)

@@ -163,3 +163,15 @@ pub struct UpdateEmojiRequest {
     #[validate(length(min = 2, max = 32, message = "Name must be 2-32 characters"))]
     pub name: String,
 }
+
+// ============================================================================
+// Command Types
+// ============================================================================
+
+/// Available slash command in a guild (from installed bots).
+#[derive(Debug, Serialize)]
+pub struct GuildCommandInfo {
+    pub name: String,
+    pub description: String,
+    pub bot_name: String,
+}

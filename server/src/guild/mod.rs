@@ -38,6 +38,7 @@ pub fn router() -> Router<AppState> {
         )
         .route("/{id}/channels", get(handlers::list_channels))
         .route("/{id}/channels/reorder", post(handlers::reorder_channels))
+        .route("/{id}/commands", get(handlers::list_guild_commands))
         // Role routes
         .route(
             "/{id}/roles",

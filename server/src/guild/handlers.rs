@@ -9,8 +9,8 @@ use uuid::Uuid;
 use validator::Validate;
 
 use super::types::{
-    CreateGuildRequest, Guild, GuildMember, GuildWithMemberCount, JoinGuildRequest,
-    UpdateGuildRequest,
+    CreateGuildRequest, Guild, GuildCommandInfo, GuildMember, GuildWithMemberCount,
+    JoinGuildRequest, UpdateGuildRequest,
 };
 use crate::api::AppState;
 use crate::auth::AuthUser;
@@ -767,4 +767,49 @@ pub async fn remove_bot_from_guild(
     }
 
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// List available slash commands in a guild (from installed bots).
+///
+/// Returns both guild-scoped and global commands from all installed bots.
+/// Guild-scoped commands take precedence over global commands with the same name.
+///
+/// `GET /api/guilds/:guild_id/commands`
+#[tracing::instrument(skip(state))]
+pub async fn list_guild_commands(
+    State(state): State<AppState>,
+    auth: AuthUser,
+    Path(guild_id): Path<Uuid>,
+) -> Result<Json<Vec<GuildCommandInfo>>, GuildError> {
+    // Verify membership
+    let is_member = db::is_guild_member(&state.db, guild_id, auth.id).await?;
+    if !is_member {
+        return Err(GuildError::Forbidden);
+    }
+
+    // Single query: guild-scoped + global commands from installed bots.
+    // DISTINCT ON deduplicates by name; ORDER BY (sc.guild_id IS NULL) ensures
+    // guild-scoped commands (IS NULL = false = 0) win over global ones (= 1).
+    let commands: Vec<(String, String, String)> = sqlx::query_as(
+        r"SELECT DISTINCT ON (sc.name) sc.name, sc.description, ba.name as bot_name
+           FROM slash_commands sc
+           INNER JOIN bot_applications ba ON sc.application_id = ba.id
+           INNER JOIN guild_bot_installations gbi ON ba.id = gbi.application_id
+           WHERE gbi.guild_id = $1 AND (sc.guild_id = $1 OR sc.guild_id IS NULL)
+           ORDER BY sc.name, (sc.guild_id IS NULL)",
+    )
+    .bind(guild_id)
+    .fetch_all(&state.db)
+    .await?;
+
+    let result: Vec<GuildCommandInfo> = commands
+        .into_iter()
+        .map(|(name, description, bot_name)| GuildCommandInfo {
+            name,
+            description,
+            bot_name,
+        })
+        .collect();
+
+    Ok(Json(result))
 }

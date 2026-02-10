@@ -23,7 +23,7 @@ interface MessageActionsProps {
 }
 
 // Quick reaction emojis
-const QUICK_EMOJIS = ["👍", "❤️", "😂", "😮"];
+export const QUICK_EMOJIS = ["👍", "❤️", "😂", "😮"];
 
 const MessageActions: Component<MessageActionsProps> = (props) => {
   const [showEmojiPicker, setShowEmojiPicker] = createSignal(false);

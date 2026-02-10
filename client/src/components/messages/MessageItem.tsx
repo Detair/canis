@@ -8,7 +8,7 @@ import Avatar from "@/components/ui/Avatar";
 import CodeBlock from "@/components/ui/CodeBlock";
 import ReactionBar from "./ReactionBar";
 import ThreadIndicator from "./ThreadIndicator";
-import MessageActions from "./MessageActions";
+import MessageActions, { QUICK_EMOJIS } from "./MessageActions";
 import { getServerUrl, getAccessToken, addReaction, removeReaction } from "@/lib/tauri";
 import { showContextMenu, type ContextMenuEntry } from "@/components/ui/ContextMenu";
 import { currentUser } from "@/stores/auth";
@@ -59,12 +59,36 @@ interface TextBlock {
 
 type ContentBlock = CodeBlockData | TextBlock;
 
+// ---- Module-level singleton for Alt+1..4 reaction shortcuts ----
+// One global listener instead of one per rendered MessageItem.
+let reactionShortcutHandler: ((emoji: string) => void) | null = null;
+let reactionListenerRegistered = false;
+
+function ensureReactionShortcutListener() {
+  if (reactionListenerRegistered) return;
+  reactionListenerRegistered = true;
+  document.addEventListener("keydown", (e: KeyboardEvent) => {
+    if (!e.altKey || !reactionShortcutHandler) return;
+    const tag = document.activeElement?.tagName;
+    if (tag === "TEXTAREA" || tag === "INPUT") return;
+
+    const index = parseInt(e.key, 10) - 1;
+    if (index >= 0 && index < QUICK_EMOJIS.length) {
+      e.preventDefault();
+      reactionShortcutHandler(QUICK_EMOJIS[index]);
+    }
+  });
+}
+
 const MessageItem: Component<MessageItemProps> = (props) => {
   let contentRef: HTMLDivElement | undefined;
 
   const author = () => props.message.author;
   const isEdited = () => !!props.message.edited_at;
   const hasReactions = () => props.message.reactions && props.message.reactions.length > 0;
+
+  // Register the singleton keydown listener once
+  onMount(() => ensureReactionShortcutListener());
 
   // Setup spoiler click-to-reveal functionality
   onMount(() => {
@@ -237,6 +261,8 @@ const MessageItem: Component<MessageItemProps> = (props) => {
   return (
     <div
       onContextMenu={handleContextMenu}
+      onMouseEnter={() => { reactionShortcutHandler = handleAddReaction; }}
+      onMouseLeave={() => { reactionShortcutHandler = null; }}
       class={`group relative flex gap-4 px-4 py-0.5 hover:bg-white/3 transition-colors ${
         props.compact ? "mt-0" : "mt-4"
       }`}
