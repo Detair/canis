@@ -6,9 +6,10 @@
 
 import { Component, createSignal, Show } from "solid-js";
 import { Portal } from "solid-js/web";
-import { X, Link, Users, Shield, Smile, Bot } from "lucide-solid";
+import { X, Link, Users, Shield, Smile, Bot, Settings } from "lucide-solid";
 import { guildsState, isGuildOwner } from "@/stores/guilds";
 import { authState } from "@/stores/auth";
+import GeneralTab from "./GeneralTab";
 import InvitesTab from "./InvitesTab";
 import MembersTab from "./MembersTab";
 import RolesTab from "./RolesTab";
@@ -24,14 +25,19 @@ interface GuildSettingsModalProps {
   onClose: () => void;
 }
 
-type TabId = "invites" | "members" | "roles" | "emojis" | "bots";
+type TabId = "general" | "invites" | "members" | "roles" | "emojis" | "bots";
 
 const GuildSettingsModal: Component<GuildSettingsModalProps> = (props) => {
   const guild = () => guildsState.guilds.find((g) => g.id === props.guildId);
   const isOwner = () => isGuildOwner(props.guildId, authState.user?.id || "");
 
-  // Default to members tab for non-owners
-  const [activeTab, setActiveTab] = createSignal<TabId>(isOwner() ? "invites" : "members");
+  // Default tab: general for managers, invites for owner-only, members for everyone else
+  const defaultTab = (): TabId => {
+    if (isOwner()) return "general";
+    if (memberHasPermission(props.guildId, authState.user?.id || "", false, PermissionBits.MANAGE_GUILD)) return "general";
+    return "members";
+  };
+  const [activeTab, setActiveTab] = createSignal<TabId>(defaultTab());
   const [editingRole, setEditingRole] = createSignal<GuildRole | null>(null);
   const [isCreatingRole, setIsCreatingRole] = createSignal(false);
 
@@ -53,7 +59,7 @@ const GuildSettingsModal: Component<GuildSettingsModalProps> = (props) => {
       PermissionBits.MANAGE_EMOJIS_AND_STICKERS
     );
 
-  const canManageBots = () =>
+  const canManageGuild = () =>
     isOwner() ||
     memberHasPermission(
       props.guildId,
@@ -61,6 +67,8 @@ const GuildSettingsModal: Component<GuildSettingsModalProps> = (props) => {
       isOwner(),
       PermissionBits.MANAGE_GUILD
     );
+
+  const canManageBots = () => canManageGuild();
 
   const handleBackdropClick = (e: MouseEvent) => {
     if (e.target === e.currentTarget) {
@@ -109,6 +117,19 @@ const GuildSettingsModal: Component<GuildSettingsModalProps> = (props) => {
 
           {/* Tabs */}
           <div class="flex border-b border-white/10">
+            <Show when={canManageGuild()}>
+              <button
+                onClick={() => setActiveTab("general")}
+                class="flex items-center gap-2 px-6 py-3 font-medium transition-colors"
+                classList={{
+                  "text-accent-primary border-b-2 border-accent-primary": activeTab() === "general",
+                  "text-text-secondary hover:text-text-primary": activeTab() !== "general",
+                }}
+              >
+                <Settings class="w-4 h-4" />
+                General
+              </button>
+            </Show>
             <Show when={isOwner()}>
               <button
                 onClick={() => setActiveTab("invites")}
@@ -176,6 +197,9 @@ const GuildSettingsModal: Component<GuildSettingsModalProps> = (props) => {
 
           {/* Content */}
           <div class="flex-1 overflow-y-auto">
+            <Show when={activeTab() === "general" && canManageGuild()}>
+              <GeneralTab guildId={props.guildId} />
+            </Show>
             <Show when={activeTab() === "invites" && isOwner()}>
               <InvitesTab guildId={props.guildId} />
             </Show>

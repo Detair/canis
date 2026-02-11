@@ -185,6 +185,7 @@ pub fn create_router(state: AppState) -> Router {
             post(favorites::add_favorite).delete(favorites::remove_favorite),
         )
         .route("/api/me/unread", get(unread::get_unread_aggregate))
+        .route("/api/me/read-all", post(unread::mark_all_read))
         .nest("/api/keys", crypto::router())
         .nest("/api/users/{user_id}/keys", crypto::user_keys_router())
         // Bot management routes

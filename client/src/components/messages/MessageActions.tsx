@@ -20,6 +20,8 @@ interface MessageActionsProps {
   isThreadReply?: boolean;
   /** Callback to open thread for this message */
   onReplyInThread?: () => void;
+  /** Whether threads are enabled for this guild (default true) */
+  threadsEnabled?: boolean;
 }
 
 // Quick reaction emojis
@@ -73,8 +75,8 @@ const MessageActions: Component<MessageActionsProps> = (props) => {
         />
       </Show>
 
-      {/* Reply in thread button (hidden for thread replies) */}
-      <Show when={!props.isThreadReply && props.onReplyInThread}>
+      {/* Reply in thread button (hidden for thread replies or when threads disabled) */}
+      <Show when={!props.isThreadReply && props.onReplyInThread && props.threadsEnabled !== false}>
         <button
           class="w-7 h-7 flex items-center justify-center rounded hover:bg-white/10 text-text-secondary hover:text-text-primary transition-colors"
           onClick={() => props.onReplyInThread?.()}

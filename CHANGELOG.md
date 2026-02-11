@@ -25,6 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Admin shield button in UserPanel now opens the AdminQuickModal instead of navigating directly (modal was unreachable dead code)
 
 ### Added
+- "Mark All as Read" bulk actions — mark all channels in a guild, all DMs, or everything as read at once
+- Per-guild thread toggle — guild managers can enable/disable message threads from Server Settings > General
+- Error toast notifications for user-initiated actions that previously failed silently (friend requests, message send/edit/delete, thread replies, favorites, categories)
 - Relevance-ranked search results using PostgreSQL `ts_rank` with sort toggle (Relevance / Date)
 - Server-side search snippet highlighting using PostgreSQL `ts_headline` with `<mark>` tags
 - Global search across all guilds and DMs (`GET /api/search`, Ctrl+Shift+F shortcut)

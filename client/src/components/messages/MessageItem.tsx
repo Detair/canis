@@ -25,6 +25,8 @@ interface MessageItemProps {
   guildId?: string;
   /** If true, suppresses thread indicator and "Reply in Thread" actions (when rendered inside ThreadSidebar) */
   isInsideThread?: boolean;
+  /** Whether threads are enabled for this guild (default true) */
+  threadsEnabled?: boolean;
 }
 
 // Configure marked for GitHub Flavored Markdown
@@ -211,8 +213,8 @@ const MessageItem: Component<MessageItemProps> = (props) => {
       },
     ];
 
-    // Only show "Reply in Thread" for top-level messages, not inside ThreadSidebar
-    if (!msg.parent_id && !props.isInsideThread) {
+    // Only show "Reply in Thread" for top-level messages, not inside ThreadSidebar, and only when threads are enabled
+    if (!msg.parent_id && !props.isInsideThread && props.threadsEnabled !== false) {
       items.push(
         { separator: true },
         {
@@ -309,6 +311,7 @@ const MessageItem: Component<MessageItemProps> = (props) => {
         guildId={props.guildId}
         isThreadReply={!!props.message.parent_id || !!props.isInsideThread}
         onReplyInThread={props.isInsideThread ? undefined : () => openThread(props.message)}
+        threadsEnabled={props.threadsEnabled}
       />
 
       {/* Content column */}

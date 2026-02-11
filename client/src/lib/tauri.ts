@@ -1139,6 +1139,26 @@ export async function getGuildChannels(guildId: string): Promise<ChannelWithUnre
 }
 
 /**
+ * Get guild settings.
+ */
+export async function getGuildSettings(guildId: string): Promise<{ threads_enabled: boolean }> {
+  return fetchApi<{ threads_enabled: boolean }>(`/api/guilds/${guildId}/settings`);
+}
+
+/**
+ * Update guild settings (requires MANAGE_GUILD).
+ */
+export async function updateGuildSettings(
+  guildId: string,
+  settings: { threads_enabled?: boolean },
+): Promise<{ threads_enabled: boolean }> {
+  return fetchApi<{ threads_enabled: boolean }>(`/api/guilds/${guildId}/settings`, {
+    method: "PATCH",
+    body: settings,
+  });
+}
+
+/**
  * Mark a guild channel as read.
  * @param channelId - Channel ID to mark as read
  * @param lastReadMessageId - Optional ID of the last read message
@@ -3306,6 +3326,27 @@ export async function deleteMessage(
  */
 export async function getUnreadAggregate(): Promise<UnreadAggregate> {
   return fetchApi<UnreadAggregate>("/api/me/unread");
+}
+
+/**
+ * Mark all text channels in a guild as read.
+ */
+export async function markAllGuildChannelsRead(guildId: string): Promise<void> {
+  await fetchApi<void>(`/api/guilds/${guildId}/read-all`, { method: "POST" });
+}
+
+/**
+ * Mark all DM channels as read.
+ */
+export async function markAllDMsRead(): Promise<void> {
+  await fetchApi<void>("/api/dm/read-all", { method: "POST" });
+}
+
+/**
+ * Mark everything (guilds + DMs) as read.
+ */
+export async function markAllRead(): Promise<void> {
+  await fetchApi<void>("/api/me/read-all", { method: "POST" });
 }
 
 // ============================================================================

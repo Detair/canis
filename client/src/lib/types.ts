@@ -101,7 +101,12 @@ export interface Guild {
   owner_id: string;
   icon_url: string | null;
   description: string | null;
+  threads_enabled: boolean;
   created_at: string;
+}
+
+export interface GuildSettings {
+  threads_enabled: boolean;
 }
 
 export interface GuildMember {

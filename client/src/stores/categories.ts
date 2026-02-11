@@ -7,6 +7,7 @@
 import { createStore, reconcile } from "solid-js/store";
 import type { ChannelCategory } from "@/lib/types";
 import * as tauri from "@/lib/tauri";
+import { showToast } from "@/components/ui/Toast";
 
 // ============================================================================
 // State Interface
@@ -51,6 +52,7 @@ export async function loadGuildCategories(guildId: string): Promise<void> {
   } catch (err) {
     const error = err instanceof Error ? err.message : String(err);
     console.error("Failed to load guild categories:", error);
+    showToast({ type: "error", title: "Categories Failed", message: "Could not load channel categories." });
     setCategoriesState({ isLoading: false, error });
   }
 }
