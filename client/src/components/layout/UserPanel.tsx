@@ -35,11 +35,9 @@ const UserPanel: Component = () => {
     return getUserPresence(userId)?.customStatus ?? null;
   };
 
-  const handleCustomStatusSave = async (status: CustomStatus | null) => {
-    // TODO: Implement custom status update via tauri/API when backend supports it
-    console.log("Custom status save:", status);
-    // For now, just close the modal - actual saving will be implemented
-    // when the backend endpoint is ready
+  const handleCustomStatusSave = async (_status: CustomStatus | null) => {
+    // No-op: backend does not support custom status yet (PresenceUpdate only handles online/away/busy/offline).
+    // Wire this up when a custom_status field is added to the presence system.
   };
 
   onMount(() => {

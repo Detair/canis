@@ -191,8 +191,8 @@ export class TauriVoiceAdapter implements VoiceAdapter {
   }
 
   async getConnectionMetrics(): Promise<ConnectionMetrics | null> {
-    // TODO: Implement via Tauri command to get native WebRTC stats
-    // This will be implemented when the connectivity monitoring feature is complete
+    // TODO: Add Tauri command to fetch native WebRTC connection stats
+    // Blocked on connectivity monitoring feature
     return null;
   }
 
