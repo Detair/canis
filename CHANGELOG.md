@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Security
+- File upload magic byte validation — uploaded files are now verified against their claimed MIME type using content inspection, preventing file type spoofing (e.g. executables disguised as images)
 - Password reset endpoint no longer leaks user existence via HTTP 500 on database errors — all code paths now return generic 200
 - Password reset aborts if old token invalidation fails, preventing token accumulation
 - SMTP connection verified at server startup; misconfiguration logged at error level instead of warn
