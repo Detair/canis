@@ -1458,11 +1458,17 @@ pub async fn forgot_password(
         })));
     }
 
-    // Look up user by email
-    let user = match find_user_by_email(&state.db, &body.email).await? {
-        Some(u) => u,
-        None => {
+    // Look up user by email — catch DB errors to prevent enumeration via 500 responses
+    let user = match find_user_by_email(&state.db, &body.email).await {
+        Ok(Some(u)) => u,
+        Ok(None) => {
             // User not found — return success silently (no enumeration)
+            return Ok(Json(serde_json::json!({
+                "message": "If an account with that email exists, a reset code has been sent."
+            })));
+        }
+        Err(e) => {
+            tracing::error!(error = %e, "Database error during password reset user lookup");
             return Ok(Json(serde_json::json!({
                 "message": "If an account with that email exists, a reset code has been sent."
             })));
@@ -1476,13 +1482,16 @@ pub async fn forgot_password(
         })));
     }
 
-    // Invalidate existing tokens for this user
+    // Invalidate existing tokens for this user — abort if this fails to prevent token accumulation
     if let Err(e) = invalidate_user_reset_tokens(&state.db, user.id).await {
-        tracing::warn!(
+        tracing::error!(
             error = %e,
             user_id = %user.id,
-            "Failed to invalidate existing reset tokens"
+            "Failed to invalidate existing reset tokens, aborting reset flow"
         );
+        return Ok(Json(serde_json::json!({
+            "message": "If an account with that email exists, a reset code has been sent."
+        })));
     }
 
     // Generate 32 random bytes → base64url token
@@ -1497,8 +1506,13 @@ pub async fn forgot_password(
     let token_hash = hash_token(&raw_token);
     let expires_at = Utc::now() + Duration::hours(1);
 
-    // Insert token into DB
-    create_password_reset_token(&state.db, user.id, &token_hash, expires_at).await?;
+    // Insert token into DB — catch DB errors to prevent enumeration via 500 responses
+    if let Err(e) = create_password_reset_token(&state.db, user.id, &token_hash, expires_at).await {
+        tracing::error!(error = %e, user_id = %user.id, "Failed to create password reset token");
+        return Ok(Json(serde_json::json!({
+            "message": "If an account with that email exists, a reset code has been sent."
+        })));
+    }
 
     // Send email — log warning on failure, return same generic response to prevent enumeration
     match email_service
@@ -1509,17 +1523,17 @@ pub async fn forgot_password(
             tracing::info!(user_id = %user.id, "Password reset email sent");
         }
         Err(e) => {
-            tracing::warn!(
+            tracing::error!(
                 error = %e,
                 user_id = %user.id,
                 "Failed to send password reset email"
             );
             // Clean up the orphaned token since the user never received it
             if let Err(cleanup_err) = invalidate_user_reset_tokens(&state.db, user.id).await {
-                tracing::warn!(
+                tracing::error!(
                     error = %cleanup_err,
                     user_id = %user.id,
-                    "Failed to clean up orphaned password reset token"
+                    "Failed to clean up orphaned password reset token after email failure"
                 );
             }
         }

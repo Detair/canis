@@ -7,7 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+- Password reset endpoint no longer leaks user existence via HTTP 500 on database errors — all code paths now return generic 200
+- Password reset aborts if old token invalidation fails, preventing token accumulation
+- SMTP connection verified at server startup; misconfiguration logged at error level instead of warn
+
 ### Fixed
+- Password reset views now read server URL from localStorage, matching Login/Register behavior for self-hosted setups
+- Server URL forwarded from Forgot Password to Reset Password page via query parameter
+- Forgot Password and Reset Password form labels now linked to inputs via `for`/`id` for accessibility
+- Error messages on password reset forms announced to screen readers via `role="alert"`
+- Typed error handling (`err: unknown` + `instanceof Error`) in password reset forms instead of `catch(err: any)`
+- Expired reset token cleanup query now logs database errors instead of silently propagating
 - Content spoilers (`||text||`) now render correctly — DOMPurify config was stripping spoiler HTML tags
 - Mention highlighting no longer corrupts inline code spans (e.g. `` `@everyone` `` renders correctly)
 - Mention styling no longer bleeds through unrevealed spoiler overlays

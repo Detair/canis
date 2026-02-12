@@ -396,7 +396,11 @@ pub async fn cleanup_expired_reset_tokens(pool: &PgPool) -> sqlx::Result<u64> {
         "DELETE FROM password_reset_tokens WHERE expires_at < NOW() - INTERVAL '24 hours'",
     )
     .execute(pool)
-    .await?;
+    .await
+    .map_err(|e| {
+        error!(query = "cleanup_expired_reset_tokens", error = %e, "Database query failed");
+        e
+    })?;
     Ok(result.rows_affected())
 }
 
