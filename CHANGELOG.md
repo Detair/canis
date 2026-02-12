@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- Content spoilers (`||text||`) now render correctly — DOMPurify config was stripping spoiler HTML tags
 - Command Palette mute/deafen commands now toggle microphone and deafen state instead of logging to console
 - "Delete Message" context menu action now calls the server API with confirmation dialog
 - "Mark as Read" channel context menu action now clears unread state via `markChannelAsRead`
@@ -25,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Admin shield button in UserPanel now opens the AdminQuickModal instead of navigating directly (modal was unreachable dead code)
 
 ### Added
+- Visual mention highlighting — `@everyone`, `@here`, and `@username` mentions render with accent-colored background styling
 - "Mark All as Read" bulk actions — mark all channels in a guild, all DMs, or everything as read at once
 - Per-guild thread toggle — guild managers can enable/disable message threads from Server Settings > General
 - Error toast notifications for user-initiated actions that previously failed silently (friend requests, message send/edit/delete, thread replies, favorites, categories)

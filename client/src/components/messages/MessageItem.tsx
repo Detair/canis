@@ -39,8 +39,8 @@ marked.use({ extensions: [spoilerExtension] });
 
 // Configure DOMPurify for safe HTML rendering (XSS prevention)
 const PURIFY_CONFIG = {
-  ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'code', 'pre', 'a', 'ul', 'ol', 'li', 'blockquote', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr', 'del', 's', 'table', 'thead', 'tbody', 'tr', 'th', 'td'],
-  ALLOWED_ATTR: ['href', 'target', 'rel'],
+  ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'code', 'pre', 'a', 'ul', 'ol', 'li', 'blockquote', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr', 'del', 's', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'span', 'mark'],
+  ALLOWED_ATTR: ['href', 'target', 'rel', 'class', 'data-spoiler'],
   ALLOW_DATA_ATTR: false,
   RETURN_TRUSTED_TYPE: false as const,
 };
@@ -48,6 +48,33 @@ const PURIFY_CONFIG = {
 const sanitizeHtml = (html: string): string => {
   return DOMPurify.sanitize(html, PURIFY_CONFIG) as string;
 };
+
+/**
+ * Highlight @mentions in text before markdown parsing.
+ * Wraps @everyone, @here, and @username in styled <mark> tags.
+ * Escapes any existing mark tags to prevent nesting issues.
+ */
+function highlightMentions(text: string): string {
+  // Escape any existing mark tags first to avoid nesting
+  text = text.replace(/<mark/g, '&lt;mark').replace(/<\/mark>/g, '&lt;/mark&gt;');
+
+  // @everyone and @here -- high-visibility
+  let result = text.replace(
+    /\B@(everyone|here)\b/g,
+    '<mark class="mention-everyone">@$1</mark>'
+  );
+
+  // @username -- normal mention (2-32 chars, alphanumeric + underscore)
+  result = result.replace(
+    /\B@([\w]{2,32})\b/g,
+    (match, username) => {
+      if (username === "everyone" || username === "here") return match; // Already handled
+      return `<mark class="mention-user">@${username}</mark>`;
+    }
+  );
+
+  return result;
+}
 
 interface CodeBlockData {
   type: 'code';
@@ -157,7 +184,7 @@ const MessageItem: Component<MessageItemProps> = (props) => {
       if (match.index > lastIndex) {
         const text = content.substring(lastIndex, match.index);
         if (text.trim()) {
-          const html = sanitizeHtml(marked.parse(text, { async: false }) as string);
+          const html = sanitizeHtml(marked.parse(highlightMentions(text), { async: false }) as string);
           blocks.push({ type: 'text', html });
         }
       }
@@ -176,14 +203,14 @@ const MessageItem: Component<MessageItemProps> = (props) => {
     if (lastIndex < content.length) {
       const text = content.substring(lastIndex);
       if (text.trim()) {
-        const html = sanitizeHtml(marked.parse(text, { async: false }) as string);
+        const html = sanitizeHtml(marked.parse(highlightMentions(text), { async: false }) as string);
         blocks.push({ type: 'text', html });
       }
     }
 
     // If no code blocks found, just parse the whole content
     if (blocks.length === 0) {
-      const html = sanitizeHtml(marked.parse(content, { async: false }) as string);
+      const html = sanitizeHtml(marked.parse(highlightMentions(content), { async: false }) as string);
       blocks.push({ type: 'text', html });
     }
 

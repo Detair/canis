@@ -87,3 +87,24 @@ textarea.bg-transparent {
 .spoiler.revealed:hover {
   background-color: transparent;
 }
+
+/* Mention highlighting */
+.mention-everyone {
+  background-color: rgba(99, 102, 241, 0.2);
+  color: var(--color-accent-primary);
+  padding: 0 2px;
+  border-radius: 3px;
+  font-weight: 600;
+}
+
+.mention-user {
+  background-color: rgba(99, 102, 241, 0.15);
+  color: var(--color-accent-primary);
+  padding: 0 2px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.mention-user:hover {
+  background-color: rgba(99, 102, 241, 0.3);
+}
