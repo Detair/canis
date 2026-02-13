@@ -4,7 +4,7 @@ This roadmap outlines the development path from the current prototype to a produ
 
 **Current Phase:** Phase 4 (Advanced Features) - In Progress
 
-**Last Updated:** 2026-02-10
+**Last Updated:** 2026-02-13
 
 ## Quick Status Overview
 
@@ -349,6 +349,12 @@ This roadmap outlines the development path from the current prototype to a produ
 ## Phase 5: Ecosystem & SaaS Readiness
 *Goal: Open the platform to developers and prepare for massive scale.*
 
+- [x] **[Test] E2E UI Test Coverage Suite** ✅
+  - Comprehensive Playwright E2E test suite covering 68 UI items across 12 spec files.
+  - Shared test helpers (`e2e/helpers.ts`) with login, navigation, and utility functions.
+  - Coverage tracking document (`docs/testing/ui-coverage.md`) mapping every UI item to its test.
+  - First run: 8/68 passing without backend (auth form rendering); remaining 58 need running backend + seed data.
+  - Areas covered: Auth, Navigation, Messaging, Guild, Channels, Friends/DMs, Settings, Voice, Admin, Search, Permissions.
 - [x] **[Infra] CI Pipeline Hardening & Green Build** ✅
   - All CI jobs passing: Rust Lint (fmt + clippy), Rust Tests, Frontend, License Compliance, Secrets Scan, Docker Build, Tauri (Ubuntu + macOS).
   - Moved `@everyone` security test into `rust-test` job (was exhausting disk space in standalone Docker build).
@@ -589,6 +595,9 @@ This roadmap outlines the development path from the current prototype to a produ
 ---
 
 ## Recent Changes
+
+### 2026-02-13
+- **E2E UI Test Coverage Suite** - Created comprehensive Playwright test suite with 68 UI items across 12 spec files (10 new + 2 pre-existing). Shared helpers (`e2e/helpers.ts`) for login, navigation, and utilities. Coverage tracker at `docs/testing/ui-coverage.md`. First run: 8 passing (auth form rendering), 58 need backend, 3 not coverable. Test areas: Auth (12 items), Navigation (9), Messaging (5), Guild (5), Channels (4), Friends/DMs (5), Settings (8), Voice (6), Admin (6), Search (3), Permissions (5).
 
 ### 2026-02-10
 - **Search Integration Tests** - 38 integration tests across 2 test files (18 global search, 20 guild/DM search) with 11 shared helpers in `helpers/mod.rs`. Coverage includes: auth (401), access control (non-member 403, nonexistent guild 404), soft-deleted and encrypted message exclusion, date/author/has:link/has:file filters, `ts_rank` relevance ranking, `ts_headline` snippets with `<mark>` tags, sort (relevance/date), pagination with offset verification, limit clamping (1-100), and data-driven validation tests. Extracted all inline SQL into reusable helpers (`create_guild`, `create_channel`, `insert_message`, `insert_message_at`, `insert_encrypted_message`, `insert_deleted_message`, `insert_attachment`, `add_guild_member`, `delete_guild`, `delete_dm_channel`). Updated roadmap search checklist.
