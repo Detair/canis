@@ -152,8 +152,9 @@ pub struct UpdateProfileResponse {
 // ============================================================================
 
 /// Username validation regex (matches DB constraint).
-static USERNAME_REGEX: std::sync::LazyLock<regex::Regex> =
-    std::sync::LazyLock::new(|| regex::Regex::new(r"^[a-z0-9_]{3,32}$").unwrap());
+static USERNAME_REGEX: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
+    regex::Regex::new(r"^[a-z0-9_]{3,32}$").expect("valid username regex")
+});
 
 // ============================================================================
 // Helper Functions
@@ -497,7 +498,9 @@ pub async fn login(
             6,
             1,
             30,
-            secret.to_bytes().unwrap(),
+            secret
+                .to_bytes()
+                .map_err(|_| AuthError::Internal("Invalid TOTP secret encoding".into()))?,
             Some("VoiceChat".to_string()),
             user.username.clone(),
         )
@@ -763,13 +766,12 @@ pub async fn upload_avatar(
     let endpoint = &state.config.s3_endpoint;
 
     // Handle localhost vs cloud endpoint formatting
-    let url = if endpoint
+    let url = if let Some(ep) = endpoint
         .as_deref()
-        .is_some_and(|s| s.contains("localhost") || s.contains("127.0.0.1"))
+        .filter(|s| s.contains("localhost") || s.contains("127.0.0.1"))
     {
         // For MinIO/Local: endpoint/bucket/key
-        // endpoint is Option, so unwrap safe because of check
-        format!("{}/{}/{}", endpoint.as_ref().unwrap(), bucket, key)
+        format!("{ep}/{bucket}/{key}")
     } else if let Some(ep) = endpoint {
         // Custom endpoint (R2, etc): endpoint/bucket/key or bucket.endpoint/key
         // We'll stick to path style for safety if custom endpoint is used
@@ -938,7 +940,9 @@ pub async fn mfa_setup(
         6,
         1,
         30,
-        secret.to_bytes().unwrap(),
+        secret
+            .to_bytes()
+            .map_err(|_| AuthError::Internal("Invalid TOTP secret encoding".into()))?,
         Some("VoiceChat".to_string()),
         auth_user.username.clone(),
     )
@@ -996,7 +1000,9 @@ pub async fn mfa_verify(
         6,
         1,
         30,
-        secret.to_bytes().unwrap(),
+        secret
+            .to_bytes()
+            .map_err(|_| AuthError::Internal("Invalid TOTP secret encoding".into()))?,
         Some("VoiceChat".to_string()),
         user.username,
     )

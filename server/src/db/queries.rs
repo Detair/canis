@@ -158,15 +158,15 @@ pub async fn update_user_profile(
     let mut param_idx = 1;
 
     if display_name.is_some() {
-        write!(query, ", display_name = ${param_idx}").unwrap();
+        write!(query, ", display_name = ${param_idx}").expect("write to String is infallible");
         param_idx += 1;
     }
     if email.is_some() {
-        write!(query, ", email = ${param_idx}").unwrap();
+        write!(query, ", email = ${param_idx}").expect("write to String is infallible");
         param_idx += 1;
     }
 
-    write!(query, " WHERE id = ${param_idx} RETURNING *").unwrap();
+    write!(query, " WHERE id = ${param_idx} RETURNING *").expect("write to String is infallible");
 
     // Build the query with dynamic bindings
     let mut q = sqlx::query_as::<_, User>(&query);
@@ -1213,15 +1213,15 @@ pub async fn search_messages_filtered(
     let mut param_idx = 3u32;
 
     if filters.date_from.is_some() {
-        write!(sql, " AND m.created_at >= ${param_idx}").unwrap();
+        write!(sql, " AND m.created_at >= ${param_idx}").expect("write to String is infallible");
         param_idx += 1;
     }
     if filters.date_to.is_some() {
-        write!(sql, " AND m.created_at <= ${param_idx}").unwrap();
+        write!(sql, " AND m.created_at <= ${param_idx}").expect("write to String is infallible");
         param_idx += 1;
     }
     if filters.author_id.is_some() {
-        write!(sql, " AND m.user_id = ${param_idx}").unwrap();
+        write!(sql, " AND m.user_id = ${param_idx}").expect("write to String is infallible");
         param_idx += 1;
     }
     if filters.has_link {
@@ -1233,7 +1233,8 @@ pub async fn search_messages_filtered(
         SearchSort::Relevance => sql.push_str(" ORDER BY rank DESC, m.created_at DESC"),
         SearchSort::Date => sql.push_str(" ORDER BY m.created_at DESC"),
     }
-    write!(sql, " LIMIT ${param_idx} OFFSET ${}", param_idx + 1).unwrap();
+    write!(sql, " LIMIT ${param_idx} OFFSET ${}", param_idx + 1)
+        .expect("write to String is infallible");
 
     let mut q = sqlx::query_as::<_, SearchMessageRow>(&sql)
         .bind(channel_ids)
@@ -1278,15 +1279,15 @@ pub async fn count_search_messages_filtered(
     let mut param_idx = 3u32;
 
     if filters.date_from.is_some() {
-        write!(sql, " AND m.created_at >= ${param_idx}").unwrap();
+        write!(sql, " AND m.created_at >= ${param_idx}").expect("write to String is infallible");
         param_idx += 1;
     }
     if filters.date_to.is_some() {
-        write!(sql, " AND m.created_at <= ${param_idx}").unwrap();
+        write!(sql, " AND m.created_at <= ${param_idx}").expect("write to String is infallible");
         param_idx += 1;
     }
     if filters.author_id.is_some() {
-        write!(sql, " AND m.user_id = ${param_idx}").unwrap();
+        write!(sql, " AND m.user_id = ${param_idx}").expect("write to String is infallible");
         param_idx += 1;
     }
     if filters.has_link {

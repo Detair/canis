@@ -916,7 +916,7 @@ pub async fn handler(
             return Response::builder()
                 .status(401)
                 .body("Missing or invalid Sec-WebSocket-Protocol header. Expected: access_token.<jwt>".into())
-                .unwrap();
+                .expect("static response builder");
         }
     };
 
@@ -927,7 +927,7 @@ pub async fn handler(
             return Response::builder()
                 .status(401)
                 .body("Invalid token".into())
-                .unwrap();
+                .expect("static response builder");
         }
     };
 
@@ -937,7 +937,7 @@ pub async fn handler(
             return Response::builder()
                 .status(401)
                 .body("Invalid user ID in token".into())
-                .unwrap();
+                .expect("static response builder");
         }
     };
 
@@ -1277,7 +1277,7 @@ pub async fn handle_client_message(
             if let Some(last_update) = activity_state.last_update {
                 let elapsed = now.duration_since(last_update);
                 if elapsed < ACTIVITY_UPDATE_INTERVAL {
-                    let remaining = ACTIVITY_UPDATE_INTERVAL.checked_sub(elapsed).unwrap();
+                    let remaining = ACTIVITY_UPDATE_INTERVAL.saturating_sub(elapsed);
                     return Err(format!(
                         "Rate limited: wait {} seconds before next activity update",
                         remaining.as_secs() + 1

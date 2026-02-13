@@ -1412,7 +1412,7 @@ pub async fn export_users_csv(
             user.created_at.format("%Y-%m-%d %H:%M:%S"),
             user.is_banned
         )
-        .unwrap();
+        .expect("write to String is infallible");
     }
 
     Ok((
@@ -1477,7 +1477,7 @@ pub async fn export_guilds_csv(
             guild.suspended_at.is_some(),
             suspended_at_str
         )
-        .unwrap();
+        .expect("write to String is infallible");
     }
 
     Ok((
