@@ -434,6 +434,7 @@ Respond to a slash command invocation.
 - Content must be 1-4000 characters.
 - Responses are stored in Redis with a 5-minute TTL.
 - The bot must own the interaction (verified via `interaction:{id}:owner` key).
+- **Single-response only:** Each `interaction_id` accepts exactly one `CommandResponse`. Subsequent responses return an error (`"Response already provided for this interaction"`). This is enforced atomically via `SET NX` in Redis.
 
 ## Command Invocation Flow
 
