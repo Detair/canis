@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - E2E tests no longer silently pass without assertions — eliminated 97 anti-pattern instances across 10 spec files: `.catch(() => false)` guards converted to hard `expect()` assertions, `waitForTimeout()` calls replaced with deterministic waits, duplicate `login()` with wrong default password removed from `permissions.spec.ts` (#186)
 
 ### Changed
+- Guild channel permission checks in search and channel listing are now batched — fetches membership, roles, and channel overrides in ~4 queries total instead of 5 per channel, reducing database round-trips from 5N to constant for N-channel guilds (#181)
 - Dynamic SQL query construction now uses `sqlx::QueryBuilder` instead of manual `format!()`/`write!()` with parameter index tracking, eliminating a class of potential runtime parameter mismatch errors (#174)
 
 ### Security

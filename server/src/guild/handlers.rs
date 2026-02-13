@@ -507,24 +507,27 @@ pub async fn list_channels(
     auth: AuthUser,
     Path(guild_id): Path<Uuid>,
 ) -> Result<Json<Vec<ChannelWithUnread>>, GuildError> {
-    // Verify membership
-    let is_member = db::is_guild_member(&state.db, guild_id, auth.id).await?;
-    if !is_member {
-        return Err(GuildError::Forbidden);
-    }
-
     let all_channels = db::get_guild_channels(&state.db, guild_id).await?;
+    let all_channel_ids: Vec<Uuid> = all_channels.iter().map(|c| c.id).collect();
 
-    // Filter channels by VIEW_CHANNEL permission
-    let mut channels = Vec::new();
-    for channel in all_channels {
-        if crate::permissions::require_channel_access(&state.db, auth.id, channel.id)
-            .await
-            .is_ok()
-        {
-            channels.push(channel);
-        }
-    }
+    // Batch permission check: fetch membership + roles once, batch-fetch overrides
+    let accessible_ids = crate::permissions::filter_accessible_channels(
+        &state.db,
+        guild_id,
+        auth.id,
+        &all_channel_ids,
+    )
+    .await
+    .map_err(|e| match e {
+        crate::permissions::PermissionError::NotGuildMember => GuildError::Forbidden,
+        other => GuildError::Permission(other),
+    })?;
+
+    let accessible_set: std::collections::HashSet<Uuid> = accessible_ids.into_iter().collect();
+    let channels: Vec<db::Channel> = all_channels
+        .into_iter()
+        .filter(|c| accessible_set.contains(&c.id))
+        .collect();
 
     // Collect text channel IDs for batched unread count query
     let text_channel_ids: Vec<Uuid> = channels

@@ -184,25 +184,20 @@ pub async fn search_messages(
         return Err(SearchError::GuildNotFound);
     }
 
-    // Check user is a member of the guild
-    let is_member = db::is_guild_member(&state.db, guild_id, auth.id).await?;
-    if !is_member {
-        return Err(SearchError::NotMember);
-    }
-
     // Get all channel IDs in this guild and filter by VIEW_CHANNEL permission
     let guild_channels = db::get_guild_channels(&state.db, guild_id).await?;
-
-    // Filter channels by VIEW_CHANNEL permission
-    let mut accessible_channel_ids: Vec<Uuid> = Vec::new();
-    for channel in &guild_channels {
-        if crate::permissions::require_channel_access(&state.db, auth.id, channel.id)
-            .await
-            .is_ok()
-        {
-            accessible_channel_ids.push(channel.id);
-        }
-    }
+    let all_channel_ids: Vec<Uuid> = guild_channels.iter().map(|c| c.id).collect();
+    let mut accessible_channel_ids = crate::permissions::filter_accessible_channels(
+        &state.db,
+        guild_id,
+        auth.id,
+        &all_channel_ids,
+    )
+    .await
+    .map_err(|e| match e {
+        crate::permissions::PermissionError::NotGuildMember => SearchError::NotMember,
+        _ => SearchError::NotMember,
+    })?;
 
     // If channel_id filter is provided, restrict to that channel (or empty if not accessible)
     if let Some(filter_channel_id) = query.channel_id {

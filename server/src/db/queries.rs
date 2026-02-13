@@ -540,6 +540,27 @@ pub async fn get_channel_overrides(
     .await
 }
 
+/// Get all permission overrides for multiple channels in a single query.
+pub async fn get_channel_overrides_batch(
+    pool: &PgPool,
+    channel_ids: &[Uuid],
+) -> sqlx::Result<Vec<crate::permissions::models::ChannelOverride>> {
+    if channel_ids.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    sqlx::query_as::<_, crate::permissions::models::ChannelOverride>(
+        r"
+        SELECT id, channel_id, role_id, allow_permissions, deny_permissions
+        FROM channel_overrides
+        WHERE channel_id = ANY($1)
+        ",
+    )
+    .bind(channel_ids)
+    .fetch_all(pool)
+    .await
+}
+
 // ============================================================================
 // Channel Member Queries
 // ============================================================================
