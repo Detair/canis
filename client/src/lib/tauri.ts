@@ -64,6 +64,7 @@ import type {
   AuthSettingsResponse,
   AuthMethodsConfig,
   AdminOidcProvider,
+  UiState,
 } from "./types";
 
 // Re-export types for convenience
@@ -1982,10 +1983,6 @@ export async function updateSettings(settings: AppSettings): Promise<void> {
     return invoke("update_settings", { settings });
   }
   // Browser mode - no-op
-}
-
-export interface UiState {
-  category_collapse: Record<string, boolean>;
 }
 
 export async function getUiState(): Promise<UiState> {

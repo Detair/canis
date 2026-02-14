@@ -2,6 +2,8 @@
  * Categories Store
  *
  * Manages channel category state including collapse states for the UI.
+ * Collapse preferences are persisted locally via the Tauri UI state file,
+ * so they survive app restarts independently of the server's default state.
  */
 
 import { createStore, reconcile } from "solid-js/store";
@@ -41,13 +43,19 @@ const [categoriesState, setCategoriesState] = createStore<CategoriesState>({
 
 /**
  * Load categories for a specific guild from the server.
+ * Also loads persisted collapse state and passes it synchronously to
+ * {@link setGuildCategories} so that the user's local preferences win
+ * over the server's default `collapsed` flags.
  */
 export async function loadGuildCategories(guildId: string): Promise<void> {
   setCategoriesState({ isLoading: true, error: null });
 
   try {
-    const categories = await tauri.getGuildCategories(guildId);
-    setGuildCategories(guildId, categories);
+    const [categories, uiState] = await Promise.all([
+      tauri.getGuildCategories(guildId),
+      tauri.getUiState(),
+    ]);
+    setGuildCategories(guildId, categories, uiState.category_collapse);
     setCategoriesState({ isLoading: false });
   } catch (err) {
     const error = err instanceof Error ? err.message : String(err);
@@ -58,45 +66,58 @@ export async function loadGuildCategories(guildId: string): Promise<void> {
 }
 
 /**
- * Set categories for a guild (used by loadGuildCategories and for initial data).
+ * Set categories for a guild (used by {@link loadGuildCategories} and for initial data).
+ *
+ * Collapse state is initialized in order of priority:
+ * 1. Existing in-memory local state (already set by the user this session)
+ * 2. Persisted local state from `persistedCollapseState` (survives restarts)
+ * 3. Server-provided `collapsed` flag on each category
+ *
+ * The optional `persistedCollapseState` is filtered to only this guild's
+ * category IDs to prevent stale entries from other guilds leaking in.
  */
 export function setGuildCategories(
   guildId: string,
-  categories: ChannelCategory[]
+  categories: ChannelCategory[],
+  persistedCollapseState?: Record<string, boolean>,
 ): void {
   setCategoriesState("categories", guildId, categories);
 
-  // Initialize collapse state from server data, then overlay with persisted local state
+  const guildCategoryIds = new Set(categories.map((c) => c.id));
+
+  // Initialize collapse state from server data for categories not already set locally
   for (const cat of categories) {
     if (categoriesState.collapseState[cat.id] === undefined) {
       setCategoriesState("collapseState", cat.id, cat.collapsed);
     }
   }
 
-  // Load persisted local collapse state (overrides server defaults)
-  tauri.getUiState().then((uiState) => {
-    for (const [id, collapsed] of Object.entries(uiState.category_collapse)) {
-      setCategoriesState("collapseState", id, collapsed);
+  // Overlay persisted local state, filtered to this guild's categories only
+  if (persistedCollapseState) {
+    for (const [id, collapsed] of Object.entries(persistedCollapseState)) {
+      if (guildCategoryIds.has(id)) {
+        setCategoriesState("collapseState", id, collapsed);
+      }
     }
-  }).catch((err) => {
-    console.error("Failed to load persisted category collapse state:", err);
-  });
+  }
 }
 
 /**
  * Toggle the collapse state of a category.
+ * The new state is persisted locally via the Tauri UI state file.
  */
 export function toggleCategoryCollapse(categoryId: string): void {
   const currentState = categoriesState.collapseState[categoryId] ?? false;
   setCategoriesState("collapseState", categoryId, !currentState);
 
-  tauri.updateCategoryCollapse(categoryId, !currentState).catch((err) =>
-    console.error("Failed to persist category collapse state:", err),
+  tauri.updateCategoryCollapse(categoryId, !currentState).catch(() =>
+    showToast({ type: "error", title: "Save Failed", message: "Could not save collapse preference." }),
   );
 }
 
 /**
  * Set the collapse state of a category directly.
+ * The new state is persisted locally via the Tauri UI state file.
  */
 export function setCategoryCollapse(
   categoryId: string,
@@ -104,8 +125,8 @@ export function setCategoryCollapse(
 ): void {
   setCategoriesState("collapseState", categoryId, collapsed);
 
-  tauri.updateCategoryCollapse(categoryId, collapsed).catch((err) =>
-    console.error("Failed to persist category collapse state:", err),
+  tauri.updateCategoryCollapse(categoryId, collapsed).catch(() =>
+    showToast({ type: "error", title: "Save Failed", message: "Could not save collapse preference." }),
   );
 }
 
@@ -165,7 +186,9 @@ export function clearGuildCategories(guildId: string): void {
 }
 
 /**
- * Clear all collapse state (useful on logout).
+ * Clear all in-memory collapse state (useful on logout).
+ * Does not clear the persisted file — the user's preferences
+ * are restored on next login via {@link loadGuildCategories}.
  */
 export function clearCollapseState(): void {
   setCategoriesState("collapseState", reconcile({}));

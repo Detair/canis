@@ -1,8 +1,11 @@
 //! Settings Commands
 //!
 //! Persistent settings and UI state stored as JSON files in the app data directory.
+//! Settings I/O uses `spawn_blocking` to avoid blocking the async runtime.
+//! UI state is cached in memory behind a `Mutex` to serialize read-modify-write operations.
 
 use std::collections::HashMap;
+use std::io::ErrorKind;
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
@@ -77,6 +80,24 @@ impl Default for Settings {
     }
 }
 
+impl Settings {
+    /// Clamp values to valid ranges and fix inconsistent state.
+    pub fn validated(mut self) -> Self {
+        self.audio.input_volume = self.audio.input_volume.clamp(0.0, 150.0);
+        self.audio.output_volume = self.audio.output_volume.clamp(0.0, 150.0);
+        self.voice.vad_threshold = self.voice.vad_threshold.clamp(0.0, 1.0);
+        if !matches!(self.theme.as_str(), "dark" | "light") {
+            self.theme = "dark".into();
+        }
+        // PTT without a key binding is unusable — fall back to VAD
+        if self.voice.push_to_talk && self.voice.push_to_talk_key.is_none() {
+            self.voice.push_to_talk = false;
+            self.voice.voice_activity_detection = true;
+        }
+        self
+    }
+}
+
 // ============================================================================
 // UI State Types
 // ============================================================================
@@ -121,7 +142,11 @@ fn load_settings_from_file(path: &PathBuf) -> Settings {
             tracing::warn!("Corrupt settings file, using defaults: {e}");
             Settings::default()
         }),
-        Err(_) => Settings::default(),
+        Err(e) if e.kind() == ErrorKind::NotFound => Settings::default(),
+        Err(e) => {
+            tracing::warn!("Failed to read settings file, using defaults: {e}");
+            Settings::default()
+        }
     }
 }
 
@@ -137,7 +162,11 @@ fn load_ui_state_from_file(path: &PathBuf) -> UiState {
             tracing::warn!("Corrupt UI state file, using defaults: {e}");
             UiState::default()
         }),
-        Err(_) => UiState::default(),
+        Err(e) if e.kind() == ErrorKind::NotFound => UiState::default(),
+        Err(e) => {
+            tracing::warn!("Failed to read UI state file, using defaults: {e}");
+            UiState::default()
+        }
     }
 }
 
@@ -154,7 +183,9 @@ fn save_ui_state_to_file(path: &PathBuf, state: &UiState) -> Result<(), String> 
 #[command]
 pub async fn get_settings(app_handle: tauri::AppHandle) -> Result<Settings, String> {
     let path = get_settings_path(&app_handle)?;
-    Ok(load_settings_from_file(&path))
+    tokio::task::spawn_blocking(move || load_settings_from_file(&path).validated())
+        .await
+        .map_err(|e| format!("Task join error: {e}"))
 }
 
 #[command]
@@ -163,27 +194,53 @@ pub async fn update_settings(
     settings: Settings,
 ) -> Result<(), String> {
     let path = get_settings_path(&app_handle)?;
-    save_settings_to_file(&path, &settings)
+    let settings = settings.validated();
+    tokio::task::spawn_blocking(move || save_settings_to_file(&path, &settings))
+        .await
+        .map_err(|e| format!("Task join error: {e}"))?
 }
 
 // ============================================================================
 // UI State Commands
 // ============================================================================
 
+/// Load `UiState` into the in-memory cache if not already loaded.
+async fn ensure_ui_state_loaded(
+    app_handle: &tauri::AppHandle,
+    cache: &mut Option<UiState>,
+) -> Result<(), String> {
+    if cache.is_none() {
+        let path = get_ui_state_path(app_handle)?;
+        *cache = Some(load_ui_state_from_file(&path));
+    }
+    Ok(())
+}
+
 #[command]
-pub async fn get_ui_state(app_handle: tauri::AppHandle) -> Result<UiState, String> {
-    let path = get_ui_state_path(&app_handle)?;
-    Ok(load_ui_state_from_file(&path))
+pub async fn get_ui_state(
+    app_handle: tauri::AppHandle,
+    state: tauri::State<'_, crate::AppState>,
+) -> Result<UiState, String> {
+    let mut guard = state.ui_state.lock().await;
+    ensure_ui_state_loaded(&app_handle, &mut guard).await?;
+    Ok(guard.as_ref().unwrap().clone())
 }
 
 #[command]
 pub async fn update_category_collapse(
     app_handle: tauri::AppHandle,
+    state: tauri::State<'_, crate::AppState>,
     category_id: String,
     collapsed: bool,
 ) -> Result<(), String> {
     let path = get_ui_state_path(&app_handle)?;
-    let mut state = load_ui_state_from_file(&path);
-    state.category_collapse.insert(category_id, collapsed);
-    save_ui_state_to_file(&path, &state)
+    let mut guard = state.ui_state.lock().await;
+    ensure_ui_state_loaded(&app_handle, &mut guard).await?;
+
+    let ui_state = guard.as_mut().unwrap();
+    ui_state.category_collapse.insert(category_id, collapsed);
+
+    // Write to disk while holding the lock to prevent interleaving.
+    // File is < 1KB so blocking duration is negligible.
+    save_ui_state_to_file(&path, ui_state)
 }
