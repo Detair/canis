@@ -66,12 +66,21 @@ export function setGuildCategories(
 ): void {
   setCategoriesState("categories", guildId, categories);
 
-  // Initialize collapse state from the server data if not already set locally
+  // Initialize collapse state from server data, then overlay with persisted local state
   for (const cat of categories) {
     if (categoriesState.collapseState[cat.id] === undefined) {
       setCategoriesState("collapseState", cat.id, cat.collapsed);
     }
   }
+
+  // Load persisted local collapse state (overrides server defaults)
+  tauri.getUiState().then((uiState) => {
+    for (const [id, collapsed] of Object.entries(uiState.category_collapse)) {
+      setCategoriesState("collapseState", id, collapsed);
+    }
+  }).catch((err) => {
+    console.error("Failed to load persisted category collapse state:", err);
+  });
 }
 
 /**
@@ -81,8 +90,9 @@ export function toggleCategoryCollapse(categoryId: string): void {
   const currentState = categoriesState.collapseState[categoryId] ?? false;
   setCategoriesState("collapseState", categoryId, !currentState);
 
-  // TODO: Persist to server (optional, could be local-only)
-  // tauri.updateCategoryCollapse(categoryId, !currentState).catch(console.error);
+  tauri.updateCategoryCollapse(categoryId, !currentState).catch((err) =>
+    console.error("Failed to persist category collapse state:", err),
+  );
 }
 
 /**
@@ -90,9 +100,13 @@ export function toggleCategoryCollapse(categoryId: string): void {
  */
 export function setCategoryCollapse(
   categoryId: string,
-  collapsed: boolean
+  collapsed: boolean,
 ): void {
   setCategoriesState("collapseState", categoryId, collapsed);
+
+  tauri.updateCategoryCollapse(categoryId, collapsed).catch((err) =>
+    console.error("Failed to persist category collapse state:", err),
+  );
 }
 
 /**

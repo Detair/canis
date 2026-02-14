@@ -1984,6 +1984,28 @@ export async function updateSettings(settings: AppSettings): Promise<void> {
   // Browser mode - no-op
 }
 
+export interface UiState {
+  category_collapse: Record<string, boolean>;
+}
+
+export async function getUiState(): Promise<UiState> {
+  if (isTauri) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return invoke("get_ui_state");
+  }
+  return { category_collapse: {} };
+}
+
+export async function updateCategoryCollapse(
+  categoryId: string,
+  collapsed: boolean,
+): Promise<void> {
+  if (isTauri) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return invoke("update_category_collapse", { categoryId, collapsed });
+  }
+}
+
 // WebSocket Commands
 
 export type ConnectionStatus =

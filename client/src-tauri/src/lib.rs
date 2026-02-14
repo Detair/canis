@@ -92,6 +92,8 @@ pub fn run() {
             // Settings commands
             commands::settings::get_settings,
             commands::settings::update_settings,
+            commands::settings::get_ui_state,
+            commands::settings::update_category_collapse,
             // WebSocket commands
             commands::websocket::ws_connect,
             commands::websocket::ws_disconnect,

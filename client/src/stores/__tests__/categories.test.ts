@@ -4,6 +4,8 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 vi.mock("@/lib/tauri", () => ({
   getGuildCategories: vi.fn(),
   reorderGuildCategories: vi.fn(),
+  getUiState: vi.fn().mockResolvedValue({ category_collapse: {} }),
+  updateCategoryCollapse: vi.fn().mockResolvedValue(undefined),
 }));
 
 import * as tauri from "@/lib/tauri";
