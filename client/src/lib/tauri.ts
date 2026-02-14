@@ -64,6 +64,7 @@ import type {
   AuthSettingsResponse,
   AuthMethodsConfig,
   AdminOidcProvider,
+  UiState,
 } from "./types";
 
 // Re-export types for convenience
@@ -1982,6 +1983,24 @@ export async function updateSettings(settings: AppSettings): Promise<void> {
     return invoke("update_settings", { settings });
   }
   // Browser mode - no-op
+}
+
+export async function getUiState(): Promise<UiState> {
+  if (isTauri) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return invoke("get_ui_state");
+  }
+  return { category_collapse: {} };
+}
+
+export async function updateCategoryCollapse(
+  categoryId: string,
+  collapsed: boolean,
+): Promise<void> {
+  if (isTauri) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return invoke("update_category_collapse", { categoryId, collapsed });
+  }
 }
 
 // WebSocket Commands

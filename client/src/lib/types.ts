@@ -507,6 +507,10 @@ export interface AppSettings {
   notifications_enabled: boolean;
 }
 
+export interface UiState {
+  category_collapse: Record<string, boolean>;
+}
+
 // Display Preferences Types
 export type DisplayMode = "dense" | "minimal" | "discord";
 export type ReactionStyle = "bar" | "compact";

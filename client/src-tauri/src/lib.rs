@@ -16,6 +16,7 @@ use std::sync::Arc;
 use audio::AudioHandle;
 use commands::clipboard::ClipboardGuard;
 use commands::screen_share::ScreenSharePipeline;
+use commands::settings::UiState;
 use commands::webcam::WebcamPipeline;
 use network::WebSocketManager;
 use reqwest::Client as HttpClient;
@@ -92,6 +93,8 @@ pub fn run() {
             // Settings commands
             commands::settings::get_settings,
             commands::settings::update_settings,
+            commands::settings::get_ui_state,
+            commands::settings::update_category_collapse,
             // WebSocket commands
             commands::websocket::ws_connect,
             commands::websocket::ws_disconnect,
@@ -276,6 +279,8 @@ pub struct AppState {
     /// E2EE crypto manager.
     /// Uses `Mutex` instead of `RwLock` because `rusqlite::Connection` is `Send` but not `Sync`.
     pub crypto: Arc<Mutex<Option<crypto::CryptoManager>>>,
+    /// Cached UI state (category collapse). Lazy-loaded from disk on first access.
+    pub ui_state: Arc<Mutex<Option<UiState>>>,
 }
 
 impl AppState {
@@ -291,6 +296,7 @@ impl AppState {
             websocket: Arc::new(RwLock::new(None)),
             voice: Arc::new(RwLock::new(None)),
             crypto: Arc::new(Mutex::new(None)),
+            ui_state: Arc::new(Mutex::new(None)),
         }
     }
 

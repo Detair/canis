@@ -4,9 +4,16 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 vi.mock("@/lib/tauri", () => ({
   getGuildCategories: vi.fn(),
   reorderGuildCategories: vi.fn(),
+  getUiState: vi.fn().mockResolvedValue({ category_collapse: {} }),
+  updateCategoryCollapse: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock("@/components/ui/Toast", () => ({
+  showToast: vi.fn(),
 }));
 
 import * as tauri from "@/lib/tauri";
+import { showToast } from "@/components/ui/Toast";
 import {
   categoriesState,
   setGuildCategories,
@@ -93,6 +100,39 @@ describe("categories store", () => {
       // Local state should be preserved
       expect(isCategoryCollapsed("local-cat1")).toBe(true);
     });
+
+    it("should overlay persisted collapse state when provided", () => {
+      const categories = [
+        createCategory("persist-cat1", "General", 0, null, false), // server says expanded
+        createCategory("persist-cat2", "Voice", 1, null, false), // server says expanded
+      ];
+
+      const persistedState = {
+        "persist-cat1": true, // user had collapsed this
+      };
+
+      setGuildCategories("guild1", categories, persistedState);
+
+      expect(isCategoryCollapsed("persist-cat1")).toBe(true); // persisted wins
+      expect(isCategoryCollapsed("persist-cat2")).toBe(false); // server default
+    });
+
+    it("should filter persisted state to only current guild's category IDs", () => {
+      const categories = [
+        createCategory("guild1-cat1", "General", 0),
+      ];
+
+      const persistedState = {
+        "guild1-cat1": true,
+        "other-guild-cat": true, // should be ignored
+      };
+
+      setGuildCategories("guild1", categories, persistedState);
+
+      expect(isCategoryCollapsed("guild1-cat1")).toBe(true);
+      // The other-guild entry should not have been set
+      expect(isCategoryCollapsed("other-guild-cat")).toBe(false); // default
+    });
   });
 
   describe("isCategoryCollapsed", () => {
@@ -131,6 +171,33 @@ describe("categories store", () => {
       expect(isCategoryCollapsed("toggle-cat3")).toBe(false);
       toggleCategoryCollapse("toggle-cat3");
       expect(isCategoryCollapsed("toggle-cat3")).toBe(true);
+    });
+
+    it("should persist collapse state via updateCategoryCollapse", () => {
+      toggleCategoryCollapse("persist-toggle-cat");
+
+      expect(tauri.updateCategoryCollapse).toHaveBeenCalledWith("persist-toggle-cat", true);
+    });
+
+    it("should show toast on persistence failure", async () => {
+      vi.mocked(tauri.updateCategoryCollapse).mockRejectedValueOnce(new Error("disk full"));
+
+      toggleCategoryCollapse("fail-cat");
+
+      // Wait for the microtask (catch handler) to run
+      await vi.waitFor(() => {
+        expect(showToast).toHaveBeenCalledWith(
+          expect.objectContaining({ type: "error", title: "Save Failed" }),
+        );
+      });
+    });
+  });
+
+  describe("setCategoryCollapse", () => {
+    it("should persist collapse state via updateCategoryCollapse", () => {
+      setCategoryCollapse("persist-set-cat", true);
+
+      expect(tauri.updateCategoryCollapse).toHaveBeenCalledWith("persist-set-cat", true);
     });
   });
 
@@ -407,6 +474,39 @@ describe("categories store", () => {
       await loadPromise;
 
       // Should no longer be loading
+      expect(categoriesState.isLoading).toBe(false);
+    });
+
+    it("should load persisted UI state alongside categories", async () => {
+      const mockCategories = [
+        createCategory("load-cat1", "General", 0, null, false), // server: expanded
+        createCategory("load-cat2", "Voice", 1, null, false), // server: expanded
+      ];
+
+      vi.mocked(tauri.getGuildCategories).mockResolvedValue(mockCategories);
+      vi.mocked(tauri.getUiState).mockResolvedValue({
+        category_collapse: { "load-cat1": true }, // persisted: collapsed
+      });
+
+      await loadGuildCategories("guild1");
+
+      expect(tauri.getUiState).toHaveBeenCalled();
+      expect(isCategoryCollapsed("load-cat1")).toBe(true); // persisted wins
+      expect(isCategoryCollapsed("load-cat2")).toBe(false); // server default
+    });
+
+    it("should still load categories if getUiState fails", async () => {
+      const mockCategories = [
+        createCategory("resilient-cat1", "General", 0, null, true),
+      ];
+
+      vi.mocked(tauri.getGuildCategories).mockResolvedValue(mockCategories);
+      vi.mocked(tauri.getUiState).mockRejectedValue(new Error("UI state read error"));
+
+      await loadGuildCategories("guild1");
+
+      // Error from Promise.all should propagate — categories won't be loaded
+      expect(categoriesState.error).toBe("UI state read error");
       expect(categoriesState.isLoading).toBe(false);
     });
   });
