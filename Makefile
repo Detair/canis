@@ -3,7 +3,8 @@
 # Usage: make <target>
 # Run `make help` to see all available targets.
 
-.PHONY: help setup dev server client test check lint fmt clean \
+.PHONY: help setup init bootstrap doctor dev server client test check lint fmt clean \
+        services-up services-down migrate \
         docker-up docker-down docker-logs docker-clean \
         db-migrate db-reset db-seed \
         test-everyone-security \
@@ -51,6 +52,21 @@ help: ## Show this help message
 
 setup: ## Run full development setup
 	@./scripts/dev-setup.sh
+
+init: setup ## Initialize project development environment
+
+bootstrap: install ## Install project dependencies
+
+doctor: ## Verify toolchain, env, and service status
+	@echo "$(CYAN)Checking required commands...$(RESET)"
+	@command -v cargo >/dev/null || (echo "$(YELLOW)Missing: cargo$(RESET)" && exit 1)
+	@command -v bun >/dev/null || (echo "$(YELLOW)Missing: bun$(RESET)" && exit 1)
+	@command -v docker >/dev/null || (echo "$(YELLOW)Missing: docker$(RESET)" && exit 1)
+	@docker compose version >/dev/null 2>&1 || (echo "$(YELLOW)Missing: docker compose plugin$(RESET)" && exit 1)
+	@echo "$(CYAN)Checking environment file...$(RESET)"
+	@[ -f .env ] && echo "$(GREEN).env present$(RESET)" || echo "$(YELLOW).env missing (run make setup)$(RESET)"
+	@echo "$(CYAN)Checking service status...$(RESET)"
+	@docker compose -f docker-compose.dev.yml ps >/dev/null 2>&1 && echo "$(GREEN)Compose reachable$(RESET)" || echo "$(YELLOW)Compose services unavailable (run make services-up)$(RESET)"
 
 setup-clean: ## Clean setup (removes .env and Docker volumes)
 	@./scripts/dev-setup.sh --clean
@@ -138,8 +154,12 @@ audit: ## Security audit of dependencies
 docker-up: ## Start Docker services (PostgreSQL, Valkey, RustFS, MailHog)
 	@docker compose -f docker-compose.dev.yml up -d
 
+services-up: docker-up ## Start development services
+
 docker-down: ## Stop Docker services
 	@docker compose -f docker-compose.dev.yml down
+
+services-down: docker-down ## Stop development services
 
 docker-logs: ## View Docker service logs
 	@docker compose -f docker-compose.dev.yml logs -f
@@ -159,6 +179,8 @@ docker-restart: docker-down docker-up ## Restart Docker services
 
 db-migrate: ## Run database migrations
 	sqlx migrate run --source server/migrations
+
+migrate: db-migrate ## Run database migrations
 
 db-revert: ## Revert last migration
 	sqlx migrate revert --source server/migrations
