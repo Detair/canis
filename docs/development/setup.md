@@ -2,6 +2,11 @@
 
 This guide covers setting up the VoiceChat development environment.
 
+## Standardized Multi-Project Setup
+
+For a reusable CachyOS setup pattern that you can apply across repositories,
+see [CachyOS Multi-Project Development Environment Manual](cachyos-dev-environment-manual.md).
+
 ## Prerequisites
 
 - Docker and Docker Compose
