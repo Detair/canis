@@ -492,7 +492,7 @@ pub async fn create(
                         let interaction_id = Uuid::new_v4();
                         let event = crate::ws::bot_gateway::BotServerEvent::CommandInvoked {
                             interaction_id,
-                            command_name,
+                            command_name: command_name.clone(),
                             guild_id: Some(guild_id),
                             channel_id,
                             user_id: auth_user.id,
@@ -529,6 +529,30 @@ pub async fn create(
                             .await
                             .map_err(|e| {
                                 warn!(error = %e, "Failed to store command interaction owner");
+                                MessageError::Validation(
+                                    "Bot command routing unavailable".to_string(),
+                                )
+                            })?;
+
+                        // Store interaction context for response delivery
+                        let context_key = format!("interaction:{interaction_id}:context");
+                        let context_data = serde_json::json!({
+                            "user_id": auth_user.id,
+                            "channel_id": channel_id,
+                            "guild_id": guild_id,
+                            "command_name": command_name,
+                        });
+                        routing_redis
+                            .set::<(), _, _>(
+                                &context_key,
+                                context_data.to_string(),
+                                Some(fred::types::Expiration::EX(300)),
+                                None,
+                                false,
+                            )
+                            .await
+                            .map_err(|e| {
+                                warn!(error = %e, "Failed to store interaction context");
                                 MessageError::Validation(
                                     "Bot command routing unavailable".to_string(),
                                 )
