@@ -460,15 +460,35 @@ pub async fn create(
                 })?;
 
                 if let Some(command) = commands.first() {
-                    let same_priority_matches = commands
+                    let same_priority: Vec<_> = commands
                         .iter()
-                        .filter(|candidate| candidate.guild_scoped == command.guild_scoped)
-                        .count();
+                        .filter(|c| c.guild_scoped == command.guild_scoped)
+                        .collect();
 
-                    if same_priority_matches > 1 {
-                        return Err(MessageError::Validation(
-                            "Command is ambiguous: multiple bots provide this command".to_string(),
-                        ));
+                    if same_priority.len() > 1 {
+                        let bot_ids: Vec<Uuid> = same_priority
+                            .iter()
+                            .filter_map(|c| c.bot_user_id)
+                            .collect();
+                        let bot_names: Vec<String> = sqlx::query_scalar!(
+                            "SELECT COALESCE(display_name, username) FROM users WHERE id = ANY($1)",
+                            &bot_ids,
+                        )
+                        .fetch_all(&state.db)
+                        .await
+                        .unwrap_or_default()
+                        .into_iter()
+                        .flatten()
+                        .collect();
+
+                        let names = if bot_names.is_empty() {
+                            "multiple bots".to_string()
+                        } else {
+                            bot_names.join(", ")
+                        };
+                        return Err(MessageError::Validation(format!(
+                            "Command '/{command_name}' is ambiguous: provided by {names}"
+                        )));
                     }
 
                     if let Some(bot_user_id) = command.bot_user_id {
