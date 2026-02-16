@@ -438,6 +438,57 @@ pub async fn create(
             if let Some(command_name) = parts.next() {
                 let command_name = command_name.to_lowercase();
 
+                // Built-in /ping: responds directly without bot routing
+                if command_name == "ping" {
+                    let start = std::time::Instant::now();
+                    let author = db::find_user_by_id(&state.db, auth_user.id)
+                        .await?
+                        .map(AuthorProfile::from)
+                        .unwrap_or_else(|| AuthorProfile {
+                            id: auth_user.id,
+                            username: "unknown".to_string(),
+                            display_name: "Unknown User".to_string(),
+                            avatar_url: None,
+                            status: "offline".to_string(),
+                        });
+                    let latency_ms = start.elapsed().as_millis();
+                    let content = format!("Pong! (latency: {latency_ms}ms)");
+
+                    let msg = sqlx::query!(
+                        r#"
+                        INSERT INTO messages (channel_id, user_id, content)
+                        VALUES ($1, $2, $3)
+                        RETURNING id, created_at
+                        "#,
+                        channel_id,
+                        auth_user.id,
+                        content,
+                    )
+                    .fetch_one(&state.db)
+                    .await
+                    .map_err(MessageError::Database)?;
+
+                    let response = MessageResponse {
+                        id: msg.id,
+                        channel_id,
+                        author,
+                        content,
+                        encrypted: false,
+                        attachments: vec![],
+                        reply_to: None,
+                        parent_id: None,
+                        thread_reply_count: 0,
+                        thread_last_reply_at: None,
+                        edited_at: None,
+                        created_at: msg.created_at,
+                        mention_type: None,
+                        reactions: None,
+                        thread_info: None,
+                    };
+
+                    return Ok((StatusCode::OK, Json(response)));
+                }
+
                 let commands = sqlx::query!(
                     r#"
                     SELECT ba.bot_user_id, sc.options, (sc.guild_id IS NOT NULL) AS "guild_scoped!"
