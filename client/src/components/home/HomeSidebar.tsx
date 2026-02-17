@@ -1,4 +1,4 @@
-import { Component, For, Show, createSignal, onMount } from "solid-js";
+import { Component, For, Show, createMemo, createSignal, onMount } from "solid-js";
 import { Users, Plus, ChevronDown } from "lucide-solid";
 import { dmsState, loadDMs, selectFriendsTab } from "@/stores/dms";
 import DMItem from "./DMItem";
@@ -19,13 +19,13 @@ const HomeSidebar: Component = () => {
   });
 
   // Sort DMs by last_message timestamp (descending)
-  const sortedDMs = () => {
+  const sortedDMs = createMemo(() => {
     return [...dmsState.dms].sort((a, b) => {
       const timeA = a.last_message?.created_at || a.created_at;
       const timeB = b.last_message?.created_at || b.created_at;
       return new Date(timeB).getTime() - new Date(timeA).getTime();
     });
-  };
+  });
 
   let dmListRef: HTMLDivElement | undefined;
 

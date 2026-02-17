@@ -1,6 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { showToast, dismissToast, dismissAllToasts, toasts } from "../Toast";
 
+/**
+ * TODO: Add component rendering tests using @solidjs/testing-library:
+ * - Verify max-5 visual limit in DOM
+ * - Test auto-dismiss with component lifecycle
+ * - Test action button clicks
+ * - Test toast stacking and animations
+ */
+
 describe("Toast System", () => {
   beforeEach(() => {
     dismissAllToasts();

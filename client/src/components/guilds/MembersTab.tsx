@@ -116,7 +116,7 @@ const MembersTab: Component<MembersTabProps> = (props) => {
   };
 
   return (
-    <div class="p-6">
+    <div class="p-6 flex flex-col h-full">
       {/* Search */}
       <div class="relative mb-4">
         <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary" />
@@ -137,18 +137,17 @@ const MembersTab: Component<MembersTabProps> = (props) => {
       </div>
 
       {/* Members List */}
-      <Show
-        when={filteredMembers().length > 0}
-        fallback={
-          <div class="text-center py-8 text-text-secondary">
-            {search() ? "No members match your search" : "You're the only one here. Invite some friends!"}
-          </div>
-        }
+      <div
+        ref={membersContainerRef}
+        class="flex-1 overflow-y-auto min-h-0"
       >
-        <div
-          ref={membersContainerRef}
-          class="overflow-y-auto"
-          style={{ "max-height": "calc(100vh - 200px)" }}
+        <Show
+          when={filteredMembers().length > 0}
+          fallback={
+            <div class="text-center py-8 text-text-secondary">
+              {search() ? "No members match your search" : "You're the only one here. Invite some friends!"}
+            </div>
+          }
         >
           <div style={{ height: `${virtualizer.getTotalSize()}px`, position: "relative" }}>
             <For each={virtualizer.getVirtualItems()}>
@@ -266,8 +265,8 @@ const MembersTab: Component<MembersTabProps> = (props) => {
               }}
             </For>
           </div>
-        </div>
-      </Show>
+        </Show>
+      </div>
 
       {/* Loading state */}
       <Show when={guildsState.isMembersLoading}>

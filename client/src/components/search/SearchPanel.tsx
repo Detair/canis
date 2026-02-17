@@ -372,7 +372,8 @@ const SearchPanel: Component<SearchPanelProps> = (props) => {
             </For>
           </div>
 
-          {/* Load More Button */}
+          {/* Load More Button — sits after the virtualizer container in normal flow.
+              New results append below existing ones; scroll position is preserved. */}
           <Show when={hasMore()}>
             <div class="p-3 text-center">
               <button

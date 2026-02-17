@@ -6,7 +6,7 @@ import {
 export type { VirtualItem };
 
 interface VirtualizerOptions {
-  count: number;
+  get count(): number;
   getScrollElement: () => HTMLElement | null;
   estimateSize: (index: number) => number;
   overscan?: number;
