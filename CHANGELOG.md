@@ -16,9 +16,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Release note structure source: `docs/project/RELEASE_NOTES_TEMPLATE.md`
 
 ### Fixed
+- Admin dashboard now correctly shows whether the current session is elevated — previously `is_elevated` was always reported as `false` regardless of actual elevation state (TD-17)
+- Revealed spoilers now stay revealed when scrolling away and back in the message list — previously clicking `||spoiler||` text to reveal it would reset when the message re-rendered (TD-22)
 - E2EE key backups now include the actual identity keys and prekeys — previously the encrypted backup contained only a timestamp placeholder, making it impossible to restore E2EE keys from a backup
 
 ### Changed
+- Upload size limits (avatar, emoji, attachment) are now fetched from `GET /api/config/upload-limits` at startup and applied client-side — previously the client used hardcoded defaults that could drift from server configuration (TD-13)
 - Notification sounds now play for the active channel when the application window is in the background
 
 ### Added
