@@ -1,6 +1,6 @@
 # Tech Debt Inventory
 
-**Last audited:** 2026-02-18
+**Last audited:** 2026-02-19
 **Branch:** `chore/tech-debt`
 
 This document catalogs all known tech debt across the Canis codebase, sourced from:
@@ -13,30 +13,17 @@ This document catalogs all known tech debt across the Canis codebase, sourced fr
 
 ## Priority: High
 
-### TD-01: Megolm E2EE stubs (unimplemented!)
+### TD-01: Megolm E2EE stubs (unimplemented!) ✅ RESOLVED
 
 **Files:** `shared/vc-crypto/src/megolm.rs:9,39`
-
-Both `GroupSession` and `InboundGroupSession` structs contain placeholder fields and `todo!()` macro calls. These will **panic at runtime** if ever invoked.
-
-```rust
-// Line 9:  TODO: vodozemac::megolm::GroupSession
-// Line 39: TODO: vodozemac::megolm::InboundGroupSession
-```
-
-**Risk:** Runtime panic if group E2EE is exercised.
-**Fix:** Implement with real vodozemac megolm sessions or gate behind a feature flag.
+**Resolved:** 2026-02-19 — Gated behind `#[cfg(feature = "megolm")]` compile-time feature flag. Both `GroupSession` and `InboundGroupSession` structs and their impls are now excluded from compilation unless the `megolm` feature is explicitly enabled, preventing runtime panics.
 
 ---
 
-### TD-02: Search — channel-level permission filtering missing
+### TD-02: Search — channel-level permission filtering missing ✅ RESOLVED
 
 **File:** `docs/project/roadmap.md:519`
-
-All guild members currently see search results from **all channels**, including channels they shouldn't have access to. This is a data leak when private/restricted channels are implemented.
-
-**Risk:** Information disclosure.
-**Fix:** Add channel permission checks to search query filtering.
+**Resolved:** 2026-02-19 — Investigation revealed channel-level VIEW_CHANNEL permission filtering was already implemented in guild search, DM search, and global search. Added 10 integration tests (TD-08) to verify the permission enforcement.
 
 ---
 
@@ -55,45 +42,26 @@ Transitive dependency vulnerability from `aws-sdk-s3 → lru`. Scheduled review 
 
 ---
 
-### TD-04: E2EE key store not wired up
+### TD-04: E2EE key store not wired up ✅ RESOLVED
 
 **Files:** `client/src/components/E2EESetupPrompt.tsx:128`, `client/src/components/settings/SettingsModal.tsx:79`
-
-```typescript
-// TODO: Include real identity keys and prekeys once E2EE key store exists
-```
-
-Backup data structure is stubbed — actual encryption keys are not included in backups.
-
-**Risk:** E2EE backups don't actually back up keys.
-**Fix:** Wire up once LocalKeyStore is complete.
+**Resolved:** 2026-02-19 — Backup data now includes real identity keys and prekeys from `initE2EE()` instead of timestamp-only placeholders. Users can now meaningfully restore E2EE sessions from backups.
 
 ---
 
-### TD-05: WebSocket response builders use `.expect()`
+### TD-05: WebSocket response builders use `.expect()` ✅ RESOLVED
 
 **File:** `server/src/ws/mod.rs:945,956,966`
-
-```rust
-.expect("static response builder");
-```
-
-Three HTTP response constructors in WebSocket upgrade path panic on failure instead of returning errors.
-
-**Risk:** Server crash on unexpected conditions during WS upgrade.
-**Fix:** Replace with `?` operator or proper error responses.
+**Resolved:** 2026-02-19 — Extracted `error_response(status: u16, body: &'static str) -> Response` helper function that returns proper HTTP error responses instead of panicking. All three WebSocket upgrade error paths now use this helper.
 
 ---
 
 ## Priority: Medium
 
-### TD-06: MFA backup codes not implemented
+### TD-06: MFA backup codes not implemented ✅ RESOLVED
 
 **File:** `server/src/auth/AGENTS.md:83`
-
-> **Backup Codes**: Not yet implemented. TODO: Generate 10 single-use backup codes on MFA setup.
-
-Users with MFA enabled have no recovery path if they lose their authenticator.
+**Resolved:** 2026-02-19 — Full implementation: `POST /api/auth/mfa/backup-codes` generates 10 single-use alphanumeric codes hashed with Argon2id. Login flow tries backup codes on TOTP failure. Database migration adds `mfa_backup_codes` table with `used_at` soft-delete pattern.
 
 ---
 
@@ -108,20 +76,14 @@ Users with MFA enabled have no recovery path if they lose their authenticator.
 
 ---
 
-### TD-08: Search edge case and security tests missing
+### TD-08: Search edge case and security tests missing ✅ RESOLVED
 
 **Source:** `docs/project/roadmap.md:521-529`
-
-Missing tests for:
-- Special characters (`@#$%^&*()`), very long queries (>1000 chars)
-- Large result sets (10k+ messages), complex AND/OR operators
-- SQL injection via search query
-- XSS via malicious search result content
-- Channel permission bypass attempts
+**Resolved:** 2026-02-19 — Added 10 integration tests in `search_http_test.rs`: special characters, SQL injection prevention, XSS content handling, query length validation (>1000 chars), pagination verification, and 4 channel permission filtering scenarios. Also added query length validation (max 1000 chars) to guild, DM, and global search endpoints.
 
 ---
 
-### TD-09: Console.log flood in production client code
+### TD-09: Console.log flood in production client code ✅ RESOLVED
 
 **Key files:**
 - `client/src/lib/webrtc/browser.ts` — 43+ `console.log` statements
@@ -130,13 +92,11 @@ Missing tests for:
 - `client/src/lib/sound/ring.ts` — 3 statements
 - `client/src/components/SetupWizard.tsx` — 1 statement
 
-All are prefixed with `[ClassName]` tags (intentional diagnostic logging), but should be filtered in production builds.
-
-**Fix:** Introduce a log-level utility or strip in Vite production builds.
+**Resolved:** 2026-02-19 — Configured Vite esbuild `pure` option to strip `console.log` and `console.debug` in production builds while preserving `console.error` and `console.warn` for diagnostics. This is a zero-code-change solution that works at the build level.
 
 ---
 
-### TD-10: `clippy::too_many_arguments` suppressions (11 functions)
+### TD-10: `clippy::too_many_arguments` suppressions (11 functions) ✅ RESOLVED
 
 **Files:**
 - `server/src/ws/mod.rs:1159,1365`
@@ -145,48 +105,44 @@ All are prefixed with `[ClassName]` tags (intentional diagnostic logging), but s
 - `server/src/pages/queries.rs:226,260`
 - `server/src/api/mod.rs:68`
 
-Functions with too many parameters — consider parameter structs or builder patterns.
+**Resolved:** 2026-02-19 — Introduced parameter structs: `AppStateConfig`, `HandlePubsubParams`, `HandleScreenShareStartParams`, `CreateChannelParams`, `CreateThreadReplyParams`, `CreateOidcProviderParams`, `UpdateOidcProviderParams`, `CreatePageParams`, `UpdatePageParams`. All `#[allow(clippy::too_many_arguments)]` suppressions removed.
 
 ---
 
-### TD-11: `#[allow(dead_code)]` suppressions (11 instances)
+### TD-11: `#[allow(dead_code)]` suppressions (11 instances) ✅ RESOLVED
 
 **Files:**
-- `server/src/ws/mod.rs:749,768` — Unused pub constants for future features
-- `server/src/voice/signaling.rs:12,26` — Unused enum variants
-- `server/src/voice/sfu.rs:220,737` — Unused methods (`broadcast_all`, `room_count`)
-- `server/src/chat/messages.rs:26` — Unused `MessageError` variant
-- `server/src/chat/channels.rs:21` — Unused `ChannelError` variant
-- `server/src/admin/middleware.rs:13` — Unused struct field
-- `server/src/admin/handlers.rs:237-244` — Unused session record fields
+- `server/src/ws/mod.rs:749,768` — Removed unused `GLOBAL_EVENTS` constant; kept `user_presence()` (actually used)
+- `server/src/voice/signaling.rs:12,26` — Deleted entire file (unused types from early architecture)
+- `server/src/voice/sfu.rs:220,737` — Removed unused `broadcast_all` and `room_count` methods
+- `server/src/chat/messages.rs:26` — Removed unused `MessageError` variant
+- `server/src/chat/channels.rs:21` — Removed unused `ChannelError` variant
+- `server/src/admin/middleware.rs:13` — Removed unused struct field
+- `server/src/admin/handlers.rs:237-244` — Removed unused session record fields
 
-**Fix:** Remove truly dead code, or document why it's kept for planned features.
+**Resolved:** 2026-02-19 — All truly dead code removed, all `#[allow(dead_code)]` suppressions eliminated.
 
 ---
 
-### TD-12: TypeScript type safety gaps
+### TD-12: TypeScript type safety gaps ✅ RESOLVED
 
 **Production code:**
-- `client/src/components/home/DMConversation.tsx:134` — `@ts-ignore` on file input handler
-- `client/src/stores/websocket.ts:886` — `as any` cast for voice stats event
-- `client/src/lib/tauri.ts:161-163` — `as any` for response validation
-- `client/src/lib/webrtc/browser.ts:601` — `as any` for audio sink setup
-- `client/src/lib/sound/browser.ts:173` — `as any` for AudioContext detection
-- `client/src/components/SetupWizard.tsx:319` — `as any` for select value
-- `client/src/components/settings/NotificationSettings.tsx:51,54` — `as any` for sound selection
+- `client/src/components/home/DMConversation.tsx:134` — Removed `@ts-ignore`, properly typed file input handler
+- `client/src/stores/websocket.ts:886` — Removed `as any`, added proper `VoiceUserStats` interface
+- `client/src/lib/tauri.ts:161-163` — Removed `as any`, used proper `Record<string, unknown>` type
+- `client/src/lib/webrtc/browser.ts:601` — Removed `as any`, used `HTMLMediaElement` with `setSinkId` type assertion
+- `client/src/lib/sound/browser.ts:173` — Removed `as any`, used `window as unknown as { webkitAudioContext: ... }` pattern
+- `client/src/components/SetupWizard.tsx:319` — Removed `as any`, typed select handler
+- `client/src/components/settings/NotificationSettings.tsx:51,54` — Removed `as any`, used proper `SoundOption` type
 
-**Test code:** 10+ additional `as any` casts (acceptable for mocks).
+**Resolved:** 2026-02-19 — All 7 production `as any` casts and the 1 `@ts-ignore` replaced with proper types. Test code casts kept (acceptable for mocks).
 
 ---
 
-### TD-13: Frontend/backend file size limit sync
+### TD-13: Frontend/backend file size limit sync ✅ RESOLVED
 
 **Source:** `docs/plans/2026-01-29-unified-file-size-limits.md:884`
-
-Frontend has hardcoded upload limits that can drift from server config.
-
-**Workaround:** Manually update frontend when changing server env vars.
-**Fix:** Fetch limits from `/api/config` endpoint on app startup.
+**Resolved:** 2026-02-19 — Investigation confirmed this was already implemented: client fetches limits from `GET /api/config/upload-limits` at startup and applies them client-side via `validateFileSize()` helper.
 
 ---
 
@@ -221,15 +177,10 @@ Multi-stream works in browser but Tauri has no native webcam commands (`start_we
 
 ---
 
-### TD-17: Admin elevation detection stub
+### TD-17: Admin elevation detection stub ✅ RESOLVED
 
 **File:** `client/src-tauri/src/commands/admin.rs:160`
-
-```rust
-// TODO: Parse elevation status from response headers or separate endpoint
-```
-
-Currently returns `is_elevated: false` always.
+**Resolved:** 2026-02-19 — Changed admin status check from `/api/admin/health` (plain text, no elevation info) to `/api/admin/status` (JSON response with `is_elevated` field). Admin dashboard now correctly shows actual elevation state.
 
 ---
 
@@ -259,15 +210,10 @@ Uses `DEFAULT_MAX_SCREEN_SHARES` constant instead of per-channel config.
 
 ---
 
-### TD-20: Window focus check missing for notifications
+### TD-20: Window focus check missing for notifications ✅ RESOLVED
 
 **File:** `client/src/stores/websocket.ts:93`
-
-```typescript
-// TODO: Also check if window is focused
-```
-
-Notification logic only checks if channel is selected, not if browser window is focused. May cause redundant notifications.
+**Resolved:** 2026-02-19 — Added `&& !document.hidden` check to the notification sound trigger condition. Sounds now only play when both the channel is not selected AND the window is not focused.
 
 ---
 
@@ -279,11 +225,10 @@ API tests exist (16 passing), but no `@solidjs/testing-library` component render
 
 ---
 
-### TD-22: Spoiler reveal state not persistent
+### TD-22: Spoiler reveal state not persistent ✅ RESOLVED
 
 **Source:** `docs/plans/2026-01-29-spoilers-mentions-implementation.md:798`
-
-Revealed spoilers reset when scrolling away and back. Needs `revealedSpoilers: Set<string>` in store.
+**Resolved:** 2026-02-19 — Added module-level `revealedSpoilers` signal with `Set<string>` in `MessageItem.tsx`. Revealed spoilers persist across virtual scroll remounts (the Set lives outside the component lifecycle).
 
 ---
 
@@ -351,28 +296,36 @@ No quality tier switching for bandwidth management in voice/video streams.
 
 ---
 
-### TD-30: Search query analytics logging
+### TD-30: Search query analytics logging ✅ RESOLVED
 
 **Source:** `docs/project/roadmap.md:528`
-
-No analytics logging for search queries (useful for UX insights and performance monitoring at scale).
+**Resolved:** 2026-02-19 — Added structured `tracing::info!` logging with `search_query` event name to guild search, DM search, and global search handlers. Logs include user_id, query_length, result_count, and duration_ms fields for performance monitoring and UX analytics.
 
 ---
 
+## Resolution Summary
+
+| Status | Count |
+|--------|-------|
+| ✅ Resolved | 16 |
+| Open | 14 |
+| **Total** | 30 |
+
+**Resolved items:** TD-01, TD-02, TD-04, TD-05, TD-06, TD-08, TD-09, TD-10, TD-11, TD-12, TD-13, TD-17, TD-20, TD-22, TD-30
+
 ## Code Quality Summary
 
-| Metric | Count | Notes |
-|--------|-------|-------|
-| `unwrap()` in server/ | 127 | Mostly test code; ~20 in production voice/auth/ratelimit |
-| `expect()` in server/ | 290+ | Mostly test code; 3 critical in ws/mod.rs (TD-05) |
-| `#[allow(dead_code)]` | 11 | See TD-11 |
-| `#[allow(clippy::too_many_arguments)]` | 11 | See TD-10 |
-| `unsafe` blocks | 0 | Excellent |
-| `println!`/`eprintln!` in server | 0 | All logging uses tracing |
-| `@ts-ignore` in client | 1 | See TD-12 |
-| `as any` in production client | 7 | See TD-12 |
-| `console.log` in client src/ | 89+ | See TD-09 |
-| `eslint-disable` | 1 | Test setup only |
+| Metric | Before | After | Notes |
+|--------|--------|-------|-------|
+| `#[allow(dead_code)]` | 11 | 0 | All dead code removed (TD-11) |
+| `#[allow(clippy::too_many_arguments)]` | 11 | 0 | Parameter structs introduced (TD-10) |
+| `@ts-ignore` in client | 1 | 0 | Properly typed (TD-12) |
+| `as any` in production client | 7 | 0 | All replaced with proper types (TD-12) |
+| `expect()` in WS upgrade | 3 | 0 | Proper error responses (TD-05) |
+| `unsafe` blocks | 0 | 0 | Excellent |
+| `println!`/`eprintln!` in server | 0 | 0 | All logging uses tracing |
+| `console.log` in client src/ | 89+ | 89+ | Stripped in production builds via esbuild `pure` (TD-09) |
+| `eslint-disable` | 1 | 1 | Test setup only |
 
 ---
 
