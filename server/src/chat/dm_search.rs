@@ -2,6 +2,8 @@
 //!
 //! Full-text search for messages within a user's DM channels.
 
+use std::time::Instant;
+
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
@@ -135,6 +137,11 @@ pub async fn search_dm_messages(
             "Search query must be at least 2 characters".to_string(),
         ));
     }
+    if search_term.len() > 1000 {
+        return Err(DmSearchError::InvalidQuery(
+            "Search query must not exceed 1000 characters".to_string(),
+        ));
+    }
 
     // Validate date range
     if let (Some(from), Some(to)) = (query.date_from, query.date_to) {
@@ -209,6 +216,7 @@ pub async fn search_dm_messages(
             .await?;
 
     // Search messages
+    let start = Instant::now();
     let messages = db::search_messages_filtered(
         &state.db,
         &dm_channel_ids,
@@ -218,6 +226,14 @@ pub async fn search_dm_messages(
         offset,
     )
     .await?;
+    let elapsed = start.elapsed();
+    tracing::info!(
+        user_id = %auth.id,
+        query_length = search_term.len(),
+        result_count = messages.len(),
+        duration_ms = elapsed.as_millis(),
+        "search_query"
+    );
 
     // Get user IDs and channel IDs for bulk lookup
     let user_ids: Vec<Uuid> = messages.iter().map(|m| m.user_id).collect();

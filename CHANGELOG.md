@@ -9,13 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Roadmap Alignment
 - Current roadmap phase: Phase 5 (Ecosystem & SaaS Readiness) - In Progress
-- Roadmap last updated: 2026-02-17
+- Roadmap last updated: 2026-02-19
 
 ### Milestone Metadata
 - Milestone: Phase 5 - Ecosystem & SaaS Readiness
 - Release note structure source: `docs/project/RELEASE_NOTES_TEMPLATE.md`
 
+### Fixed
+- Admin dashboard now correctly shows whether the current session is elevated — previously `is_elevated` was always reported as `false` regardless of actual elevation state (TD-17)
+- Revealed spoilers now stay revealed when scrolling away and back in the message list — previously clicking `||spoiler||` text to reveal it would reset when the message re-rendered (TD-22)
+- E2EE key backups now include the actual identity keys and prekeys — previously the encrypted backup contained only a timestamp placeholder, making it impossible to restore E2EE keys from a backup
+- WebSocket upgrade error paths no longer panic on unexpected conditions — replaced `.expect()` calls with a proper `error_response` helper that returns HTTP status codes (TD-05)
+
+### Changed
+- Upload size limits (avatar, emoji, attachment) are now fetched from `GET /api/config/upload-limits` at startup and applied client-side — previously the client used hardcoded defaults that could drift from server configuration (TD-13)
+- Notification sounds now play for the active channel when the application window is in the background
+- Production client builds now selectively strip `console.log` and `console.debug` while preserving `console.error` and `console.warn` for diagnostics (TD-09)
+
 ### Added
+- MFA backup codes — users with MFA enabled can generate 10 one-time recovery codes (`POST /api/auth/mfa/backup-codes`) to regain account access if their authenticator app is unavailable; each code is single-use and hashed with Argon2id at rest
 - Virtualized guild member list, DM conversation sidebar, and search results using `@tanstack/solid-virtual` for smooth scrolling with large datasets
 - Toast usage convention documentation with type/duration table and deduplication guidance
 - Built-in `/ping` command for smoke testing — responds with "Pong!" and server-side latency in any guild channel without bot installation
@@ -633,6 +645,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed unused `update_user_password` database function (#131)
 
 ### Security
+- Megolm group E2EE stubs gated behind compile-time `megolm` feature flag — previously contained `todo!()` macros that would panic at runtime if group encryption was invoked (TD-01)
+- Search query length capped at 1000 characters across guild, DM, and global search endpoints to prevent resource exhaustion (TD-08)
 - Eliminated all `.unwrap()` calls in production server code — TOTP secret decoding now returns proper errors instead of panicking, WebSocket auth responses use `.expect()` with justification, duration arithmetic uses `saturating_sub()`, and S3 endpoint formatting uses safe `if let` pattern (#163)
 - File upload magic byte validation — uploaded files are now verified against their claimed MIME type using content inspection, preventing file type spoofing (e.g. executables disguised as images)
 - Password reset endpoint no longer leaks user existence via HTTP 500 on database errors — all code paths now return generic 200

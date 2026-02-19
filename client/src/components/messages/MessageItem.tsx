@@ -1,4 +1,4 @@
-import { Component, Show, createMemo, For, onMount, onCleanup } from "solid-js";
+import { Component, Show, createMemo, For, onMount, onCleanup, createSignal } from "solid-js";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
 import { File, Download, Copy, Link, Hash, Trash2, Flag, MessageSquareMore } from "lucide-solid";
@@ -111,6 +111,30 @@ interface TextBlock {
 
 type ContentBlock = CodeBlockData | TextBlock;
 
+// ---- Module-level spoiler reveal state ----
+// Persists revealed spoilers across component remounts (e.g. virtual scroll).
+// Key format: `${messageId}:${spoilerIndex}` (0-based index within a message).
+const [revealedSpoilers, setRevealedSpoilers] = createSignal<Set<string>>(new Set());
+
+/**
+ * Mark a spoiler as revealed and persist it in the session-scoped set.
+ */
+function revealSpoiler(messageId: string, spoilerIndex: number): void {
+  const key = `${messageId}:${spoilerIndex}`;
+  setRevealedSpoilers((prev) => {
+    const next = new Set(prev);
+    next.add(key);
+    return next;
+  });
+}
+
+/**
+ * Check whether a spoiler has been revealed in this session.
+ */
+function isSpoilerRevealed(messageId: string, spoilerIndex: number): boolean {
+  return revealedSpoilers().has(`${messageId}:${spoilerIndex}`);
+}
+
 // ---- Module-level singleton for Alt+1..4 reaction shortcuts ----
 // One global listener instead of one per rendered MessageItem.
 let reactionShortcutHandler: ((emoji: string) => void) | null = null;
@@ -142,15 +166,24 @@ const MessageItem: Component<MessageItemProps> = (props) => {
   // Register the singleton keydown listener once
   onMount(() => ensureReactionShortcutListener());
 
-  // Setup spoiler click-to-reveal functionality
+  // Setup spoiler click-to-reveal functionality.
+  // State is persisted in the module-level `revealedSpoilers` set so revealed
+  // spoilers stay revealed when the component remounts (e.g. virtual scroll).
   onMount(() => {
     if (contentRef) {
-      const spoilers = contentRef.querySelectorAll('.spoiler[data-spoiler="true"]');
+      const messageId = props.message.id;
+      const spoilerEls = contentRef.querySelectorAll('.spoiler[data-spoiler="true"]');
       const listeners: Array<{ element: Element; handler: EventListener }> = [];
 
-      spoilers.forEach((spoiler) => {
+      spoilerEls.forEach((spoiler, index) => {
+        // Restore previously revealed state
+        if (isSpoilerRevealed(messageId, index)) {
+          (spoiler as HTMLElement).classList.add('revealed');
+        }
+
         const handler: EventListener = function(this: HTMLElement) {
           this.classList.add('revealed');
+          revealSpoiler(messageId, index);
         };
         spoiler.addEventListener('click', handler);
         listeners.push({ element: spoiler, handler });

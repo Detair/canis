@@ -88,9 +88,8 @@ function handleMessageNotification(message: Message): void {
     return;
   }
 
-  // Don't notify for currently focused channel
-  if (channelsState.selectedChannelId === message.channel_id) {
-    // TODO: Also check if window is focused
+  // Don't notify for currently focused channel when the window is visible
+  if (channelsState.selectedChannelId === message.channel_id && !document.hidden) {
     return;
   }
 
@@ -883,7 +882,7 @@ async function handleServerEvent(event: ServerEvent): Promise<void> {
       break;
 
     case "voice_user_stats":
-      await handleVoiceUserStatsEvent(event as any);
+      await handleVoiceUserStatsEvent(event);
       break;
 
     // Admin events

@@ -745,8 +745,7 @@ pub mod channels {
         format!("channel:{channel_id}")
     }
 
-    /// Redis channel for user presence updates (future feature).
-    #[allow(dead_code)]
+    /// Redis channel for user presence updates.
     #[must_use]
     pub fn user_presence(user_id: Uuid) -> String {
         format!("presence:{user_id}")
@@ -763,10 +762,6 @@ pub mod channels {
     pub fn guild_events(guild_id: Uuid) -> String {
         format!("guild:{guild_id}")
     }
-
-    /// Redis channel for global events (future feature).
-    #[allow(dead_code)]
-    pub const GLOBAL_EVENTS: &str = "global";
 
     /// Redis channel for admin events.
     pub const ADMIN_EVENTS: &str = "admin:events";
@@ -921,6 +916,23 @@ pub async fn broadcast_member_patch(
     Ok(())
 }
 
+/// Build a plain-text HTTP error response without panicking.
+///
+/// Falls back to a 500 Internal Server Error if building the requested
+/// status fails (which cannot happen with hardcoded status codes, but
+/// avoids any `.expect` in the hot path).
+fn error_response(status: u16, body: &'static str) -> Response {
+    Response::builder()
+        .status(status)
+        .body(body.into())
+        .unwrap_or_else(|_| {
+            Response::builder()
+                .status(500)
+                .body("Internal Server Error".into())
+                .expect("fallback response builder")
+        })
+}
+
 /// WebSocket upgrade handler.
 ///
 /// Authentication is performed via the `Sec-WebSocket-Protocol` header to avoid
@@ -939,10 +951,10 @@ pub async fn handler(
     let token = match extract_token_from_protocol(&headers) {
         Some(t) => t,
         None => {
-            return Response::builder()
-                .status(401)
-                .body("Missing or invalid Sec-WebSocket-Protocol header. Expected: access_token.<jwt>".into())
-                .expect("static response builder");
+            return error_response(
+                401,
+                "Missing or invalid Sec-WebSocket-Protocol header. Expected: access_token.<jwt>",
+            );
         }
     };
 
@@ -950,20 +962,14 @@ pub async fn handler(
     let claims = match jwt::validate_access_token(&token, &state.config.jwt_public_key) {
         Ok(claims) => claims,
         Err(_) => {
-            return Response::builder()
-                .status(401)
-                .body("Invalid token".into())
-                .expect("static response builder");
+            return error_response(401, "Invalid token");
         }
     };
 
     let user_id = match Uuid::parse_str(&claims.sub) {
         Ok(id) => id,
         Err(_) => {
-            return Response::builder()
-                .status(401)
-                .body("Invalid user ID in token".into())
-                .expect("static response builder");
+            return error_response(401, "Invalid user ID in token");
         }
     };
 
@@ -1068,13 +1074,15 @@ async fn handle_socket(socket: WebSocket, state: AppState, user_id: Uuid) {
     let pubsub_handle = tokio::spawn(async move {
         handle_pubsub(
             redis_client,
-            tx_clone,
-            subscribed_clone,
-            admin_subscribed_clone,
-            blocked_clone,
-            user_id,
-            friend_ids,
-            guild_ids,
+            HandlePubsubParams {
+                tx: tx_clone,
+                subscribed_channels: subscribed_clone,
+                admin_subscribed: admin_subscribed_clone,
+                blocked_users: blocked_clone,
+                user_id,
+                friend_ids,
+                guild_ids,
+            },
         )
         .await;
     });
@@ -1361,10 +1369,8 @@ pub async fn handle_client_message(
     Ok(())
 }
 
-/// Handle Redis pub/sub messages.
-#[allow(clippy::too_many_arguments)]
-async fn handle_pubsub(
-    redis: Client,
+/// Parameters for the Redis pub/sub handler.
+struct HandlePubsubParams {
     tx: mpsc::Sender<ServerEvent>,
     subscribed_channels: Arc<tokio::sync::RwLock<HashSet<Uuid>>>,
     admin_subscribed: Arc<tokio::sync::RwLock<bool>>,
@@ -1372,7 +1378,10 @@ async fn handle_pubsub(
     user_id: Uuid,
     friend_ids: Vec<Uuid>,
     guild_ids: Vec<Uuid>,
-) {
+}
+
+/// Handle Redis pub/sub messages.
+async fn handle_pubsub(redis: Client, params: HandlePubsubParams) {
     // Create a subscriber client
     let subscriber = redis.clone_new();
 
@@ -1394,7 +1403,7 @@ async fn handle_pubsub(
     }
 
     // Subscribe to user's own events channel (for preferences sync, etc.)
-    let user_channel = channels::user_events(user_id);
+    let user_channel = channels::user_events(params.user_id);
     if let Err(e) = subscriber.subscribe(&user_channel).await {
         warn!("Failed to subscribe to user events channel: {}", e);
     } else {
@@ -1409,7 +1418,7 @@ async fn handle_pubsub(
     }
 
     // Subscribe to friends' presence channels
-    for friend_id in &friend_ids {
+    for friend_id in &params.friend_ids {
         let presence_channel = channels::user_presence(*friend_id);
         if let Err(e) = subscriber.subscribe(&presence_channel).await {
             warn!(
@@ -1422,7 +1431,7 @@ async fn handle_pubsub(
     }
 
     // Subscribe to guild event channels for state sync
-    for guild_id in &guild_ids {
+    for guild_id in &params.guild_ids {
         let guild_channel = channels::guild_events(*guild_id);
         if let Err(e) = subscriber.subscribe(&guild_channel).await {
             warn!(
@@ -1441,7 +1450,7 @@ async fn handle_pubsub(
         if let Some(uuid_str) = channel_name.strip_prefix("channel:") {
             if let Ok(channel_id) = Uuid::parse_str(uuid_str) {
                 // Check if we're subscribed to this channel
-                if subscribed_channels.read().await.contains(&channel_id) {
+                if params.subscribed_channels.read().await.contains(&channel_id) {
                     // Parse and forward the event (with block filtering)
                     if let Some(payload) = message.value.as_str() {
                         if let Ok(event) = serde_json::from_str::<ServerEvent>(&payload) {
@@ -1457,7 +1466,7 @@ async fn handle_pubsub(
                                             // Block check must not fail open
                                             // Use blocking_read since we're in a sync closure
                                             // within async context
-                                            blocked_users.blocking_read().contains(&author_id)
+                                            params.blocked_users.blocking_read().contains(&author_id)
                                         })
                                 }
                                 ServerEvent::TypingStart { user_id: uid, .. }
@@ -1469,12 +1478,12 @@ async fn handle_pubsub(
                                     // Block check must not fail open
                                     // Use blocking_read since we're in a sync closure within async
                                     // context
-                                    blocked_users.blocking_read().contains(uid)
+                                    params.blocked_users.blocking_read().contains(uid)
                                 }
                                 _ => false,
                             };
 
-                            if !should_filter && tx.send(event).await.is_err() {
+                            if !should_filter && params.tx.send(event).await.is_err() {
                                 break;
                             }
                         }
@@ -1491,17 +1500,17 @@ async fn handle_pubsub(
                         ServerEvent::UserBlocked {
                             user_id: blocked_id,
                         } => {
-                            blocked_users.write().await.insert(*blocked_id);
+                            params.blocked_users.write().await.insert(*blocked_id);
                         }
                         ServerEvent::UserUnblocked {
                             user_id: unblocked_id,
                         } => {
-                            blocked_users.write().await.remove(unblocked_id);
+                            params.blocked_users.write().await.remove(unblocked_id);
                         }
                         _ => {}
                     }
 
-                    if tx.send(event).await.is_err() {
+                    if params.tx.send(event).await.is_err() {
                         break;
                     }
                 }
@@ -1510,10 +1519,10 @@ async fn handle_pubsub(
         // Handle admin events
         else if channel_name == channels::ADMIN_EVENTS {
             // Only forward if user is subscribed to admin events
-            if *admin_subscribed.read().await {
+            if *params.admin_subscribed.read().await {
                 if let Some(payload) = message.value.as_str() {
                     if let Ok(event) = serde_json::from_str::<ServerEvent>(&payload) {
-                        if tx.send(event).await.is_err() {
+                        if params.tx.send(event).await.is_err() {
                             break;
                         }
                     }
@@ -1530,12 +1539,12 @@ async fn handle_pubsub(
                         | ServerEvent::RichPresenceUpdate { user_id: uid, .. } => {
                             // Block check must not fail open
                             // Use blocking_read since we're in a sync closure within async context
-                            blocked_users.blocking_read().contains(uid)
+                            params.blocked_users.blocking_read().contains(uid)
                         }
                         _ => false,
                     };
 
-                    if !should_filter && tx.send(event).await.is_err() {
+                    if !should_filter && params.tx.send(event).await.is_err() {
                         break;
                     }
                 }
@@ -1546,7 +1555,7 @@ async fn handle_pubsub(
             // Forward all user-targeted events (read sync, etc.)
             if let Some(payload) = message.value.as_str() {
                 if let Ok(event) = serde_json::from_str::<ServerEvent>(&payload) {
-                    if tx.send(event).await.is_err() {
+                    if params.tx.send(event).await.is_err() {
                         break;
                     }
                 }
@@ -1557,7 +1566,7 @@ async fn handle_pubsub(
             // Forward guild/member patch events to all guild members
             if let Some(payload) = message.value.as_str() {
                 if let Ok(event) = serde_json::from_str::<ServerEvent>(&payload) {
-                    if tx.send(event).await.is_err() {
+                    if params.tx.send(event).await.is_err() {
                         break;
                     }
                 }

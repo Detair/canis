@@ -212,7 +212,7 @@ pub async fn get_admin_status(
     let elevated = if is_admin {
         sqlx::query_as!(
             ElevatedSessionRecord,
-            r#"SELECT id, user_id, elevated_at, expires_at, reason
+            r#"SELECT expires_at
                FROM elevated_sessions
                WHERE user_id = $1 AND expires_at > NOW()
                ORDER BY elevated_at DESC
@@ -232,17 +232,9 @@ pub async fn get_admin_status(
     }))
 }
 
-/// Elevated session record for querying.
+/// Elevated session record for querying (only the fields we actually use).
 struct ElevatedSessionRecord {
-    #[allow(dead_code)]
-    id: Uuid,
-    #[allow(dead_code)]
-    user_id: Uuid,
-    #[allow(dead_code)]
-    elevated_at: chrono::DateTime<chrono::Utc>,
     expires_at: chrono::DateTime<chrono::Utc>,
-    #[allow(dead_code)]
-    reason: Option<String>,
 }
 
 /// Get admin statistics.
@@ -1879,18 +1871,20 @@ pub async fn create_oidc_provider(
 
     let row = crate::db::create_oidc_provider(
         &state.db,
-        &body.slug,
-        &body.display_name,
-        body.icon_hint.as_deref(),
-        &provider_type,
-        issuer_url.as_deref(),
-        authorization_url.as_deref(),
-        token_url.as_deref(),
-        userinfo_url.as_deref(),
-        &body.client_id,
-        &encrypted_secret,
-        &scopes,
-        admin.user_id,
+        crate::db::CreateOidcProviderParams {
+            slug: &body.slug,
+            display_name: &body.display_name,
+            icon_hint: body.icon_hint.as_deref(),
+            provider_type: &provider_type,
+            issuer_url: issuer_url.as_deref(),
+            authorization_url: authorization_url.as_deref(),
+            token_url: token_url.as_deref(),
+            userinfo_url: userinfo_url.as_deref(),
+            client_id: &body.client_id,
+            client_secret_encrypted: &encrypted_secret,
+            scopes: &scopes,
+            created_by: admin.user_id,
+        },
     )
     .await?;
 
@@ -1945,17 +1939,19 @@ pub async fn update_oidc_provider(
 
     let row = crate::db::update_oidc_provider(
         &state.db,
-        id,
-        &body.display_name,
-        body.icon_hint.as_deref(),
-        body.issuer_url.as_deref(),
-        body.authorization_url.as_deref(),
-        body.token_url.as_deref(),
-        body.userinfo_url.as_deref(),
-        &body.client_id,
-        encrypted_secret.as_deref(),
-        &body.scopes,
-        body.enabled,
+        crate::db::UpdateOidcProviderParams {
+            id,
+            display_name: &body.display_name,
+            icon_hint: body.icon_hint.as_deref(),
+            issuer_url: body.issuer_url.as_deref(),
+            authorization_url: body.authorization_url.as_deref(),
+            token_url: body.token_url.as_deref(),
+            userinfo_url: body.userinfo_url.as_deref(),
+            client_id: &body.client_id,
+            client_secret_encrypted: encrypted_secret.as_deref(),
+            scopes: &body.scopes,
+            enabled: body.enabled,
+        },
     )
     .await?;
 

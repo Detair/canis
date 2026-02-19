@@ -114,9 +114,18 @@ pub struct DeleteResponse {
 // Admin Status Commands
 // ============================================================================
 
-/// Check if current user has admin access.
+/// Admin status as returned by `GET /api/admin/status`.
+#[derive(Debug, Deserialize)]
+struct AdminStatusJson {
+    is_admin: bool,
+    is_elevated: bool,
+    elevation_expires_at: Option<String>,
+}
+
+/// Check if current user has admin access and whether their session is elevated.
 ///
-/// Returns admin status by hitting the admin health endpoint.
+/// Calls `GET /api/admin/status` which is accessible to any authenticated user
+/// and returns real elevation state from the server.
 #[command]
 pub async fn check_admin_status(state: State<'_, AppState>) -> Result<AdminStatus, String> {
     let (server_url, token) = {
@@ -131,7 +140,7 @@ pub async fn check_admin_status(state: State<'_, AppState>) -> Result<AdminStatu
 
     let response = state
         .http
-        .get(format!("{server_url}/api/admin/health"))
+        .get(format!("{server_url}/api/admin/status"))
         .header("Authorization", format!("Bearer {token}"))
         .send()
         .await
@@ -140,15 +149,6 @@ pub async fn check_admin_status(state: State<'_, AppState>) -> Result<AdminStatu
             format!("Connection failed: {e}")
         })?;
 
-    // 403 means not admin, which is a valid response
-    if response.status().as_u16() == 403 {
-        return Ok(AdminStatus {
-            is_admin: false,
-            is_elevated: false,
-            elevation_expires_at: None,
-        });
-    }
-
     if !response.status().is_success() {
         let status = response.status();
         let body = response.text().await.unwrap_or_default();
@@ -156,13 +156,21 @@ pub async fn check_admin_status(state: State<'_, AppState>) -> Result<AdminStatu
         return Err(format!("Failed to check admin status: {status}"));
     }
 
-    // If we got a 200, user is admin
-    // TODO: Parse elevation status from response headers or separate endpoint
-    debug!("User has admin privileges");
+    let json: AdminStatusJson = response
+        .json()
+        .await
+        .map_err(|e| format!("Invalid response: {e}"))?;
+
+    debug!(
+        is_admin = json.is_admin,
+        is_elevated = json.is_elevated,
+        "Admin status fetched"
+    );
+
     Ok(AdminStatus {
-        is_admin: true,
-        is_elevated: false,
-        elevation_expires_at: None,
+        is_admin: json.is_admin,
+        is_elevated: json.is_elevated,
+        elevation_expires_at: json.elevation_expires_at,
     })
 }
 

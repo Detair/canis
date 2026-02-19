@@ -130,11 +130,12 @@ const DMConversation: Component = () => {
             type="file"
             accept="image/*"
             class="hidden"
-            ref={(el) => {
-              // @ts-ignore
-              el.onchange = async (e: any) => {
-                const file = e.target.files?.[0];
-                if (file && dm()) {
+            ref={(el: HTMLInputElement) => {
+              el.onchange = (e: Event) => {
+                const input = e.target as HTMLInputElement;
+                const file = input.files?.[0];
+                const currentDm = dm();
+                if (file && currentDm) {
                   setUploadError(null);
 
                   // Frontend validation
@@ -142,19 +143,23 @@ const DMConversation: Component = () => {
                   if (validationError) {
                     setUploadError(validationError);
                     setTimeout(() => setUploadError(null), 5000);
-                    e.target.value = ""; // Clear selection
+                    input.value = ""; // Clear selection
                     return;
                   }
 
-                  try {
-                    const result = await uploadDMAvatar(dm()!.id, file);
-                    updateDMIconUrl(dm()!.id, result.icon_url);
-                  } catch (err) {
-                    console.error("Failed to upload icon", err);
-                    setUploadError("Failed to upload icon");
-                    setTimeout(() => setUploadError(null), 3000);
-                  }
-                  e.target.value = ""; // Clear selection
+                  const dmId = currentDm.id;
+                  uploadDMAvatar(dmId, file)
+                    .then((result) => {
+                      updateDMIconUrl(dmId, result.icon_url);
+                    })
+                    .catch((err) => {
+                      console.error("Failed to upload icon", err);
+                      setUploadError("Failed to upload icon");
+                      setTimeout(() => setUploadError(null), 3000);
+                    })
+                    .finally(() => {
+                      input.value = ""; // Clear selection
+                    });
                 }
               };
             }}

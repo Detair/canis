@@ -2,6 +2,8 @@
 //!
 //! Full-text search across all guilds and DMs the authenticated user has access to.
 
+use std::time::Instant;
+
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
@@ -130,6 +132,11 @@ pub async fn search_all(
     if search_term.len() < 2 {
         return Err(GlobalSearchError::InvalidQuery(
             "Search query must be at least 2 characters".to_string(),
+        ));
+    }
+    if search_term.len() > 1000 {
+        return Err(GlobalSearchError::InvalidQuery(
+            "Search query must not exceed 1000 characters".to_string(),
         ));
     }
 
@@ -262,6 +269,7 @@ pub async fn search_all(
         db::count_search_messages_filtered(&state.db, &all_channel_ids, search_term, &filters)
             .await?;
 
+    let start = Instant::now();
     let messages = db::search_messages_filtered(
         &state.db,
         &all_channel_ids,
@@ -271,6 +279,14 @@ pub async fn search_all(
         offset,
     )
     .await?;
+    let elapsed = start.elapsed();
+    tracing::info!(
+        user_id = %auth.id,
+        query_length = search_term.len(),
+        result_count = messages.len(),
+        duration_ms = elapsed.as_millis(),
+        "search_query"
+    );
 
     // 5. Bulk fetch users
     let user_ids: Vec<Uuid> = messages.iter().map(|m| m.user_id).collect();
