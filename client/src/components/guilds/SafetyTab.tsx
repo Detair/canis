@@ -72,7 +72,6 @@ const SafetyTab: Component<SafetyTabProps> = (props) => {
   const [logTotal, setLogTotal] = createSignal(0);
   const [logLoading, setLogLoading] = createSignal(false);
   const [logOffset, setLogOffset] = createSignal(0);
-  const [showLog, setShowLog] = createSignal(false);
 
   // Active section
   const [activeSection, setActiveSection] = createSignal<"categories" | "patterns" | "test" | "log">("categories");
