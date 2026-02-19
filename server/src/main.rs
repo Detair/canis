@@ -157,6 +157,28 @@ async fn main() -> Result<()> {
                 }
                 _ => {}
             }
+
+            // Cleanup webhook delivery logs older than 7 days
+            match vc_server::webhooks::queries::cleanup_old_delivery_logs(&db_pool_clone, 7).await {
+                Ok(count) if count > 0 => {
+                    tracing::debug!(count, "Cleaned up old webhook delivery logs");
+                }
+                Err(e) => {
+                    tracing::warn!(error = %e, "Failed to cleanup webhook delivery logs");
+                }
+                _ => {}
+            }
+
+            // Cleanup webhook dead letters older than 30 days
+            match vc_server::webhooks::queries::cleanup_old_dead_letters(&db_pool_clone, 30).await {
+                Ok(count) if count > 0 => {
+                    tracing::debug!(count, "Cleaned up old webhook dead letters");
+                }
+                Err(e) => {
+                    tracing::warn!(error = %e, "Failed to cleanup webhook dead letters");
+                }
+                _ => {}
+            }
         }
     });
 
@@ -227,6 +249,18 @@ async fn main() -> Result<()> {
         None
     };
 
+    // Spawn webhook delivery worker
+    let webhook_http_client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .build()
+        .expect("Failed to build webhook HTTP client");
+    let webhook_worker_handle = tokio::spawn(vc_server::webhooks::delivery::spawn_delivery_worker(
+        db_pool.clone(),
+        redis.clone(),
+        webhook_http_client,
+    ));
+    info!("Webhook delivery worker started");
+
     // Build application state
     let state = api::AppState::new(api::AppStateConfig {
         db: db_pool.clone(),
@@ -270,9 +304,11 @@ async fn main() -> Result<()> {
     // 1. Abort background cleanup tasks
     voice_cleanup_handle.abort();
     db_cleanup_handle.abort();
+    webhook_worker_handle.abort();
     // Wait for them to finish (will return Err(JoinError) due to abort, which is expected)
     let _ = voice_cleanup_handle.await;
     let _ = db_cleanup_handle.await;
+    let _ = webhook_worker_handle.await;
     info!("Background cleanup tasks stopped");
 
     // 2. Close database pool gracefully

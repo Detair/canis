@@ -14,7 +14,7 @@ interface VirtualizerOptions {
 
 interface ScrollToIndexOptions {
   align?: "start" | "center" | "end" | "auto";
-  behavior?: ScrollBehavior;
+  behavior?: "auto" | "smooth";
 }
 
 export function createVirtualizer(options: VirtualizerOptions) {
