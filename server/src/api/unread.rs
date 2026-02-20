@@ -26,6 +26,16 @@ use crate::ws::{broadcast_to_user, ServerEvent};
 /// # Returns
 /// - 200 OK: `UnreadAggregate` with guild and DM unread counts
 /// - 500 Internal Server Error: Database error
+#[utoipa::path(
+    get,
+    path = "/api/me/unread",
+    tag = "system",
+    responses(
+        (status = 200, description = "Aggregate unread counts", body = crate::db::UnreadAggregate),
+        (status = 500, description = "Database error"),
+    ),
+    security(("BearerAuth" = []))
+)]
 #[tracing::instrument(skip(state))]
 pub async fn get_unread_aggregate(
     auth_user: AuthUser,
@@ -47,6 +57,16 @@ pub async fn get_unread_aggregate(
 ///
 /// # Route
 /// `POST /api/me/read-all`
+#[utoipa::path(
+    post,
+    path = "/api/me/read-all",
+    tag = "system",
+    responses(
+        (status = 204, description = "All messages marked as read"),
+        (status = 500, description = "Database error"),
+    ),
+    security(("BearerAuth" = []))
+)]
 #[tracing::instrument(skip(state))]
 pub async fn mark_all_read(
     auth_user: AuthUser,

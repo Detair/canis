@@ -24,6 +24,14 @@ type PageResult<T> = Result<T, (StatusCode, String)>;
 // ============================================================================
 
 /// List all platform pages.
+#[utoipa::path(
+    get,
+    path = "/api/pages",
+    tag = "pages",
+    responses(
+        (status = 200, description = "List of platform pages", body = Vec<PageListItem>),
+    ),
+)]
 pub async fn list_platform_pages(
     State(state): State<AppState>,
 ) -> PageResult<Json<Vec<PageListItem>>> {
@@ -38,6 +46,18 @@ pub async fn list_platform_pages(
 }
 
 /// Get a platform page by slug.
+#[utoipa::path(
+    get,
+    path = "/api/pages/{slug}",
+    tag = "pages",
+    params(
+        ("slug" = String, Path, description = "Page slug")
+    ),
+    responses(
+        (status = 200, description = "Platform page", body = Page),
+        (status = 404, description = "Page not found"),
+    ),
+)]
 pub async fn get_platform_page(
     State(state): State<AppState>,
     Path(slug): Path<String>,
@@ -56,6 +76,19 @@ pub async fn get_platform_page(
 }
 
 /// Create a new platform page (system admin only).
+#[utoipa::path(
+    post,
+    path = "/api/pages",
+    tag = "pages",
+    request_body = CreatePageRequest,
+    responses(
+        (status = 200, description = "Platform page created", body = Page),
+        (status = 400, description = "Validation error"),
+        (status = 403, description = "System admin required"),
+        (status = 409, description = "Slug conflict"),
+    ),
+    security(("BearerAuth" = []))
+)]
 pub async fn create_platform_page(
     State(state): State<AppState>,
     user: AuthUser,
@@ -153,6 +186,23 @@ pub async fn create_platform_page(
 }
 
 /// Update a platform page (system admin only).
+#[utoipa::path(
+    patch,
+    path = "/api/pages/{id}",
+    tag = "pages",
+    params(
+        ("id" = Uuid, Path, description = "Page ID")
+    ),
+    request_body = UpdatePageRequest,
+    responses(
+        (status = 200, description = "Platform page updated", body = Page),
+        (status = 400, description = "Validation error"),
+        (status = 403, description = "System admin required"),
+        (status = 404, description = "Page not found"),
+        (status = 409, description = "Slug conflict"),
+    ),
+    security(("BearerAuth" = []))
+)]
 pub async fn update_platform_page(
     State(state): State<AppState>,
     user: AuthUser,
@@ -245,6 +295,21 @@ pub async fn update_platform_page(
 }
 
 /// Delete a platform page (system admin only).
+#[utoipa::path(
+    delete,
+    path = "/api/pages/{id}",
+    tag = "pages",
+    params(
+        ("id" = Uuid, Path, description = "Page ID")
+    ),
+    responses(
+        (status = 204, description = "Platform page deleted"),
+        (status = 400, description = "Not a platform page"),
+        (status = 403, description = "System admin required"),
+        (status = 404, description = "Page not found"),
+    ),
+    security(("BearerAuth" = []))
+)]
 pub async fn delete_platform_page(
     State(state): State<AppState>,
     user: AuthUser,
@@ -309,6 +374,17 @@ pub async fn delete_platform_page(
 }
 
 /// Reorder platform pages (system admin only).
+#[utoipa::path(
+    post,
+    path = "/api/pages/reorder",
+    tag = "pages",
+    request_body = ReorderRequest,
+    responses(
+        (status = 204, description = "Pages reordered"),
+        (status = 403, description = "System admin required"),
+    ),
+    security(("BearerAuth" = []))
+)]
 pub async fn reorder_platform_pages(
     State(state): State<AppState>,
     user: AuthUser,
@@ -378,9 +454,21 @@ async fn check_manage_pages_permission(
 
 /// List all pages for a guild.
 ///
-/// Note: Does not check guild membership — guild information pages (rules, welcome)
+/// Note: Does not check guild membership -- guild information pages (rules, welcome)
 /// are intentionally readable by any authenticated user who has the guild ID.
 /// Write operations are protected by `MANAGE_PAGES` permission.
+#[utoipa::path(
+    get,
+    path = "/api/guilds/{id}/pages",
+    tag = "pages",
+    params(
+        ("id" = Uuid, Path, description = "Guild ID")
+    ),
+    responses(
+        (status = 200, description = "List of guild pages", body = Vec<PageListItem>),
+    ),
+    security(("BearerAuth" = []))
+)]
 pub async fn list_guild_pages(
     State(state): State<AppState>,
     Path(guild_id): Path<Uuid>,
@@ -398,6 +486,20 @@ pub async fn list_guild_pages(
 }
 
 /// Get a guild page by slug.
+#[utoipa::path(
+    get,
+    path = "/api/guilds/{id}/pages/{slug}",
+    tag = "pages",
+    params(
+        ("id" = Uuid, Path, description = "Guild ID"),
+        ("slug" = String, Path, description = "Page slug")
+    ),
+    responses(
+        (status = 200, description = "Guild page", body = Page),
+        (status = 404, description = "Page not found"),
+    ),
+    security(("BearerAuth" = []))
+)]
 pub async fn get_guild_page(
     State(state): State<AppState>,
     Path((guild_id, slug)): Path<(Uuid, String)>,
@@ -416,6 +518,22 @@ pub async fn get_guild_page(
 }
 
 /// Create a new guild page.
+#[utoipa::path(
+    post,
+    path = "/api/guilds/{id}/pages",
+    tag = "pages",
+    params(
+        ("id" = Uuid, Path, description = "Guild ID")
+    ),
+    request_body = CreatePageRequest,
+    responses(
+        (status = 200, description = "Guild page created", body = Page),
+        (status = 400, description = "Validation error"),
+        (status = 403, description = "Missing MANAGE_PAGES permission"),
+        (status = 409, description = "Slug conflict"),
+    ),
+    security(("BearerAuth" = []))
+)]
 pub async fn create_guild_page(
     State(state): State<AppState>,
     user: AuthUser,
@@ -505,6 +623,24 @@ pub async fn create_guild_page(
 }
 
 /// Update a guild page.
+#[utoipa::path(
+    patch,
+    path = "/api/guilds/{id}/pages/{page_id}",
+    tag = "pages",
+    params(
+        ("id" = Uuid, Path, description = "Guild ID"),
+        ("page_id" = Uuid, Path, description = "Page ID")
+    ),
+    request_body = UpdatePageRequest,
+    responses(
+        (status = 200, description = "Guild page updated", body = Page),
+        (status = 400, description = "Validation error"),
+        (status = 403, description = "Missing MANAGE_PAGES permission"),
+        (status = 404, description = "Page not found"),
+        (status = 409, description = "Slug conflict"),
+    ),
+    security(("BearerAuth" = []))
+)]
 pub async fn update_guild_page(
     State(state): State<AppState>,
     user: AuthUser,
@@ -588,6 +724,21 @@ pub async fn update_guild_page(
 }
 
 /// Delete a guild page.
+#[utoipa::path(
+    delete,
+    path = "/api/guilds/{id}/pages/{page_id}",
+    tag = "pages",
+    params(
+        ("id" = Uuid, Path, description = "Guild ID"),
+        ("page_id" = Uuid, Path, description = "Page ID")
+    ),
+    responses(
+        (status = 204, description = "Guild page deleted"),
+        (status = 403, description = "Missing MANAGE_PAGES permission"),
+        (status = 404, description = "Page not found"),
+    ),
+    security(("BearerAuth" = []))
+)]
 pub async fn delete_guild_page(
     State(state): State<AppState>,
     user: AuthUser,
@@ -643,6 +794,20 @@ pub async fn delete_guild_page(
 }
 
 /// Reorder guild pages.
+#[utoipa::path(
+    post,
+    path = "/api/guilds/{id}/pages/reorder",
+    tag = "pages",
+    params(
+        ("id" = Uuid, Path, description = "Guild ID")
+    ),
+    request_body = ReorderRequest,
+    responses(
+        (status = 204, description = "Guild pages reordered"),
+        (status = 403, description = "Missing MANAGE_PAGES permission"),
+    ),
+    security(("BearerAuth" = []))
+)]
 pub async fn reorder_guild_pages(
     State(state): State<AppState>,
     user: AuthUser,
@@ -670,6 +835,20 @@ pub async fn reorder_guild_pages(
 // ============================================================================
 
 /// Accept a page (record user acceptance).
+#[utoipa::path(
+    post,
+    path = "/api/pages/{id}/accept",
+    tag = "pages",
+    params(
+        ("id" = Uuid, Path, description = "Page ID")
+    ),
+    responses(
+        (status = 204, description = "Page accepted"),
+        (status = 400, description = "Page does not require acceptance"),
+        (status = 404, description = "Page not found"),
+    ),
+    security(("BearerAuth" = []))
+)]
 pub async fn accept_page(
     State(state): State<AppState>,
     user: AuthUser,
@@ -707,6 +886,21 @@ pub async fn accept_page(
 }
 
 /// Accept a guild page (record user acceptance with guild scope check).
+#[utoipa::path(
+    post,
+    path = "/api/guilds/{id}/pages/{page_id}/accept",
+    tag = "pages",
+    params(
+        ("id" = Uuid, Path, description = "Guild ID"),
+        ("page_id" = Uuid, Path, description = "Page ID")
+    ),
+    responses(
+        (status = 204, description = "Guild page accepted"),
+        (status = 400, description = "Page does not require acceptance"),
+        (status = 404, description = "Page not found"),
+    ),
+    security(("BearerAuth" = []))
+)]
 pub async fn accept_guild_page(
     State(state): State<AppState>,
     user: AuthUser,
@@ -749,6 +943,15 @@ pub async fn accept_guild_page(
 }
 
 /// Get pages requiring acceptance that user hasn't accepted.
+#[utoipa::path(
+    get,
+    path = "/api/me/pages/pending-acceptance",
+    tag = "pages",
+    responses(
+        (status = 200, description = "Pages pending acceptance", body = Vec<PageListItem>),
+    ),
+    security(("BearerAuth" = []))
+)]
 pub async fn get_pending_acceptance(
     State(state): State<AppState>,
     user: AuthUser,

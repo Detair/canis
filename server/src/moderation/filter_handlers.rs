@@ -56,8 +56,21 @@ pub fn router() -> Router<AppState> {
 /// List guild filter category configs.
 ///
 /// GET `/api/guilds/{id}/filters`
+#[utoipa::path(
+    get,
+    path = "/api/guilds/{id}/filters",
+    tag = "moderation",
+    params(
+        ("id" = Uuid, Path, description = "Guild ID")
+    ),
+    responses(
+        (status = 200, description = "List of filter configs", body = Vec<GuildFilterConfig>),
+        (status = 403, description = "Forbidden"),
+    ),
+    security(("BearerAuth" = []))
+)]
 #[tracing::instrument(skip(state, auth_user))]
-async fn list_filter_configs(
+pub async fn list_filter_configs(
     State(state): State<AppState>,
     auth_user: AuthUser,
     Path(guild_id): Path<Uuid>,
@@ -78,8 +91,23 @@ async fn list_filter_configs(
 /// Update guild filter category configs (bulk upsert).
 ///
 /// PUT `/api/guilds/{id}/filters`
+#[utoipa::path(
+    put,
+    path = "/api/guilds/{id}/filters",
+    tag = "moderation",
+    params(
+        ("id" = Uuid, Path, description = "Guild ID")
+    ),
+    request_body = UpdateFilterConfigsRequest,
+    responses(
+        (status = 200, description = "Updated filter configs", body = Vec<GuildFilterConfig>),
+        (status = 400, description = "Validation error"),
+        (status = 403, description = "Forbidden"),
+    ),
+    security(("BearerAuth" = []))
+)]
 #[tracing::instrument(skip(state, auth_user, body))]
-async fn update_filter_configs(
+pub async fn update_filter_configs(
     State(state): State<AppState>,
     auth_user: AuthUser,
     Path(guild_id): Path<Uuid>,
@@ -126,8 +154,21 @@ async fn update_filter_configs(
 /// List guild custom filter patterns.
 ///
 /// GET `/api/guilds/{id}/filters/patterns`
+#[utoipa::path(
+    get,
+    path = "/api/guilds/{id}/filters/patterns",
+    tag = "moderation",
+    params(
+        ("id" = Uuid, Path, description = "Guild ID")
+    ),
+    responses(
+        (status = 200, description = "List of custom patterns", body = Vec<GuildFilterPattern>),
+        (status = 403, description = "Forbidden"),
+    ),
+    security(("BearerAuth" = []))
+)]
 #[tracing::instrument(skip(state, auth_user))]
-async fn list_custom_patterns(
+pub async fn list_custom_patterns(
     State(state): State<AppState>,
     auth_user: AuthUser,
     Path(guild_id): Path<Uuid>,
@@ -148,8 +189,23 @@ async fn list_custom_patterns(
 /// Create a custom filter pattern.
 ///
 /// POST `/api/guilds/{id}/filters/patterns`
+#[utoipa::path(
+    post,
+    path = "/api/guilds/{id}/filters/patterns",
+    tag = "moderation",
+    params(
+        ("id" = Uuid, Path, description = "Guild ID")
+    ),
+    request_body = CreatePatternRequest,
+    responses(
+        (status = 201, description = "Pattern created", body = GuildFilterPattern),
+        (status = 400, description = "Validation error"),
+        (status = 403, description = "Forbidden"),
+    ),
+    security(("BearerAuth" = []))
+)]
 #[tracing::instrument(skip(state, auth_user, body))]
-async fn create_custom_pattern(
+pub async fn create_custom_pattern(
     State(state): State<AppState>,
     auth_user: AuthUser,
     Path(guild_id): Path<Uuid>,
@@ -219,8 +275,25 @@ async fn create_custom_pattern(
 /// Update a custom filter pattern.
 ///
 /// PUT `/api/guilds/{id}/filters/patterns/{pid}`
+#[utoipa::path(
+    put,
+    path = "/api/guilds/{id}/filters/patterns/{pid}",
+    tag = "moderation",
+    params(
+        ("id" = Uuid, Path, description = "Guild ID"),
+        ("pid" = Uuid, Path, description = "Pattern ID")
+    ),
+    request_body = UpdatePatternRequest,
+    responses(
+        (status = 200, description = "Pattern updated", body = GuildFilterPattern),
+        (status = 400, description = "Validation error"),
+        (status = 403, description = "Forbidden"),
+        (status = 404, description = "Pattern not found"),
+    ),
+    security(("BearerAuth" = []))
+)]
 #[tracing::instrument(skip(state, auth_user, body))]
-async fn update_custom_pattern(
+pub async fn update_custom_pattern(
     State(state): State<AppState>,
     auth_user: AuthUser,
     Path((guild_id, pattern_id)): Path<(Uuid, Uuid)>,
@@ -303,8 +376,23 @@ async fn update_custom_pattern(
 /// Delete a custom filter pattern.
 ///
 /// DELETE `/api/guilds/{id}/filters/patterns/{pid}`
+#[utoipa::path(
+    delete,
+    path = "/api/guilds/{id}/filters/patterns/{pid}",
+    tag = "moderation",
+    params(
+        ("id" = Uuid, Path, description = "Guild ID"),
+        ("pid" = Uuid, Path, description = "Pattern ID")
+    ),
+    responses(
+        (status = 204, description = "Pattern deleted"),
+        (status = 403, description = "Forbidden"),
+        (status = 404, description = "Pattern not found"),
+    ),
+    security(("BearerAuth" = []))
+)]
 #[tracing::instrument(skip(state, auth_user))]
-async fn delete_custom_pattern(
+pub async fn delete_custom_pattern(
     State(state): State<AppState>,
     auth_user: AuthUser,
     Path((guild_id, pattern_id)): Path<(Uuid, Uuid)>,
@@ -345,8 +433,22 @@ async fn delete_custom_pattern(
 /// List moderation action log for a guild (paginated).
 ///
 /// GET `/api/guilds/{id}/filters/log`
+#[utoipa::path(
+    get,
+    path = "/api/guilds/{id}/filters/log",
+    tag = "moderation",
+    params(
+        ("id" = Uuid, Path, description = "Guild ID"),
+        PaginationQuery
+    ),
+    responses(
+        (status = 200, description = "Paginated moderation log", body = PaginatedModerationLog),
+        (status = 403, description = "Forbidden"),
+    ),
+    security(("BearerAuth" = []))
+)]
 #[tracing::instrument(skip(state, auth_user))]
-async fn list_moderation_log(
+pub async fn list_moderation_log(
     State(state): State<AppState>,
     auth_user: AuthUser,
     Path(guild_id): Path<Uuid>,
@@ -378,8 +480,23 @@ async fn list_moderation_log(
 /// Test content against active filters (dry-run).
 ///
 /// POST `/api/guilds/{id}/filters/test`
+#[utoipa::path(
+    post,
+    path = "/api/guilds/{id}/filters/test",
+    tag = "moderation",
+    params(
+        ("id" = Uuid, Path, description = "Guild ID")
+    ),
+    request_body = TestFilterRequest,
+    responses(
+        (status = 200, description = "Filter test results", body = TestFilterResponse),
+        (status = 400, description = "Validation error"),
+        (status = 403, description = "Forbidden"),
+    ),
+    security(("BearerAuth" = []))
+)]
 #[tracing::instrument(skip(state, auth_user, body))]
-async fn test_filter(
+pub async fn test_filter(
     State(state): State<AppState>,
     auth_user: AuthUser,
     Path(guild_id): Path<Uuid>,

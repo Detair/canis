@@ -212,13 +212,11 @@ pub async fn get_page_by_slug(
 
 /// Get page by ID (excludes soft-deleted pages).
 pub async fn get_page_by_id(pool: &PgPool, id: Uuid) -> Result<Option<Page>, sqlx::Error> {
-    let page: Option<Page> = sqlx::query_as!(
-        Page,
-        r"SELECT * FROM pages WHERE id = $1 AND deleted_at IS NULL",
-        id,
-    )
-    .fetch_optional(pool)
-    .await?;
+    let page: Option<Page> =
+        sqlx::query_as::<_, Page>(r"SELECT * FROM pages WHERE id = $1 AND deleted_at IS NULL")
+            .bind(id)
+            .fetch_optional(pool)
+            .await?;
     Ok(page)
 }
 

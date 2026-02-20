@@ -4,7 +4,7 @@
 
 mod backup_codes;
 mod error;
-mod handlers;
+pub(crate) mod handlers;
 pub mod jwt;
 pub mod mfa_crypto;
 mod middleware;

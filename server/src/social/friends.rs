@@ -11,6 +11,20 @@ use crate::ws::{broadcast_to_user, ServerEvent};
 
 /// POST /api/friends/request
 /// Send a friend request to another user
+#[utoipa::path(
+    post,
+    path = "/friends/requests",
+    tag = "social",
+    request_body = SendFriendRequestBody,
+    responses(
+        (status = 200, description = "Friend request sent", body = Friendship),
+        (status = 400, description = "Validation error"),
+        (status = 403, description = "Blocked"),
+        (status = 404, description = "User not found"),
+        (status = 409, description = "Friend request already exists"),
+    ),
+    security(("BearerAuth" = []))
+)]
 pub async fn send_friend_request(
     State(state): State<AppState>,
     auth: AuthUser,
@@ -100,6 +114,16 @@ pub async fn send_friend_request(
 
 /// GET /api/friends
 /// List all friends (accepted friendships)
+#[utoipa::path(
+    get,
+    path = "/friends",
+    tag = "social",
+    responses(
+        (status = 200, description = "List of friends", body = Vec<Friend>),
+        (status = 401, description = "Unauthorized"),
+    ),
+    security(("BearerAuth" = []))
+)]
 pub async fn list_friends(
     State(state): State<AppState>,
     auth: AuthUser,
@@ -136,6 +160,16 @@ pub async fn list_friends(
 
 /// GET /api/friends/pending
 /// List pending friend requests (both sent and received)
+#[utoipa::path(
+    get,
+    path = "/friends/requests",
+    tag = "social",
+    responses(
+        (status = 200, description = "List of pending friend requests", body = Vec<Friend>),
+        (status = 401, description = "Unauthorized"),
+    ),
+    security(("BearerAuth" = []))
+)]
 pub async fn list_pending_requests(
     State(state): State<AppState>,
     auth: AuthUser,
@@ -172,6 +206,16 @@ pub async fn list_pending_requests(
 
 /// GET /api/friends/blocked
 /// List blocked users
+#[utoipa::path(
+    get,
+    path = "/friends/blocked",
+    tag = "social",
+    responses(
+        (status = 200, description = "List of blocked users", body = Vec<Friend>),
+        (status = 401, description = "Unauthorized"),
+    ),
+    security(("BearerAuth" = []))
+)]
 pub async fn list_blocked(
     State(state): State<AppState>,
     auth: AuthUser,
@@ -202,6 +246,20 @@ pub async fn list_blocked(
 
 /// POST /api/friends/:id/accept
 /// Accept a friend request
+#[utoipa::path(
+    post,
+    path = "/friends/requests/{id}/accept",
+    tag = "social",
+    params(
+        ("id" = Uuid, Path, description = "Friendship ID"),
+    ),
+    responses(
+        (status = 200, description = "Friend request accepted", body = Friendship),
+        (status = 403, description = "Not authorized"),
+        (status = 404, description = "Friendship not found"),
+    ),
+    security(("BearerAuth" = []))
+)]
 pub async fn accept_friend_request(
     State(state): State<AppState>,
     auth: AuthUser,
@@ -265,6 +323,20 @@ pub async fn accept_friend_request(
 
 /// POST /api/friends/:id/reject
 /// Reject a friend request (deletes the friendship)
+#[utoipa::path(
+    post,
+    path = "/friends/requests/{id}/reject",
+    tag = "social",
+    params(
+        ("id" = Uuid, Path, description = "Friendship ID"),
+    ),
+    responses(
+        (status = 200, description = "Friend request rejected"),
+        (status = 403, description = "Not authorized"),
+        (status = 404, description = "Friendship not found"),
+    ),
+    security(("BearerAuth" = []))
+)]
 pub async fn reject_friend_request(
     State(state): State<AppState>,
     auth: AuthUser,
@@ -297,6 +369,20 @@ pub async fn reject_friend_request(
 
 /// POST /api/friends/:id/block
 /// Block a user
+#[utoipa::path(
+    post,
+    path = "/friends/blocked/{user_id}",
+    tag = "social",
+    params(
+        ("user_id" = Uuid, Path, description = "User ID to block"),
+    ),
+    responses(
+        (status = 200, description = "User blocked", body = Friendship),
+        (status = 400, description = "Cannot block yourself"),
+        (status = 404, description = "User not found"),
+    ),
+    security(("BearerAuth" = []))
+)]
 pub async fn block_user(
     State(state): State<AppState>,
     auth: AuthUser,
@@ -389,6 +475,19 @@ pub async fn block_user(
 
 /// DELETE /api/friends/:id/block
 /// Unblock a user
+#[utoipa::path(
+    delete,
+    path = "/friends/blocked/{user_id}",
+    tag = "social",
+    params(
+        ("user_id" = Uuid, Path, description = "User ID to unblock"),
+    ),
+    responses(
+        (status = 200, description = "User unblocked"),
+        (status = 404, description = "Blocked friendship not found"),
+    ),
+    security(("BearerAuth" = []))
+)]
 pub async fn unblock_user(
     State(state): State<AppState>,
     auth: AuthUser,
@@ -426,6 +525,20 @@ pub async fn unblock_user(
 
 /// DELETE /api/friends/:id
 /// Remove a friend (delete friendship)
+#[utoipa::path(
+    delete,
+    path = "/friends/{user_id}",
+    tag = "social",
+    params(
+        ("user_id" = Uuid, Path, description = "Friendship ID to remove"),
+    ),
+    responses(
+        (status = 200, description = "Friend removed"),
+        (status = 403, description = "Not authorized"),
+        (status = 404, description = "Friendship not found"),
+    ),
+    security(("BearerAuth" = []))
+)]
 pub async fn remove_friend(
     State(state): State<AppState>,
     auth: AuthUser,

@@ -38,6 +38,18 @@ fn parse_expiry(expires_in: &str) -> Option<Duration> {
 }
 
 /// List invites for a guild (owner only)
+#[utoipa::path(
+    get,
+    path = "/api/guilds/{id}/invites",
+    tag = "invites",
+    params(
+        ("id" = Uuid, Path, description = "Guild ID"),
+    ),
+    responses(
+        (status = 200, description = "List of active invites", body = Vec<GuildInvite>),
+    ),
+    security(("BearerAuth" = []))
+)]
 #[tracing::instrument(skip(state))]
 pub async fn list_invites(
     State(state): State<AppState>,
@@ -70,6 +82,19 @@ pub async fn list_invites(
 }
 
 /// Create a new invite (owner only)
+#[utoipa::path(
+    post,
+    path = "/api/guilds/{id}/invites",
+    tag = "invites",
+    params(
+        ("id" = Uuid, Path, description = "Guild ID"),
+    ),
+    request_body = CreateInviteRequest,
+    responses(
+        (status = 200, description = "Invite created", body = GuildInvite),
+    ),
+    security(("BearerAuth" = []))
+)]
 #[tracing::instrument(skip(state))]
 pub async fn create_invite(
     State(state): State<AppState>,
@@ -139,6 +164,19 @@ pub async fn create_invite(
 }
 
 /// Delete/revoke an invite (owner only)
+#[utoipa::path(
+    delete,
+    path = "/api/guilds/{id}/invites/{code}",
+    tag = "invites",
+    params(
+        ("id" = Uuid, Path, description = "Guild ID"),
+        ("code" = String, Path, description = "Invite code"),
+    ),
+    responses(
+        (status = 204, description = "Invite deleted"),
+    ),
+    security(("BearerAuth" = []))
+)]
 #[tracing::instrument(skip(state))]
 pub async fn delete_invite(
     State(state): State<AppState>,
@@ -171,6 +209,18 @@ pub async fn delete_invite(
 }
 
 /// Join a guild via invite code (any authenticated user)
+#[utoipa::path(
+    post,
+    path = "/api/invites/{code}/join",
+    tag = "invites",
+    params(
+        ("code" = String, Path, description = "Invite code"),
+    ),
+    responses(
+        (status = 200, description = "Joined guild via invite", body = InviteResponse),
+    ),
+    security(("BearerAuth" = []))
+)]
 #[tracing::instrument(skip(state))]
 pub async fn join_via_invite(
     State(state): State<AppState>,

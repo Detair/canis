@@ -89,7 +89,7 @@ impl From<sqlx::Error> for MessageError {
 // ============================================================================
 
 /// Author profile for message responses.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct AuthorProfile {
     pub id: Uuid,
     pub username: String,
@@ -111,7 +111,7 @@ impl From<db::User> for AuthorProfile {
 }
 
 /// Attachment info for message responses (matches client Attachment type).
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct AttachmentInfo {
     pub id: Uuid,
     pub filename: String,
@@ -134,7 +134,7 @@ impl AttachmentInfo {
 }
 
 /// Mention type for notification sounds.
-#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, PartialEq, Eq, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum MentionType {
     /// Direct @username mention
@@ -146,7 +146,7 @@ pub enum MentionType {
 }
 
 /// Thread info for parent messages (returned alongside message responses).
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct ThreadInfoResponse {
     pub reply_count: i32,
     pub last_reply_at: Option<DateTime<Utc>>,
@@ -159,7 +159,7 @@ pub struct ThreadInfoResponse {
 }
 
 /// Full message response with author info (matches client Message type).
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct MessageResponse {
     pub id: Uuid,
     pub channel_id: Uuid,
@@ -185,14 +185,14 @@ pub struct MessageResponse {
     pub thread_info: Option<ThreadInfoResponse>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ReactionInfo {
     pub emoji: String,
     pub count: i64,
     pub me: bool,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, utoipa::IntoParams)]
 pub struct ListMessagesQuery {
     pub before: Option<Uuid>,
     #[serde(default = "default_limit")]
@@ -221,6 +221,15 @@ pub struct CursorPaginatedResponse<T> {
     /// Cursor for fetching the next page (ID of the oldest item).
     /// Pass this as `before` parameter to get the next page.
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub next_cursor: Option<Uuid>,
+}
+
+/// Cursor-paginated message response (`OpenAPI` schema).
+#[derive(utoipa::ToSchema)]
+#[allow(dead_code)]
+pub struct CursorPaginatedMessageResponse {
+    pub items: Vec<MessageResponse>,
+    pub has_more: bool,
     pub next_cursor: Option<Uuid>,
 }
 
@@ -257,7 +266,7 @@ pub fn detect_mention_type(content: &str, author_username: Option<&str>) -> Opti
     None
 }
 
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, utoipa::ToSchema)]
 pub struct CreateMessageRequest {
     #[validate(length(min = 1, max = 4000, message = "Content must be 1-4000 characters"))]
     pub content: String,
@@ -275,7 +284,7 @@ pub struct ListThreadRepliesQuery {
     pub limit: i64,
 }
 
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, utoipa::ToSchema)]
 pub struct UpdateMessageRequest {
     #[validate(length(min = 1, max = 4000, message = "Content must be 1-4000 characters"))]
     pub content: String,
@@ -290,6 +299,21 @@ pub struct UpdateMessageRequest {
 ///
 /// Returns cursor-based pagination with `has_more` indicator.
 /// Use the `next_cursor` value as `before` parameter to fetch the next page.
+#[utoipa::path(
+    get,
+    path = "/api/channels/{channel_id}/messages",
+    tag = "chat",
+    params(
+        ("channel_id" = Uuid, Path, description = "Channel ID"),
+        ListMessagesQuery,
+    ),
+    responses(
+        (status = 200, description = "List of messages", body = CursorPaginatedMessageResponse),
+        (status = 403, description = "Access denied"),
+        (status = 404, description = "Channel not found"),
+    ),
+    security(("BearerAuth" = [])),
+)]
 pub async fn list(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -352,6 +376,22 @@ pub async fn list(
 
 /// Create a new message.
 /// POST /`api/messages/channel/:channel_id`
+#[utoipa::path(
+    post,
+    path = "/api/channels/{channel_id}/messages",
+    tag = "chat",
+    params(
+        ("channel_id" = Uuid, Path, description = "Channel ID"),
+    ),
+    request_body = CreateMessageRequest,
+    responses(
+        (status = 201, description = "Message created", body = MessageResponse),
+        (status = 400, description = "Validation error"),
+        (status = 403, description = "Access denied"),
+        (status = 404, description = "Channel not found"),
+    ),
+    security(("BearerAuth" = [])),
+)]
 pub async fn create(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -993,6 +1033,23 @@ pub async fn create(
 
 /// Update (edit) a message.
 /// PATCH /api/messages/:id
+#[utoipa::path(
+    patch,
+    path = "/api/channels/{channel_id}/messages/{message_id}",
+    tag = "chat",
+    params(
+        ("channel_id" = Uuid, Path, description = "Channel ID"),
+        ("message_id" = Uuid, Path, description = "Message ID"),
+    ),
+    request_body = UpdateMessageRequest,
+    responses(
+        (status = 200, description = "Message updated", body = MessageResponse),
+        (status = 400, description = "Validation error"),
+        (status = 403, description = "Access denied"),
+        (status = 404, description = "Message not found"),
+    ),
+    security(("BearerAuth" = [])),
+)]
 pub async fn update(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -1137,6 +1194,21 @@ pub async fn update(
 
 /// Delete a message (soft delete).
 /// DELETE /api/messages/:id
+#[utoipa::path(
+    delete,
+    path = "/api/channels/{channel_id}/messages/{message_id}",
+    tag = "chat",
+    params(
+        ("channel_id" = Uuid, Path, description = "Channel ID"),
+        ("message_id" = Uuid, Path, description = "Message ID"),
+    ),
+    responses(
+        (status = 204, description = "Message deleted"),
+        (status = 403, description = "Access denied"),
+        (status = 404, description = "Message not found"),
+    ),
+    security(("BearerAuth" = [])),
+)]
 pub async fn delete(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -1507,6 +1579,21 @@ async fn build_batch_thread_infos(
 
 /// List thread replies for a parent message.
 /// `GET /api/messages/{parent_id}/thread`
+#[utoipa::path(
+    get,
+    path = "/api/channels/{channel_id}/messages/{message_id}/thread",
+    tag = "chat",
+    params(
+        ("channel_id" = Uuid, Path, description = "Channel ID"),
+        ("message_id" = Uuid, Path, description = "Parent message ID"),
+    ),
+    responses(
+        (status = 200, description = "Thread replies", body = CursorPaginatedMessageResponse),
+        (status = 403, description = "Access denied"),
+        (status = 404, description = "Parent message not found"),
+    ),
+    security(("BearerAuth" = [])),
+)]
 pub async fn list_thread_replies(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -1564,6 +1651,21 @@ pub async fn list_thread_replies(
 
 /// Mark a thread as read.
 /// `POST /api/messages/{parent_id}/thread/read`
+#[utoipa::path(
+    post,
+    path = "/api/channels/{channel_id}/messages/{message_id}/thread/read",
+    tag = "chat",
+    params(
+        ("channel_id" = Uuid, Path, description = "Channel ID"),
+        ("message_id" = Uuid, Path, description = "Parent message ID"),
+    ),
+    responses(
+        (status = 204, description = "Thread marked as read"),
+        (status = 403, description = "Access denied"),
+        (status = 404, description = "Parent message not found"),
+    ),
+    security(("BearerAuth" = [])),
+)]
 pub async fn mark_thread_read(
     State(state): State<AppState>,
     auth_user: AuthUser,
