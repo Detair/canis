@@ -4,7 +4,9 @@ use uuid::Uuid;
 use validator::Validate;
 
 /// Friendship status enum
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type, utoipa::ToSchema)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type, utoipa::ToSchema,
+)]
 #[sqlx(type_name = "friendship_status", rename_all = "lowercase")]
 pub enum FriendshipStatus {
     Pending,

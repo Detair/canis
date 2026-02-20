@@ -2,12 +2,12 @@
 //!
 //! Central routing configuration and shared state.
 
-#[cfg(feature = "swagger")]
-mod openapi;
 pub mod bots;
 pub mod commands;
 pub mod favorites;
 pub mod global_search;
+#[cfg(feature = "swagger")]
+mod openapi;
 pub mod pins;
 pub mod preferences;
 pub mod reactions;

@@ -12,7 +12,9 @@ use validator::Validate;
 // Database Enums
 // ============================================================================
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type, utoipa::ToSchema)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type, utoipa::ToSchema,
+)]
 #[sqlx(type_name = "report_category", rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 pub enum ReportCategory {
@@ -23,7 +25,9 @@ pub enum ReportCategory {
     Other,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type, utoipa::ToSchema)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type, utoipa::ToSchema,
+)]
 #[sqlx(type_name = "report_status", rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 pub enum ReportStatus {
@@ -33,7 +37,9 @@ pub enum ReportStatus {
     Dismissed,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type, utoipa::ToSchema)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type, utoipa::ToSchema,
+)]
 #[sqlx(type_name = "report_target_type", rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 pub enum ReportTargetType {

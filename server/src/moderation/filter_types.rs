@@ -15,7 +15,9 @@ use uuid::Uuid;
 // ============================================================================
 
 /// Built-in filter categories.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type, utoipa::ToSchema)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type, utoipa::ToSchema,
+)]
 #[sqlx(type_name = "filter_category", rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 pub enum FilterCategory {
@@ -39,7 +41,9 @@ impl std::fmt::Display for FilterCategory {
 }
 
 /// Action to take when a filter matches.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type, utoipa::ToSchema)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type, utoipa::ToSchema,
+)]
 #[sqlx(type_name = "filter_action", rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 pub enum FilterAction {

@@ -24,9 +24,8 @@ use super::oidc::{append_collision_suffix, generate_username_from_claims, OidcFl
 use super::password::{hash_password, verify_password};
 use crate::api::AppState;
 use crate::db::{
-    self, count_all_mfa_backup_codes, count_unused_mfa_backup_codes,
-    create_password_reset_token, create_session, delete_mfa_backup_codes,
-    delete_session_by_token_hash, email_exists,
+    self, count_all_mfa_backup_codes, count_unused_mfa_backup_codes, create_password_reset_token,
+    create_session, delete_mfa_backup_codes, delete_session_by_token_hash, email_exists,
     find_session_by_token_hash, find_user_by_email, find_user_by_external_id, find_user_by_id,
     find_user_by_username, find_valid_reset_token, get_auth_methods_allowed,
     get_unused_mfa_backup_codes, invalidate_user_reset_tokens, is_setup_complete,
