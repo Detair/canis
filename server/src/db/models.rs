@@ -68,7 +68,7 @@ const fn default_max_screen_shares() -> i32 {
 }
 
 /// Channel model.
-#[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
+#[derive(Debug, Clone, FromRow, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct Channel {
     /// Unique channel ID.
     pub id: Uuid,
@@ -98,7 +98,7 @@ pub struct Channel {
 }
 
 /// Channel type.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, sqlx::Type, utoipa::ToSchema)]
 #[sqlx(type_name = "channel_type", rename_all = "lowercase")]
 #[serde(rename_all = "lowercase")]
 pub enum ChannelType {
@@ -282,7 +282,7 @@ pub struct OidcProviderRow {
 }
 
 /// Public-facing OIDC provider info (no secrets).
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct PublicOidcProvider {
     /// URL-safe slug.
     pub slug: String,
@@ -293,7 +293,7 @@ pub struct PublicOidcProvider {
 }
 
 /// Auth methods configuration.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct AuthMethodsConfig {
     /// Whether local (password) auth is allowed.
     pub local: bool,
@@ -311,7 +311,7 @@ impl Default for AuthMethodsConfig {
 }
 
 /// Channel unread count for a specific channel.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ChannelUnread {
     /// Channel ID.
     pub channel_id: Uuid,
@@ -322,7 +322,7 @@ pub struct ChannelUnread {
 }
 
 /// Guild unread summary for the unread aggregator.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct GuildUnreadSummary {
     /// Guild ID.
     pub guild_id: Uuid,
@@ -335,7 +335,7 @@ pub struct GuildUnreadSummary {
 }
 
 /// Aggregate unread counts across all guilds and DMs.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct UnreadAggregate {
     /// Guild-based unreads.
     pub guilds: Vec<GuildUnreadSummary>,

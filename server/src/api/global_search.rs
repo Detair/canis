@@ -54,7 +54,7 @@ impl From<sqlx::Error> for GlobalSearchError {
 // Request/Response Types
 // ============================================================================
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, utoipa::IntoParams)]
 pub struct GlobalSearchQuery {
     pub q: String,
     #[serde(default = "default_limit")]
@@ -72,7 +72,7 @@ const fn default_limit() -> i64 {
     25
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct GlobalSearchAuthor {
     pub id: Uuid,
     pub username: String,
@@ -80,7 +80,7 @@ pub struct GlobalSearchAuthor {
     pub avatar_url: Option<String>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct GlobalSearchSource {
     #[serde(rename = "type")]
     pub source_type: String,
@@ -88,7 +88,7 @@ pub struct GlobalSearchSource {
     pub guild_name: Option<String>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct GlobalSearchResult {
     pub id: Uuid,
     pub channel_id: Uuid,
@@ -101,7 +101,7 @@ pub struct GlobalSearchResult {
     pub source: GlobalSearchSource,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct GlobalSearchResponse {
     pub results: Vec<GlobalSearchResult>,
     pub total: i64,
@@ -115,6 +115,17 @@ pub struct GlobalSearchResponse {
 
 /// Search messages across all guilds and DMs.
 /// GET `/api/search?q=...`
+#[utoipa::path(
+    get,
+    path = "/api/search",
+    tag = "search",
+    params(GlobalSearchQuery),
+    responses(
+        (status = 200, description = "Search results", body = GlobalSearchResponse),
+        (status = 400, description = "Invalid query"),
+    ),
+    security(("BearerAuth" = []))
+)]
 #[tracing::instrument(skip(state))]
 pub async fn search_all(
     State(state): State<AppState>,
@@ -224,6 +235,7 @@ pub async fn search_all(
                 auth.id,
                 ctx.guild_owner_id,
                 ctx.everyone_permissions,
+                ctx.everyone_role_id,
                 &ctx.member_roles,
                 Some(&overrides),
             );

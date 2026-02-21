@@ -6,6 +6,8 @@ pub mod bots;
 pub mod commands;
 pub mod favorites;
 pub mod global_search;
+#[cfg(feature = "swagger")]
+mod openapi;
 pub mod pins;
 pub mod preferences;
 pub mod reactions;
@@ -366,7 +368,15 @@ async fn health_check(State(state): State<AppState>) -> Json<HealthResponse> {
 }
 
 /// API documentation routes.
+///
+/// When compiled with the `swagger` feature, serves Swagger UI at `/api/docs`.
 fn api_docs() -> Router<AppState> {
-    // TODO: Setup utoipa swagger-ui
-    Router::new()
+    #[cfg(feature = "swagger")]
+    {
+        openapi::swagger_router()
+    }
+    #[cfg(not(feature = "swagger"))]
+    {
+        Router::new()
+    }
 }

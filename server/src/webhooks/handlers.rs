@@ -64,6 +64,23 @@ fn validate_url(url: &str) -> Result<(), WebhookError> {
 }
 
 /// POST /`api/applications/{app_id}/webhooks`
+#[utoipa::path(
+    post,
+    path = "/api/applications/{app_id}/webhooks",
+    tag = "webhooks",
+    params(
+        ("app_id" = Uuid, Path, description = "Application ID"),
+    ),
+    request_body = CreateWebhookRequest,
+    responses(
+        (status = 201, description = "Webhook created", body = WebhookCreatedResponse),
+        (status = 400, description = "Validation error"),
+        (status = 404, description = "Application not found"),
+        (status = 403, description = "Forbidden"),
+        (status = 409, description = "Maximum webhooks reached"),
+    ),
+    security(("BearerAuth" = []))
+)]
 #[instrument(skip(pool, claims))]
 pub async fn create_webhook(
     State(pool): State<PgPool>,
@@ -130,6 +147,20 @@ pub async fn create_webhook(
 }
 
 /// GET /`api/applications/{app_id}/webhooks`
+#[utoipa::path(
+    get,
+    path = "/api/applications/{app_id}/webhooks",
+    tag = "webhooks",
+    params(
+        ("app_id" = Uuid, Path, description = "Application ID"),
+    ),
+    responses(
+        (status = 200, description = "List of webhooks", body = Vec<WebhookResponse>),
+        (status = 404, description = "Application not found"),
+        (status = 403, description = "Forbidden"),
+    ),
+    security(("BearerAuth" = []))
+)]
 #[instrument(skip(pool, claims))]
 pub async fn list_webhooks(
     State(pool): State<PgPool>,
@@ -146,6 +177,21 @@ pub async fn list_webhooks(
 }
 
 /// GET /`api/applications/{app_id}/webhooks/{wh_id}`
+#[utoipa::path(
+    get,
+    path = "/api/applications/{app_id}/webhooks/{wh_id}",
+    tag = "webhooks",
+    params(
+        ("app_id" = Uuid, Path, description = "Application ID"),
+        ("wh_id" = Uuid, Path, description = "Webhook ID"),
+    ),
+    responses(
+        (status = 200, description = "Webhook details", body = WebhookResponse),
+        (status = 404, description = "Webhook or application not found"),
+        (status = 403, description = "Forbidden"),
+    ),
+    security(("BearerAuth" = []))
+)]
 #[instrument(skip(pool, claims))]
 pub async fn get_webhook(
     State(pool): State<PgPool>,
@@ -163,6 +209,23 @@ pub async fn get_webhook(
 }
 
 /// PATCH /`api/applications/{app_id}/webhooks/{wh_id}`
+#[utoipa::path(
+    patch,
+    path = "/api/applications/{app_id}/webhooks/{wh_id}",
+    tag = "webhooks",
+    params(
+        ("app_id" = Uuid, Path, description = "Application ID"),
+        ("wh_id" = Uuid, Path, description = "Webhook ID"),
+    ),
+    request_body = UpdateWebhookRequest,
+    responses(
+        (status = 200, description = "Webhook updated", body = WebhookResponse),
+        (status = 400, description = "Validation error"),
+        (status = 404, description = "Webhook or application not found"),
+        (status = 403, description = "Forbidden"),
+    ),
+    security(("BearerAuth" = []))
+)]
 #[instrument(skip(pool, claims))]
 pub async fn update_webhook(
     State(pool): State<PgPool>,
@@ -225,6 +288,21 @@ pub async fn update_webhook(
 }
 
 /// DELETE /`api/applications/{app_id}/webhooks/{wh_id}`
+#[utoipa::path(
+    delete,
+    path = "/api/applications/{app_id}/webhooks/{wh_id}",
+    tag = "webhooks",
+    params(
+        ("app_id" = Uuid, Path, description = "Application ID"),
+        ("wh_id" = Uuid, Path, description = "Webhook ID"),
+    ),
+    responses(
+        (status = 204, description = "Webhook deleted"),
+        (status = 404, description = "Webhook or application not found"),
+        (status = 403, description = "Forbidden"),
+    ),
+    security(("BearerAuth" = []))
+)]
 #[instrument(skip(pool, claims))]
 pub async fn delete_webhook(
     State(pool): State<PgPool>,
@@ -245,6 +323,21 @@ pub async fn delete_webhook(
 }
 
 /// POST /`api/applications/{app_id}/webhooks/{wh_id}/test`
+#[utoipa::path(
+    post,
+    path = "/api/applications/{app_id}/webhooks/{wh_id}/test",
+    tag = "webhooks",
+    params(
+        ("app_id" = Uuid, Path, description = "Application ID"),
+        ("wh_id" = Uuid, Path, description = "Webhook ID"),
+    ),
+    responses(
+        (status = 200, description = "Test delivery result", body = TestDeliveryResult),
+        (status = 404, description = "Webhook or application not found"),
+        (status = 403, description = "Forbidden"),
+    ),
+    security(("BearerAuth" = []))
+)]
 #[instrument(skip(pool, claims))]
 pub async fn test_webhook(
     State(pool): State<PgPool>,
@@ -340,6 +433,21 @@ pub async fn test_webhook(
 }
 
 /// GET /`api/applications/{app_id}/webhooks/{wh_id}/deliveries`
+#[utoipa::path(
+    get,
+    path = "/api/applications/{app_id}/webhooks/{wh_id}/deliveries",
+    tag = "webhooks",
+    params(
+        ("app_id" = Uuid, Path, description = "Application ID"),
+        ("wh_id" = Uuid, Path, description = "Webhook ID"),
+    ),
+    responses(
+        (status = 200, description = "List of delivery logs", body = Vec<DeliveryLogEntry>),
+        (status = 404, description = "Webhook or application not found"),
+        (status = 403, description = "Forbidden"),
+    ),
+    security(("BearerAuth" = []))
+)]
 #[instrument(skip(pool, claims))]
 pub async fn list_deliveries(
     State(pool): State<PgPool>,

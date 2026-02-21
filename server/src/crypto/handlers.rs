@@ -19,7 +19,7 @@ use crate::auth::{AuthError, AuthUser};
 // ============================================================================
 
 /// Request to upload device keys.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct UploadKeysRequest {
     /// Optional human-readable device name (e.g., "Desktop", "Phone").
     pub device_name: Option<String>,
@@ -32,7 +32,7 @@ pub struct UploadKeysRequest {
 }
 
 /// A single prekey to upload.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct PrekeyUpload {
     /// Unique identifier for this prekey (usually a counter or UUID).
     pub key_id: String,
@@ -41,7 +41,7 @@ pub struct PrekeyUpload {
 }
 
 /// Response after uploading keys.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct UploadKeysResponse {
     /// The device ID (new or existing).
     pub device_id: Uuid,
@@ -52,21 +52,21 @@ pub struct UploadKeysResponse {
 }
 
 /// Response containing a user's device keys.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct UserKeysResponse {
     /// List of devices with their public keys.
     pub devices: Vec<DeviceKeys>,
 }
 
 /// Request to claim a prekey from a specific device.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct ClaimPrekeyRequest {
     /// The device ID to claim a prekey from.
     pub device_id: Uuid,
 }
 
 /// Response after claiming a prekey.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct ClaimPrekeyResponse {
     /// The device ID the prekey was claimed from.
     pub device_id: Uuid,
@@ -79,7 +79,7 @@ pub struct ClaimPrekeyResponse {
 }
 
 /// A claimed one-time prekey.
-#[derive(Debug, Serialize, FromRow)]
+#[derive(Debug, Serialize, FromRow, utoipa::ToSchema)]
 pub struct ClaimedPrekey {
     /// Unique identifier for this prekey.
     pub key_id: String,
@@ -88,7 +88,7 @@ pub struct ClaimedPrekey {
 }
 
 /// Public keys for a single device.
-#[derive(Debug, Serialize, FromRow)]
+#[derive(Debug, Serialize, FromRow, utoipa::ToSchema)]
 pub struct DeviceKeys {
     /// Device ID.
     pub device_id: Uuid,
@@ -119,6 +119,18 @@ const MAX_PREKEYS_PER_UPLOAD: usize = 100;
 /// DO NOTHING` to avoid duplicate key errors.
 ///
 /// POST /api/keys/upload
+#[utoipa::path(
+    post,
+    path = "/keys",
+    tag = "crypto",
+    request_body = UploadKeysRequest,
+    responses(
+        (status = 200, description = "Keys uploaded", body = UploadKeysResponse),
+        (status = 400, description = "Validation error"),
+        (status = 401, description = "Unauthorized"),
+    ),
+    security(("BearerAuth" = []))
+)]
 #[tracing::instrument(skip(state, req), fields(user_id = %auth_user.id))]
 pub async fn upload_keys(
     State(state): State<AppState>,
@@ -219,6 +231,19 @@ pub async fn upload_keys(
 /// This is used when establishing encrypted sessions with another user.
 ///
 /// GET /api/users/:id/keys
+#[utoipa::path(
+    get,
+    path = "/users/{user_id}/keys",
+    tag = "crypto",
+    params(
+        ("user_id" = Uuid, Path, description = "Target user ID"),
+    ),
+    responses(
+        (status = 200, description = "User device keys", body = UserKeysResponse),
+        (status = 401, description = "Unauthorized"),
+    ),
+    security(("BearerAuth" = []))
+)]
 #[tracing::instrument(skip(state, auth_user), fields(target_user_id = %user_id))]
 pub async fn get_user_keys(
     State(state): State<AppState>,
@@ -253,6 +278,16 @@ pub async fn get_user_keys(
 /// Returns all devices registered for the authenticated user.
 ///
 /// GET /api/keys/devices
+#[utoipa::path(
+    get,
+    path = "/keys/devices",
+    tag = "crypto",
+    responses(
+        (status = 200, description = "Own device keys", body = UserKeysResponse),
+        (status = 401, description = "Unauthorized"),
+    ),
+    security(("BearerAuth" = []))
+)]
 #[tracing::instrument(skip(state), fields(user_id = %auth_user.id))]
 pub async fn get_own_devices(
     State(state): State<AppState>,
@@ -285,6 +320,18 @@ pub async fn get_own_devices(
 /// identity keys along with the claimed prekey.
 ///
 /// POST /api/users/:id/keys/claim
+#[utoipa::path(
+    post,
+    path = "/keys/claim",
+    tag = "crypto",
+    request_body = ClaimPrekeyRequest,
+    responses(
+        (status = 200, description = "Prekey claimed", body = ClaimPrekeyResponse),
+        (status = 400, description = "Device not found"),
+        (status = 401, description = "Unauthorized"),
+    ),
+    security(("BearerAuth" = []))
+)]
 #[tracing::instrument(skip(state), fields(claimer_id = %auth_user.id, target_user_id = %target_user_id))]
 pub async fn claim_prekey(
     State(state): State<AppState>,
@@ -358,7 +405,7 @@ struct DeviceIdentityKeys {
 // ============================================================================
 
 /// Request to upload an encrypted key backup.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct UploadBackupRequest {
     /// Salt used for key derivation (Base64-encoded, must be 16 bytes).
     pub salt: String,
@@ -371,7 +418,7 @@ pub struct UploadBackupRequest {
 }
 
 /// Response containing an encrypted key backup.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct BackupResponse {
     /// Salt used for key derivation (Base64-encoded).
     pub salt: String,
@@ -396,6 +443,18 @@ pub struct BackupResponse {
 /// using a recovery key before uploading.
 ///
 /// POST /api/keys/backup
+#[utoipa::path(
+    post,
+    path = "/keys/backup",
+    tag = "crypto",
+    request_body = UploadBackupRequest,
+    responses(
+        (status = 201, description = "Backup uploaded"),
+        (status = 400, description = "Validation error"),
+        (status = 401, description = "Unauthorized"),
+    ),
+    security(("BearerAuth" = []))
+)]
 #[tracing::instrument(skip(state, req), fields(user_id = %auth_user.id))]
 pub async fn upload_backup(
     State(state): State<AppState>,
@@ -459,6 +518,17 @@ pub async fn upload_backup(
 /// for decrypting the backup using their recovery key.
 ///
 /// GET /api/keys/backup
+#[utoipa::path(
+    get,
+    path = "/keys/backup",
+    tag = "crypto",
+    responses(
+        (status = 200, description = "Encrypted key backup", body = BackupResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "No backup found"),
+    ),
+    security(("BearerAuth" = []))
+)]
 #[tracing::instrument(skip(state), fields(user_id = %auth_user.id))]
 pub async fn get_backup(
     State(state): State<AppState>,
@@ -499,7 +569,7 @@ struct BackupRow {
 }
 
 /// Response for backup status check.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct BackupStatusResponse {
     /// Whether a backup exists.
     pub has_backup: bool,
@@ -522,6 +592,16 @@ struct BackupStatusRow {
 /// This is a lightweight endpoint that doesn't return the actual backup data.
 ///
 /// GET /api/keys/backup/status
+#[utoipa::path(
+    get,
+    path = "/keys/backup/status",
+    tag = "crypto",
+    responses(
+        (status = 200, description = "Backup status", body = BackupStatusResponse),
+        (status = 401, description = "Unauthorized"),
+    ),
+    security(("BearerAuth" = []))
+)]
 #[tracing::instrument(skip(state), fields(user_id = %auth_user.id))]
 pub async fn get_backup_status(
     State(state): State<AppState>,

@@ -63,7 +63,7 @@ impl From<sqlx::Error> for ChannelError {
 // Request/Response Types
 // ============================================================================
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct ChannelResponse {
     pub id: Uuid,
     pub name: String,
@@ -101,7 +101,7 @@ impl From<db::Channel> for ChannelResponse {
     }
 }
 
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, utoipa::ToSchema)]
 pub struct CreateChannelRequest {
     #[validate(length(min = 1, max = 64, message = "Name must be 1-64 characters"))]
     pub name: String,
@@ -112,7 +112,7 @@ pub struct CreateChannelRequest {
     pub user_limit: Option<i32>,
 }
 
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize, Validate, utoipa::ToSchema)]
 pub struct UpdateChannelRequest {
     #[validate(length(min = 1, max = 64, message = "Name must be 1-64 characters"))]
     pub name: Option<String>,
@@ -121,13 +121,13 @@ pub struct UpdateChannelRequest {
     pub position: Option<i32>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct AddMemberRequest {
     pub user_id: Uuid,
     pub role_id: Option<Uuid>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct MemberResponse {
     pub user_id: Uuid,
     pub username: String,
@@ -141,6 +141,17 @@ pub struct MemberResponse {
 
 /// Create a new channel.
 /// POST /api/channels
+#[utoipa::path(
+    post,
+    path = "/api/channels",
+    tag = "chat",
+    request_body = CreateChannelRequest,
+    responses(
+        (status = 201, description = "Channel created", body = ChannelResponse),
+        (status = 400, description = "Validation error"),
+    ),
+    security(("BearerAuth" = [])),
+)]
 pub async fn create(
     State(state): State<AppState>,
     _auth_user: AuthUser,
@@ -188,6 +199,20 @@ pub async fn create(
 
 /// Get a channel by ID.
 /// GET /api/channels/:id
+#[utoipa::path(
+    get,
+    path = "/api/channels/{id}",
+    tag = "chat",
+    params(
+        ("id" = Uuid, Path, description = "Channel ID"),
+    ),
+    responses(
+        (status = 200, description = "Channel details", body = ChannelResponse),
+        (status = 403, description = "Access denied"),
+        (status = 404, description = "Channel not found"),
+    ),
+    security(("BearerAuth" = [])),
+)]
 pub async fn get(
     State(state): State<AppState>,
     auth: AuthUser,
@@ -207,6 +232,22 @@ pub async fn get(
 
 /// Update a channel.
 /// PATCH /api/channels/:id
+#[utoipa::path(
+    patch,
+    path = "/api/channels/{id}",
+    tag = "chat",
+    params(
+        ("id" = Uuid, Path, description = "Channel ID"),
+    ),
+    request_body = UpdateChannelRequest,
+    responses(
+        (status = 200, description = "Channel updated", body = ChannelResponse),
+        (status = 400, description = "Validation error"),
+        (status = 403, description = "Access denied"),
+        (status = 404, description = "Channel not found"),
+    ),
+    security(("BearerAuth" = [])),
+)]
 pub async fn update(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -248,6 +289,20 @@ pub async fn update(
 
 /// Delete a channel.
 /// DELETE /api/channels/:id
+#[utoipa::path(
+    delete,
+    path = "/api/channels/{id}",
+    tag = "chat",
+    params(
+        ("id" = Uuid, Path, description = "Channel ID"),
+    ),
+    responses(
+        (status = 204, description = "Channel deleted"),
+        (status = 403, description = "Access denied"),
+        (status = 404, description = "Channel not found"),
+    ),
+    security(("BearerAuth" = [])),
+)]
 pub async fn delete(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -273,6 +328,19 @@ pub async fn delete(
 
 /// List members of a channel.
 /// GET /api/channels/:id/members
+#[utoipa::path(
+    get,
+    path = "/api/channels/{id}/members",
+    tag = "chat",
+    params(
+        ("id" = Uuid, Path, description = "Channel ID"),
+    ),
+    responses(
+        (status = 200, description = "List of channel members", body = Vec<MemberResponse>),
+        (status = 404, description = "Channel not found"),
+    ),
+    security(("BearerAuth" = [])),
+)]
 pub async fn list_members(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
@@ -299,6 +367,21 @@ pub async fn list_members(
 
 /// Add a member to a channel.
 /// POST /api/channels/:id/members
+#[utoipa::path(
+    post,
+    path = "/api/channels/{id}/members",
+    tag = "chat",
+    params(
+        ("id" = Uuid, Path, description = "Channel ID"),
+    ),
+    request_body = AddMemberRequest,
+    responses(
+        (status = 201, description = "Member added"),
+        (status = 400, description = "Validation error"),
+        (status = 404, description = "Channel not found"),
+    ),
+    security(("BearerAuth" = [])),
+)]
 pub async fn add_member(
     State(state): State<AppState>,
     _auth_user: AuthUser,
@@ -322,6 +405,20 @@ pub async fn add_member(
 
 /// Remove a member from a channel.
 /// DELETE /`api/channels/:id/members/:user_id`
+#[utoipa::path(
+    delete,
+    path = "/api/channels/{id}/members/{user_id}",
+    tag = "chat",
+    params(
+        ("id" = Uuid, Path, description = "Channel ID"),
+        ("user_id" = Uuid, Path, description = "User ID to remove"),
+    ),
+    responses(
+        (status = 204, description = "Member removed"),
+        (status = 404, description = "Channel or member not found"),
+    ),
+    security(("BearerAuth" = [])),
+)]
 pub async fn remove_member(
     State(state): State<AppState>,
     _auth_user: AuthUser,
@@ -341,13 +438,28 @@ pub async fn remove_member(
 // ============================================================================
 
 /// Request body for marking a guild channel as read.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct MarkChannelAsReadRequest {
     pub last_read_message_id: Option<Uuid>,
 }
 
 /// Mark a guild channel as read.
 /// POST /api/channels/:id/read
+#[utoipa::path(
+    post,
+    path = "/api/channels/{id}/read",
+    tag = "chat",
+    params(
+        ("id" = Uuid, Path, description = "Channel ID"),
+    ),
+    request_body = MarkChannelAsReadRequest,
+    responses(
+        (status = 200, description = "Channel marked as read"),
+        (status = 403, description = "Access denied"),
+        (status = 404, description = "Channel not found"),
+    ),
+    security(("BearerAuth" = [])),
+)]
 #[tracing::instrument(skip(state))]
 pub async fn mark_as_read(
     State(state): State<AppState>,

@@ -23,9 +23,10 @@ use tracing::warn;
 use uuid::Uuid;
 
 use super::types::{
-    AdminError, BulkActionFailure, BulkBanRequest, BulkBanResponse, BulkSuspendRequest,
-    BulkSuspendResponse, CreateAnnouncementRequest, ElevateRequest, ElevateResponse, ElevatedAdmin,
-    GlobalBanRequest, SuspendGuildRequest, SystemAdminUser,
+    AdminError, AdminStatsResponse, AdminStatusResponse, BulkActionFailure, BulkBanRequest,
+    BulkBanResponse, BulkSuspendRequest, BulkSuspendResponse, CreateAnnouncementRequest,
+    ElevateRequest, ElevateResponse, ElevatedAdmin, GlobalBanRequest, SuspendGuildRequest,
+    SystemAdminUser,
 };
 use crate::api::AppState;
 use crate::auth::mfa_crypto::decrypt_mfa_secret;
@@ -39,7 +40,7 @@ use crate::ws::{broadcast_admin_event, ServerEvent};
 // ============================================================================
 
 /// Pagination query parameters with optional search.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, utoipa::IntoParams)]
 pub struct PaginationParams {
     /// Maximum number of items to return.
     #[serde(default = "default_limit")]
@@ -57,7 +58,7 @@ fn default_limit() -> i64 {
 }
 
 /// Audit log query parameters.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, utoipa::IntoParams)]
 pub struct AuditLogParams {
     /// Maximum number of items to return.
     #[serde(default = "default_limit")]
@@ -88,8 +89,38 @@ pub struct PaginatedResponse<T> {
     pub offset: i64,
 }
 
+/// Paginated user summary (`OpenAPI` schema).
+#[derive(utoipa::ToSchema)]
+#[allow(dead_code)]
+pub struct PaginatedUserSummary {
+    pub items: Vec<UserSummary>,
+    pub total: i64,
+    pub limit: i64,
+    pub offset: i64,
+}
+
+/// Paginated guild summary (`OpenAPI` schema).
+#[derive(utoipa::ToSchema)]
+#[allow(dead_code)]
+pub struct PaginatedGuildSummary {
+    pub items: Vec<GuildSummary>,
+    pub total: i64,
+    pub limit: i64,
+    pub offset: i64,
+}
+
+/// Paginated audit log entry (`OpenAPI` schema).
+#[derive(utoipa::ToSchema)]
+#[allow(dead_code)]
+pub struct PaginatedAuditLogEntry {
+    pub items: Vec<AuditLogEntryResponse>,
+    pub total: i64,
+    pub limit: i64,
+    pub offset: i64,
+}
+
 /// User summary for admin listing.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct UserSummary {
     pub id: Uuid,
     pub username: String,
@@ -101,7 +132,7 @@ pub struct UserSummary {
 }
 
 /// Guild summary for admin listing.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct GuildSummary {
     pub id: Uuid,
     pub name: String,
@@ -113,7 +144,7 @@ pub struct GuildSummary {
 }
 
 /// Audit log entry response.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct AuditLogEntryResponse {
     pub id: Uuid,
     pub actor_id: Uuid,
@@ -121,19 +152,20 @@ pub struct AuditLogEntryResponse {
     pub action: String,
     pub target_type: Option<String>,
     pub target_id: Option<Uuid>,
+    #[schema(value_type = Option<Object>)]
     pub details: Option<serde_json::Value>,
     pub ip_address: Option<String>,
     pub created_at: DateTime<Utc>,
 }
 
 /// De-elevate response.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct DeElevateResponse {
     pub elevated: bool,
 }
 
 /// User guild membership info for detail view.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct UserGuildMembership {
     pub guild_id: Uuid,
     pub guild_name: String,
@@ -143,7 +175,7 @@ pub struct UserGuildMembership {
 }
 
 /// Detailed user information response.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct UserDetailsResponse {
     pub id: Uuid,
     pub username: String,
@@ -158,7 +190,7 @@ pub struct UserDetailsResponse {
 }
 
 /// Guild member info for detail view.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct GuildMemberInfo {
     pub user_id: Uuid,
     pub username: String,
@@ -168,7 +200,7 @@ pub struct GuildMemberInfo {
 }
 
 /// Guild owner info for detail view.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct GuildOwnerInfo {
     pub user_id: Uuid,
     pub username: String,
@@ -177,7 +209,7 @@ pub struct GuildOwnerInfo {
 }
 
 /// Detailed guild information response.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct GuildDetailsResponse {
     pub id: Uuid,
     pub name: String,
@@ -198,6 +230,16 @@ pub struct GuildDetailsResponse {
 /// `GET /api/admin/status`
 ///
 /// This endpoint does NOT require admin privileges - it checks if the user IS an admin.
+#[utoipa::path(
+    get,
+    path = "/api/admin/status",
+    tag = "admin",
+    security(("BearerAuth" = [])),
+    responses(
+        (status = 200, description = "Admin status retrieved", body = AdminStatusResponse),
+        (status = 403, description = "Not authenticated"),
+    )
+)]
 #[tracing::instrument(skip(state))]
 pub async fn get_admin_status(
     State(state): State<AppState>,
@@ -240,6 +282,16 @@ struct ElevatedSessionRecord {
 /// Get admin statistics.
 ///
 /// `GET /api/admin/stats`
+#[utoipa::path(
+    get,
+    path = "/api/admin/stats",
+    tag = "admin",
+    security(("BearerAuth" = [])),
+    responses(
+        (status = 200, description = "Admin statistics retrieved", body = AdminStatsResponse),
+        (status = 403, description = "Not an admin"),
+    )
+)]
 #[tracing::instrument(skip(state))]
 pub async fn get_admin_stats(
     State(state): State<AppState>,
@@ -272,6 +324,17 @@ pub async fn get_admin_stats(
 /// List all users with pagination and optional search.
 ///
 /// `GET /api/admin/users`
+#[utoipa::path(
+    get,
+    path = "/api/admin/users",
+    tag = "admin",
+    security(("BearerAuth" = [])),
+    params(PaginationParams),
+    responses(
+        (status = 200, description = "Users listed", body = PaginatedUserSummary),
+        (status = 403, description = "Not an admin"),
+    )
+)]
 #[tracing::instrument(skip(state))]
 pub async fn list_users(
     State(state): State<AppState>,
@@ -378,6 +441,17 @@ pub async fn list_users(
 /// List all guilds with pagination and optional search.
 ///
 /// `GET /api/admin/guilds`
+#[utoipa::path(
+    get,
+    path = "/api/admin/guilds",
+    tag = "admin",
+    security(("BearerAuth" = [])),
+    params(PaginationParams),
+    responses(
+        (status = 200, description = "Guilds listed", body = PaginatedGuildSummary),
+        (status = 403, description = "Not an admin"),
+    )
+)]
 #[tracing::instrument(skip(state))]
 pub async fn list_guilds(
     State(state): State<AppState>,
@@ -557,6 +631,17 @@ async fn get_audit_log_filtered(
 /// - `action_type`: Filter by exact action type (e.g., "admin.users.ban")
 /// - `from_date`: Filter entries created on or after this date (ISO 8601)
 /// - `to_date`: Filter entries created on or before this date (ISO 8601)
+#[utoipa::path(
+    get,
+    path = "/api/admin/audit-log",
+    tag = "admin",
+    security(("BearerAuth" = [])),
+    params(AuditLogParams),
+    responses(
+        (status = 200, description = "Audit log retrieved", body = PaginatedAuditLogEntry),
+        (status = 403, description = "Not an admin"),
+    )
+)]
 #[tracing::instrument(skip(state))]
 pub async fn get_audit_log(
     State(state): State<AppState>,
@@ -631,6 +716,19 @@ pub async fn get_audit_log(
 ///
 /// If MFA is not enabled on the user account, elevation is allowed without MFA
 /// (for development/testing purposes).
+#[utoipa::path(
+    post,
+    path = "/api/admin/elevate",
+    tag = "admin",
+    security(("BearerAuth" = [])),
+    request_body = ElevateRequest,
+    responses(
+        (status = 200, description = "Session elevated", body = ElevateResponse),
+        (status = 400, description = "MFA required or validation error"),
+        (status = 401, description = "Invalid MFA code"),
+        (status = 403, description = "Not an admin"),
+    )
+)]
 #[tracing::instrument(skip(state, body))]
 pub async fn elevate_session(
     State(state): State<AppState>,
@@ -751,6 +849,16 @@ pub async fn elevate_session(
 /// De-elevate admin session.
 ///
 /// `DELETE /api/admin/elevate`
+#[utoipa::path(
+    delete,
+    path = "/api/admin/elevate",
+    tag = "admin",
+    security(("BearerAuth" = [])),
+    responses(
+        (status = 200, description = "Session de-elevated", body = DeElevateResponse),
+        (status = 403, description = "Not an admin"),
+    )
+)]
 #[tracing::instrument(skip(state))]
 pub async fn de_elevate_session(
     State(state): State<AppState>,
@@ -792,28 +900,28 @@ pub async fn de_elevate_session(
 // ============================================================================
 
 /// Global ban response.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct BanResponse {
     pub banned: bool,
     pub user_id: Uuid,
 }
 
 /// Guild suspend response.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct SuspendResponse {
     pub suspended: bool,
     pub guild_id: Uuid,
 }
 
 /// Delete response.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct DeleteResponse {
     pub deleted: bool,
     pub id: Uuid,
 }
 
 /// Announcement response.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct AnnouncementResponse {
     pub id: Uuid,
     pub title: String,
@@ -823,6 +931,20 @@ pub struct AnnouncementResponse {
 /// Global ban a user.
 ///
 /// `POST /api/admin/users/:id/ban`
+#[utoipa::path(
+    post,
+    path = "/api/admin/users/{id}/ban",
+    tag = "admin",
+    security(("BearerAuth" = [])),
+    params(("id" = Uuid, Path, description = "User ID to ban")),
+    request_body = GlobalBanRequest,
+    responses(
+        (status = 200, description = "User banned", body = BanResponse),
+        (status = 400, description = "Validation error"),
+        (status = 403, description = "Not an elevated admin"),
+        (status = 404, description = "User not found"),
+    )
+)]
 #[tracing::instrument(skip(state))]
 pub async fn ban_user(
     State(state): State<AppState>,
@@ -902,6 +1024,18 @@ pub async fn ban_user(
 /// Remove global ban from a user.
 ///
 /// `DELETE /api/admin/users/:id/ban`
+#[utoipa::path(
+    delete,
+    path = "/api/admin/users/{id}/ban",
+    tag = "admin",
+    security(("BearerAuth" = [])),
+    params(("id" = Uuid, Path, description = "User ID to unban")),
+    responses(
+        (status = 200, description = "User unbanned", body = BanResponse),
+        (status = 403, description = "Not an elevated admin"),
+        (status = 404, description = "Ban not found"),
+    )
+)]
 #[tracing::instrument(skip(state))]
 pub async fn unban_user(
     State(state): State<AppState>,
@@ -961,6 +1095,20 @@ pub async fn unban_user(
 /// Suspend a guild.
 ///
 /// `POST /api/admin/guilds/:id/suspend`
+#[utoipa::path(
+    post,
+    path = "/api/admin/guilds/{id}/suspend",
+    tag = "admin",
+    security(("BearerAuth" = [])),
+    params(("id" = Uuid, Path, description = "Guild ID to suspend")),
+    request_body = SuspendGuildRequest,
+    responses(
+        (status = 200, description = "Guild suspended", body = SuspendResponse),
+        (status = 400, description = "Guild already suspended"),
+        (status = 403, description = "Not an elevated admin"),
+        (status = 404, description = "Guild not found"),
+    )
+)]
 #[tracing::instrument(skip(state))]
 pub async fn suspend_guild(
     State(state): State<AppState>,
@@ -1037,6 +1185,18 @@ pub async fn suspend_guild(
 /// Unsuspend a guild.
 ///
 /// `DELETE /api/admin/guilds/:id/suspend`
+#[utoipa::path(
+    delete,
+    path = "/api/admin/guilds/{id}/suspend",
+    tag = "admin",
+    security(("BearerAuth" = [])),
+    params(("id" = Uuid, Path, description = "Guild ID to unsuspend")),
+    responses(
+        (status = 200, description = "Guild unsuspended", body = SuspendResponse),
+        (status = 403, description = "Not an elevated admin"),
+        (status = 404, description = "Suspended guild not found"),
+    )
+)]
 #[tracing::instrument(skip(state))]
 pub async fn unsuspend_guild(
     State(state): State<AppState>,
@@ -1104,6 +1264,18 @@ pub async fn unsuspend_guild(
 /// Create a system announcement.
 ///
 /// `POST /api/admin/announcements`
+#[utoipa::path(
+    post,
+    path = "/api/admin/announcements",
+    tag = "admin",
+    security(("BearerAuth" = [])),
+    request_body = CreateAnnouncementRequest,
+    responses(
+        (status = 200, description = "Announcement created", body = AnnouncementResponse),
+        (status = 400, description = "Validation error"),
+        (status = 403, description = "Not an elevated admin"),
+    )
+)]
 #[tracing::instrument(skip(state))]
 pub async fn create_announcement(
     State(state): State<AppState>,
@@ -1167,6 +1339,18 @@ pub async fn create_announcement(
 /// Get detailed user information.
 ///
 /// `GET /api/admin/users/:id/details`
+#[utoipa::path(
+    get,
+    path = "/api/admin/users/{id}/details",
+    tag = "admin",
+    security(("BearerAuth" = [])),
+    params(("id" = Uuid, Path, description = "User ID")),
+    responses(
+        (status = 200, description = "User details retrieved", body = UserDetailsResponse),
+        (status = 403, description = "Not an admin"),
+        (status = 404, description = "User not found"),
+    )
+)]
 #[tracing::instrument(skip(state))]
 pub async fn get_user_details(
     State(state): State<AppState>,
@@ -1242,6 +1426,18 @@ pub async fn get_user_details(
 /// Get detailed guild information.
 ///
 /// `GET /api/admin/guilds/:id/details`
+#[utoipa::path(
+    get,
+    path = "/api/admin/guilds/{id}/details",
+    tag = "admin",
+    security(("BearerAuth" = [])),
+    params(("id" = Uuid, Path, description = "Guild ID")),
+    responses(
+        (status = 200, description = "Guild details retrieved", body = GuildDetailsResponse),
+        (status = 403, description = "Not an admin"),
+        (status = 404, description = "Guild not found"),
+    )
+)]
 #[tracing::instrument(skip(state))]
 pub async fn get_guild_details(
     State(state): State<AppState>,
@@ -1325,6 +1521,17 @@ pub async fn get_guild_details(
 /// Export users to CSV.
 ///
 /// `GET /api/admin/users/export`
+#[utoipa::path(
+    get,
+    path = "/api/admin/users/export",
+    tag = "admin",
+    security(("BearerAuth" = [])),
+    params(PaginationParams),
+    responses(
+        (status = 200, description = "CSV export of users", content_type = "text/csv"),
+        (status = 403, description = "Not an admin"),
+    )
+)]
 #[tracing::instrument(skip(state))]
 pub async fn export_users_csv(
     State(state): State<AppState>,
@@ -1387,6 +1594,17 @@ pub async fn export_users_csv(
 /// Export guilds to CSV.
 ///
 /// `GET /api/admin/guilds/export`
+#[utoipa::path(
+    get,
+    path = "/api/admin/guilds/export",
+    tag = "admin",
+    security(("BearerAuth" = [])),
+    params(PaginationParams),
+    responses(
+        (status = 200, description = "CSV export of guilds", content_type = "text/csv"),
+        (status = 403, description = "Not an admin"),
+    )
+)]
 #[tracing::instrument(skip(state))]
 pub async fn export_guilds_csv(
     State(state): State<AppState>,
@@ -1465,6 +1683,18 @@ fn escape_csv(s: &str) -> String {
 /// Ban multiple users at once.
 ///
 /// `POST /api/admin/users/bulk-ban`
+#[utoipa::path(
+    post,
+    path = "/api/admin/users/bulk-ban",
+    tag = "admin",
+    security(("BearerAuth" = [])),
+    request_body = BulkBanRequest,
+    responses(
+        (status = 200, description = "Bulk ban completed", body = BulkBanResponse),
+        (status = 400, description = "Validation error"),
+        (status = 403, description = "Not an elevated admin"),
+    )
+)]
 #[tracing::instrument(skip(state))]
 pub async fn bulk_ban_users(
     State(state): State<AppState>,
@@ -1575,6 +1805,18 @@ pub async fn bulk_ban_users(
 /// Suspend multiple guilds at once.
 ///
 /// `POST /api/admin/guilds/bulk-suspend`
+#[utoipa::path(
+    post,
+    path = "/api/admin/guilds/bulk-suspend",
+    tag = "admin",
+    security(("BearerAuth" = [])),
+    request_body = BulkSuspendRequest,
+    responses(
+        (status = 200, description = "Bulk suspend completed", body = BulkSuspendResponse),
+        (status = 400, description = "Validation error"),
+        (status = 403, description = "Not an elevated admin"),
+    )
+)]
 #[tracing::instrument(skip(state))]
 pub async fn bulk_suspend_guilds(
     State(state): State<AppState>,
@@ -1674,14 +1916,14 @@ pub async fn bulk_suspend_guilds(
 // ============================================================================
 
 /// Auth settings response.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct AuthSettingsResponse {
     pub auth_methods: crate::db::AuthMethodsConfig,
     pub registration_policy: String,
 }
 
 /// Auth settings update request.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct UpdateAuthSettingsRequest {
     pub auth_methods: Option<crate::db::AuthMethodsConfig>,
     pub registration_policy: Option<String>,
@@ -1690,6 +1932,16 @@ pub struct UpdateAuthSettingsRequest {
 /// Get auth settings.
 ///
 /// GET /api/admin/auth-settings
+#[utoipa::path(
+    get,
+    path = "/api/admin/auth-settings",
+    tag = "admin",
+    security(("BearerAuth" = [])),
+    responses(
+        (status = 200, description = "Auth settings retrieved", body = AuthSettingsResponse),
+        (status = 403, description = "Not an elevated admin"),
+    )
+)]
 pub async fn get_auth_settings(
     State(state): State<AppState>,
     Extension(_admin): Extension<SystemAdminUser>,
@@ -1711,6 +1963,18 @@ pub async fn get_auth_settings(
 /// Update auth settings.
 ///
 /// PUT /api/admin/auth-settings
+#[utoipa::path(
+    put,
+    path = "/api/admin/auth-settings",
+    tag = "admin",
+    security(("BearerAuth" = [])),
+    request_body = UpdateAuthSettingsRequest,
+    responses(
+        (status = 200, description = "Auth settings updated", body = AuthSettingsResponse),
+        (status = 400, description = "Validation error"),
+        (status = 403, description = "Not an elevated admin"),
+    )
+)]
 pub async fn update_auth_settings(
     State(state): State<AppState>,
     Extension(admin): Extension<SystemAdminUser>,
@@ -1752,7 +2016,7 @@ pub async fn update_auth_settings(
 }
 
 /// OIDC provider response (secrets masked).
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct OidcProviderResponse {
     pub id: Uuid,
     pub slug: String,
@@ -1794,6 +2058,16 @@ impl From<crate::db::OidcProviderRow> for OidcProviderResponse {
 /// List all OIDC providers (admin view with secrets masked).
 ///
 /// GET /api/admin/oidc-providers
+#[utoipa::path(
+    get,
+    path = "/api/admin/oidc-providers",
+    tag = "admin",
+    security(("BearerAuth" = [])),
+    responses(
+        (status = 200, description = "OIDC providers listed", body = Vec<OidcProviderResponse>),
+        (status = 403, description = "Not an elevated admin"),
+    )
+)]
 pub async fn list_oidc_providers(
     State(state): State<AppState>,
     Extension(_admin): Extension<SystemAdminUser>,
@@ -1804,7 +2078,7 @@ pub async fn list_oidc_providers(
 }
 
 /// Create OIDC provider request.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct CreateOidcProviderRequest {
     pub slug: String,
     pub display_name: String,
@@ -1822,6 +2096,18 @@ pub struct CreateOidcProviderRequest {
 /// Create a new OIDC provider.
 ///
 /// POST /api/admin/oidc-providers
+#[utoipa::path(
+    post,
+    path = "/api/admin/oidc-providers",
+    tag = "admin",
+    security(("BearerAuth" = [])),
+    request_body = CreateOidcProviderRequest,
+    responses(
+        (status = 200, description = "OIDC provider created", body = OidcProviderResponse),
+        (status = 403, description = "Not an elevated admin"),
+        (status = 500, description = "OIDC manager not configured"),
+    )
+)]
 pub async fn create_oidc_provider(
     State(state): State<AppState>,
     Extension(admin): Extension<SystemAdminUser>,
@@ -1897,7 +2183,7 @@ pub async fn create_oidc_provider(
 }
 
 /// Update OIDC provider request.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct UpdateOidcProviderRequest {
     pub display_name: String,
     pub icon_hint: Option<String>,
@@ -1915,6 +2201,19 @@ pub struct UpdateOidcProviderRequest {
 /// Update an OIDC provider.
 ///
 /// PUT /api/admin/oidc-providers/:id
+#[utoipa::path(
+    put,
+    path = "/api/admin/oidc-providers/{id}",
+    tag = "admin",
+    security(("BearerAuth" = [])),
+    params(("id" = Uuid, Path, description = "OIDC provider ID")),
+    request_body = UpdateOidcProviderRequest,
+    responses(
+        (status = 200, description = "OIDC provider updated", body = OidcProviderResponse),
+        (status = 403, description = "Not an elevated admin"),
+        (status = 500, description = "OIDC manager not configured"),
+    )
+)]
 pub async fn update_oidc_provider(
     State(state): State<AppState>,
     Extension(_admin): Extension<SystemAdminUser>,
@@ -1966,6 +2265,18 @@ pub async fn update_oidc_provider(
 /// Delete an OIDC provider.
 ///
 /// DELETE /api/admin/oidc-providers/:id
+#[utoipa::path(
+    delete,
+    path = "/api/admin/oidc-providers/{id}",
+    tag = "admin",
+    security(("BearerAuth" = [])),
+    params(("id" = Uuid, Path, description = "OIDC provider ID")),
+    responses(
+        (status = 200, description = "OIDC provider deleted"),
+        (status = 403, description = "Not an elevated admin"),
+        (status = 500, description = "OIDC manager not configured"),
+    )
+)]
 pub async fn delete_oidc_provider(
     State(state): State<AppState>,
     Extension(_admin): Extension<SystemAdminUser>,
@@ -1994,6 +2305,19 @@ pub async fn delete_oidc_provider(
 /// Permanently delete a user and all associated data.
 ///
 /// `DELETE /api/admin/users/:id`
+#[utoipa::path(
+    delete,
+    path = "/api/admin/users/{id}",
+    tag = "admin",
+    security(("BearerAuth" = [])),
+    params(("id" = Uuid, Path, description = "User ID to delete")),
+    responses(
+        (status = 200, description = "User deleted", body = DeleteResponse),
+        (status = 400, description = "Cannot delete yourself"),
+        (status = 403, description = "Not an elevated admin"),
+        (status = 404, description = "User not found"),
+    )
+)]
 #[tracing::instrument(skip(state))]
 pub async fn delete_user(
     State(state): State<AppState>,
@@ -2063,6 +2387,18 @@ pub async fn delete_user(
 /// Permanently delete a guild and all associated data.
 ///
 /// `DELETE /api/admin/guilds/:id`
+#[utoipa::path(
+    delete,
+    path = "/api/admin/guilds/{id}",
+    tag = "admin",
+    security(("BearerAuth" = [])),
+    params(("id" = Uuid, Path, description = "Guild ID to delete")),
+    responses(
+        (status = 200, description = "Guild deleted", body = DeleteResponse),
+        (status = 403, description = "Not an elevated admin"),
+        (status = 404, description = "Guild not found"),
+    )
+)]
 #[tracing::instrument(skip(state))]
 pub async fn delete_guild(
     State(state): State<AppState>,

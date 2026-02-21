@@ -17,7 +17,7 @@ use crate::auth::AuthUser;
 // Types
 // ============================================================================
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum PinType {
     Note,
@@ -56,7 +56,7 @@ pub struct PinRow {
     pub position: i32,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct Pin {
     pub id: Uuid,
     pub pin_type: PinType,
@@ -81,7 +81,7 @@ impl From<PinRow> for Pin {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct CreatePinRequest {
     pub pin_type: PinType,
     pub content: String,
@@ -90,14 +90,14 @@ pub struct CreatePinRequest {
     pub metadata: serde_json::Value,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct UpdatePinRequest {
     pub content: Option<String>,
     pub title: Option<String>,
     pub metadata: Option<serde_json::Value>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct ReorderPinsRequest {
     pub pin_ids: Vec<Uuid>,
 }
@@ -169,6 +169,15 @@ impl IntoResponse for PinsError {
 // ============================================================================
 
 /// GET /api/me/pins - List user's pins
+#[utoipa::path(
+    get,
+    path = "/api/me/pins",
+    tag = "pins",
+    responses(
+        (status = 200, description = "List of user pins", body = Vec<Pin>),
+    ),
+    security(("BearerAuth" = []))
+)]
 pub async fn list_pins(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -190,6 +199,17 @@ pub async fn list_pins(
 }
 
 /// POST /api/me/pins - Create a new pin
+#[utoipa::path(
+    post,
+    path = "/api/me/pins",
+    tag = "pins",
+    request_body = CreatePinRequest,
+    responses(
+        (status = 200, description = "Pin created", body = Pin),
+        (status = 400, description = "Validation error"),
+    ),
+    security(("BearerAuth" = []))
+)]
 pub async fn create_pin(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -247,6 +267,21 @@ pub async fn create_pin(
 }
 
 /// PUT /api/me/pins/:id - Update a pin
+#[utoipa::path(
+    put,
+    path = "/api/me/pins/{id}",
+    tag = "pins",
+    params(
+        ("id" = Uuid, Path, description = "Pin ID"),
+    ),
+    request_body = UpdatePinRequest,
+    responses(
+        (status = 200, description = "Pin updated", body = Pin),
+        (status = 400, description = "Validation error"),
+        (status = 404, description = "Pin not found"),
+    ),
+    security(("BearerAuth" = []))
+)]
 pub async fn update_pin(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -302,6 +337,19 @@ pub async fn update_pin(
 }
 
 /// DELETE /api/me/pins/:id - Delete a pin
+#[utoipa::path(
+    delete,
+    path = "/api/me/pins/{id}",
+    tag = "pins",
+    params(
+        ("id" = Uuid, Path, description = "Pin ID"),
+    ),
+    responses(
+        (status = 204, description = "Pin deleted"),
+        (status = 404, description = "Pin not found"),
+    ),
+    security(("BearerAuth" = []))
+)]
 pub async fn delete_pin(
     State(state): State<AppState>,
     auth_user: AuthUser,
@@ -321,6 +369,16 @@ pub async fn delete_pin(
 }
 
 /// PUT /api/me/pins/reorder - Reorder pins
+#[utoipa::path(
+    put,
+    path = "/api/me/pins/reorder",
+    tag = "pins",
+    request_body = ReorderPinsRequest,
+    responses(
+        (status = 204, description = "Pins reordered"),
+    ),
+    security(("BearerAuth" = []))
+)]
 pub async fn reorder_pins(
     State(state): State<AppState>,
     auth_user: AuthUser,
