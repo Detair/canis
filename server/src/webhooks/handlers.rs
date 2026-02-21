@@ -5,8 +5,7 @@
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
-use sqlx::PgPool;
-use tracing::{info, instrument};
+use tracing::{info, instrument, warn};
 use uuid::Uuid;
 
 use super::types::{
@@ -14,10 +13,16 @@ use super::types::{
     WebhookCreatedResponse, WebhookError, WebhookResponse,
 };
 use super::{queries, signing};
+use crate::api::AppState;
+use crate::auth::mfa_crypto::{decrypt_mfa_secret, encrypt_mfa_secret};
 use crate::auth::AuthUser;
 
 /// Verify application ownership and return application ID.
-async fn verify_ownership(pool: &PgPool, app_id: Uuid, user_id: Uuid) -> Result<(), WebhookError> {
+async fn verify_ownership(
+    pool: &sqlx::PgPool,
+    app_id: Uuid,
+    user_id: Uuid,
+) -> Result<(), WebhookError> {
     let row: Option<(Uuid,)> =
         sqlx::query_as("SELECT owner_id FROM bot_applications WHERE id = $1")
             .bind(app_id)
@@ -31,6 +36,28 @@ async fn verify_ownership(pool: &PgPool, app_id: Uuid, user_id: Uuid) -> Result<
     }
 
     Ok(())
+}
+
+/// Get the MFA encryption key bytes from config, or return an error if not configured.
+fn get_encryption_key(state: &AppState) -> Result<Vec<u8>, WebhookError> {
+    let key_hex = state.config.mfa_encryption_key.as_ref().ok_or_else(|| {
+        WebhookError::Validation(
+            "Server encryption key not configured (MFA_ENCRYPTION_KEY)".to_string(),
+        )
+    })?;
+    let key = hex::decode(key_hex).map_err(|_| {
+        WebhookError::Validation("Server encryption key misconfigured".to_string())
+    })?;
+    if key.len() != 32 {
+        tracing::error!(
+            actual_len = key.len(),
+            "MFA_ENCRYPTION_KEY has wrong length (expected 32 bytes)"
+        );
+        return Err(WebhookError::Validation(
+            "Server encryption key misconfigured".to_string(),
+        ));
+    }
+    Ok(key)
 }
 
 /// Validate a URL for webhook delivery (includes SSRF protection).
@@ -64,14 +91,14 @@ fn validate_url(url: &str) -> Result<(), WebhookError> {
 }
 
 /// POST /`api/applications/{app_id}/webhooks`
-#[instrument(skip(pool, claims))]
+#[instrument(skip(state, claims))]
 pub async fn create_webhook(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     Path(app_id): Path<Uuid>,
     claims: AuthUser,
     Json(req): Json<CreateWebhookRequest>,
 ) -> Result<(StatusCode, Json<WebhookCreatedResponse>), (StatusCode, String)> {
-    verify_ownership(&pool, app_id, claims.id).await?;
+    verify_ownership(&state.db, app_id, claims.id).await?;
 
     // Validate
     validate_url(&req.url)?;
@@ -93,7 +120,7 @@ pub async fn create_webhook(
     }
 
     // Check limit
-    let count = queries::count_webhooks(&pool, app_id)
+    let count = queries::count_webhooks(&state.db, app_id)
         .await
         .map_err(WebhookError::Database)?;
     if count >= 5 {
@@ -101,11 +128,17 @@ pub async fn create_webhook(
     }
 
     let secret = signing::generate_signing_secret();
+
+    // Encrypt signing secret before storing in database
+    let encryption_key = get_encryption_key(&state)?;
+    let encrypted_secret = encrypt_mfa_secret(&secret, &encryption_key)
+        .map_err(|e| WebhookError::Validation(format!("Failed to encrypt signing secret: {e}")))?;
+
     let webhook_id = queries::create_webhook(
-        &pool,
+        &state.db,
         app_id,
         &req.url,
-        &secret,
+        &encrypted_secret,
         &req.subscribed_events,
         req.description.as_deref(),
     )
@@ -114,6 +147,7 @@ pub async fn create_webhook(
 
     info!(webhook_id = %webhook_id, app_id = %app_id, "Webhook created");
 
+    // Return plaintext secret to user (shown only once at creation)
     Ok((
         StatusCode::CREATED,
         Json(WebhookCreatedResponse {
@@ -130,15 +164,15 @@ pub async fn create_webhook(
 }
 
 /// GET /`api/applications/{app_id}/webhooks`
-#[instrument(skip(pool, claims))]
+#[instrument(skip(state, claims))]
 pub async fn list_webhooks(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     Path(app_id): Path<Uuid>,
     claims: AuthUser,
 ) -> Result<Json<Vec<WebhookResponse>>, (StatusCode, String)> {
-    verify_ownership(&pool, app_id, claims.id).await?;
+    verify_ownership(&state.db, app_id, claims.id).await?;
 
-    let webhooks = queries::list_webhooks(&pool, app_id)
+    let webhooks = queries::list_webhooks(&state.db, app_id)
         .await
         .map_err(WebhookError::Database)?;
 
@@ -146,15 +180,15 @@ pub async fn list_webhooks(
 }
 
 /// GET /`api/applications/{app_id}/webhooks/{wh_id}`
-#[instrument(skip(pool, claims))]
+#[instrument(skip(state, claims))]
 pub async fn get_webhook(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     Path((app_id, wh_id)): Path<(Uuid, Uuid)>,
     claims: AuthUser,
 ) -> Result<Json<WebhookResponse>, (StatusCode, String)> {
-    verify_ownership(&pool, app_id, claims.id).await?;
+    verify_ownership(&state.db, app_id, claims.id).await?;
 
-    let webhook = queries::get_webhook(&pool, wh_id, app_id)
+    let webhook = queries::get_webhook(&state.db, wh_id, app_id)
         .await
         .map_err(WebhookError::Database)?
         .ok_or(WebhookError::NotFound)?;
@@ -163,14 +197,14 @@ pub async fn get_webhook(
 }
 
 /// PATCH /`api/applications/{app_id}/webhooks/{wh_id}`
-#[instrument(skip(pool, claims))]
+#[instrument(skip(state, claims))]
 pub async fn update_webhook(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     Path((app_id, wh_id)): Path<(Uuid, Uuid)>,
     claims: AuthUser,
     Json(req): Json<UpdateWebhookRequest>,
 ) -> Result<Json<WebhookResponse>, (StatusCode, String)> {
-    verify_ownership(&pool, app_id, claims.id).await?;
+    verify_ownership(&state.db, app_id, claims.id).await?;
 
     if let Some(ref url) = req.url {
         validate_url(url)?;
@@ -201,7 +235,7 @@ pub async fn update_webhook(
     };
 
     let updated = queries::update_webhook(
-        &pool,
+        &state.db,
         wh_id,
         app_id,
         req.url.as_deref(),
@@ -216,7 +250,7 @@ pub async fn update_webhook(
         return Err(WebhookError::NotFound.into());
     }
 
-    let webhook = queries::get_webhook(&pool, wh_id, app_id)
+    let webhook = queries::get_webhook(&state.db, wh_id, app_id)
         .await
         .map_err(WebhookError::Database)?
         .ok_or(WebhookError::NotFound)?;
@@ -225,15 +259,15 @@ pub async fn update_webhook(
 }
 
 /// DELETE /`api/applications/{app_id}/webhooks/{wh_id}`
-#[instrument(skip(pool, claims))]
+#[instrument(skip(state, claims))]
 pub async fn delete_webhook(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     Path((app_id, wh_id)): Path<(Uuid, Uuid)>,
     claims: AuthUser,
 ) -> Result<StatusCode, (StatusCode, String)> {
-    verify_ownership(&pool, app_id, claims.id).await?;
+    verify_ownership(&state.db, app_id, claims.id).await?;
 
-    let deleted = queries::delete_webhook(&pool, wh_id, app_id)
+    let deleted = queries::delete_webhook(&state.db, wh_id, app_id)
         .await
         .map_err(WebhookError::Database)?;
 
@@ -245,15 +279,15 @@ pub async fn delete_webhook(
 }
 
 /// POST /`api/applications/{app_id}/webhooks/{wh_id}/test`
-#[instrument(skip(pool, claims))]
+#[instrument(skip(state, claims))]
 pub async fn test_webhook(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     Path((app_id, wh_id)): Path<(Uuid, Uuid)>,
     claims: AuthUser,
 ) -> Result<Json<TestDeliveryResult>, (StatusCode, String)> {
-    verify_ownership(&pool, app_id, claims.id).await?;
+    verify_ownership(&state.db, app_id, claims.id).await?;
 
-    let webhook = queries::get_webhook_full(&pool, wh_id)
+    let webhook = queries::get_webhook_full(&state.db, wh_id)
         .await
         .map_err(WebhookError::Database)?
         .ok_or(WebhookError::NotFound)?;
@@ -261,6 +295,15 @@ pub async fn test_webhook(
     if webhook.application_id != app_id {
         return Err(WebhookError::NotFound.into());
     }
+
+    // Decrypt signing secret (fall back to plaintext for pre-encryption legacy webhooks)
+    let signing_secret = {
+        let key = get_encryption_key(&state)?;
+        decrypt_mfa_secret(&webhook.signing_secret, &key).unwrap_or_else(|_| {
+            warn!(webhook_id = %wh_id, "Signing secret not encrypted, using plaintext (legacy webhook)");
+            webhook.signing_secret.clone()
+        })
+    };
 
     // SSRF check at delivery time (DNS rebinding protection)
     if let Err(e) = super::ssrf::verify_resolved_ip(&webhook.url).await {
@@ -289,7 +332,7 @@ pub async fn test_webhook(
             format!("Failed to serialize test payload: {e}"),
         )
     })?;
-    let signature = signing::sign_payload(&webhook.signing_secret, &payload_bytes);
+    let signature = signing::sign_payload(&signing_secret, &payload_bytes);
     let timestamp = chrono::Utc::now().timestamp().to_string();
 
     let client = reqwest::Client::builder()
@@ -340,21 +383,21 @@ pub async fn test_webhook(
 }
 
 /// GET /`api/applications/{app_id}/webhooks/{wh_id}/deliveries`
-#[instrument(skip(pool, claims))]
+#[instrument(skip(state, claims))]
 pub async fn list_deliveries(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     Path((app_id, wh_id)): Path<(Uuid, Uuid)>,
     claims: AuthUser,
 ) -> Result<Json<Vec<DeliveryLogEntry>>, (StatusCode, String)> {
-    verify_ownership(&pool, app_id, claims.id).await?;
+    verify_ownership(&state.db, app_id, claims.id).await?;
 
     // Verify webhook belongs to app
-    let _ = queries::get_webhook(&pool, wh_id, app_id)
+    let _ = queries::get_webhook(&state.db, wh_id, app_id)
         .await
         .map_err(WebhookError::Database)?
         .ok_or(WebhookError::NotFound)?;
 
-    let entries = queries::list_deliveries(&pool, wh_id, 50)
+    let entries = queries::list_deliveries(&state.db, wh_id, 50)
         .await
         .map_err(WebhookError::Database)?;
 
