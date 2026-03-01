@@ -443,7 +443,7 @@ impl Config {
             turn_server: None,
             turn_username: None,
             turn_credential: None,
-            mfa_encryption_key: None,
+            mfa_encryption_key: Some(TEST_MFA_ENCRYPTION_KEY.into()),
             require_e2ee_setup: false,
             block_check_fail_open: false,
             cors_allowed_origins: vec!["*".to_string()],
@@ -492,3 +492,8 @@ const TEST_JWT_PRIVATE_KEY: &str = "LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCk1DNENB
 
 /// Test public key (base64-encoded PEM) - Ed25519
 const TEST_JWT_PUBLIC_KEY: &str = "LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0KTUNvd0JRWURLMlZ3QXlFQW80TlJjVnQ2ajF3OHRCWUtxUEJzS0krNUZVREkwVGtJaHF4WWlud05TRlU9Ci0tLS0tRU5EIFBVQkxJQyBLRVktLS0tLQo=";
+
+/// Test MFA encryption key (32-byte hex) - DO NOT USE IN PRODUCTION
+/// Generated with: openssl rand -hex 32
+const TEST_MFA_ENCRYPTION_KEY: &str =
+    "a4f8e2d1b7c9036f5e8d4a2b1c7f9e3d6a8b5c2d4e7f1a3b9c6d8e2f5a7b4c";
