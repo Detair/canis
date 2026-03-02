@@ -20,7 +20,6 @@ pub struct FrameCapturer {
 
 impl FrameCapturer {
     /// Create a new frame capturer for the given source.
-    ///
     pub const fn new(source_id: String, fps: u32, width: u32, height: u32) -> Self {
         Self {
             source_id,
