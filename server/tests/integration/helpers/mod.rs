@@ -748,7 +748,8 @@ pub async fn delete_guild(pool: &PgPool, guild_id: Uuid) {
 pub async fn create_bot_application(pool: &PgPool, owner_id: Uuid) -> (Uuid, Uuid, String) {
     let app_id = Uuid::now_v7();
     let bot_user_id = Uuid::now_v7();
-    let bot_username = format!("bot_{}", &app_id.to_string()[..8]);
+    let bot_username_seed = bot_user_id.simple().to_string();
+    let bot_username = format!("bot_{}", &bot_username_seed[20..]);
 
     // Create bot user
     sqlx::query(
