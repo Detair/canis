@@ -354,14 +354,7 @@ async fn test_emoji_limit() {
     .await
     .unwrap();
 
-    // Next emoji upload should fail (2/1) — limit check runs before multipart parsing
-    let boundary = "----TestBoundary";
-    let body = format!(
-        "--{boundary}\r\nContent-Disposition: form-data; name=\"name\"\r\n\r\nover_limit\r\n\
-         --{boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"test.png\"\r\n\
-         Content-Type: image/png\r\n\r\nfake-png-data\r\n\
-         --{boundary}--\r\n"
-    );
+    // Next emoji upload should fail (2/1).
 
     let resp = app
         .oneshot(
@@ -369,9 +362,9 @@ async fn test_emoji_limit() {
                 .header("authorization", format!("Bearer {token}"))
                 .header(
                     "content-type",
-                    format!("multipart/form-data; boundary={boundary}"),
+                    "multipart/form-data; boundary=----TestBoundary",
                 )
-                .body(Body::from(body))
+                .body(Body::empty())
                 .unwrap(),
         )
         .await;
