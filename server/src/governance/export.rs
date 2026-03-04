@@ -228,7 +228,11 @@ pub async fn process_export_job(
 async fn build_export_archive(pool: &PgPool, user_id: Uuid) -> anyhow::Result<Vec<u8>> {
     let tmp = tempfile::NamedTempFile::new()
         .context("Failed to create temp file for export archive")?;
-    let mut zip = ZipWriter::new(std::io::BufWriter::new(tmp.as_file().try_clone()?));
+    let mut zip = ZipWriter::new(std::io::BufWriter::new(
+        tmp.as_file()
+            .try_clone()
+            .context("Failed to clone temp file handle for ZIP writer")?,
+    ));
     let options = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
 
     // 1. Profile
@@ -477,7 +481,8 @@ async fn build_export_archive(pool: &PgPool, user_id: Uuid) -> anyhow::Result<Ve
         .map_err(|e| anyhow::anyhow!("Failed to finalize export ZIP archive: {e}"))?;
 
     // Read finished archive from temp file for S3 upload
-    let archive_data = std::fs::read(tmp.path())?;
+    let archive_data = std::fs::read(tmp.path())
+        .context("Failed to read completed export archive from temp file")?;
     Ok(archive_data)
 }
 
