@@ -392,10 +392,8 @@ function scheduleTokenRefresh() {
   );
 
   browserState.refreshTimer = setTimeout(async () => {
-    try {
-      await refreshAccessToken();
-    } catch (error) {
-      console.error("[Auth] Auto-refresh failed:", error);
+    const success = await refreshAccessToken();
+    if (!success) {
       clearBrowserTokens();
       window.dispatchEvent(new CustomEvent("kaiku:session-expired"));
     }
@@ -455,9 +453,12 @@ export async function refreshAccessToken(): Promise<boolean> {
       throw new Error("Token refresh returned empty access token");
     }
 
-    // Store new tokens in memory only
+    // Store access token in memory; browser mode relies on HttpOnly cookie
+    // for the refresh token so we don't keep it in JS-accessible memory.
     browserState.accessToken = data.access_token;
-    browserState.refreshToken = data.refresh_token;
+    if (isTauri) {
+      browserState.refreshToken = data.refresh_token;
+    }
     browserState.tokenExpiresAt = Date.now() + data.expires_in * 1000;
 
     console.log("[Auth] Token refreshed successfully");

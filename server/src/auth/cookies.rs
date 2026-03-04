@@ -16,8 +16,23 @@ pub const REFRESH_COOKIE_NAME: &str = "kaiku_refresh";
 fn parse_same_site(config: &Config) -> SameSite {
     match config.cookie_same_site.as_str() {
         "strict" => SameSite::Strict,
-        "none" => SameSite::None,
-        _ => SameSite::Lax,
+        "none" => {
+            if !config.cookie_secure {
+                tracing::warn!(
+                    "COOKIE_SAMESITE=none requires COOKIE_SECURE=true; \
+                     browsers will reject the refresh cookie without the Secure flag"
+                );
+            }
+            SameSite::None
+        }
+        "lax" => SameSite::Lax,
+        other => {
+            tracing::warn!(
+                value = %other,
+                "Unknown COOKIE_SAMESITE value, defaulting to Lax"
+            );
+            SameSite::Lax
+        }
     }
 }
 
