@@ -416,7 +416,7 @@ function scheduleTokenRefresh() {
   browserState.refreshTimer = setTimeout(async () => {
     const success = await refreshAccessToken();
     if (!success) {
-      console.warn("[Auth] Scheduled refresh failed — session expired");
+      console.warn("[Auth] Scheduled token refresh failed — clearing session");
       clearBrowserTokens();
       window.dispatchEvent(new CustomEvent("kaiku:session-expired"));
     }
@@ -466,19 +466,17 @@ export async function refreshAccessToken(): Promise<boolean> {
       data = await response.json();
     } catch (parseError) {
       console.error(
-        "[Auth] Failed to parse token refresh response as JSON:",
+        "[Auth] Token refresh returned invalid JSON:",
         parseError,
       );
       clearBrowserTokens();
-      throw new Error(
-        `Token refresh returned invalid JSON: ${parseError instanceof Error ? parseError.message : "Parse failed"}`,
-      );
+      return false;
     }
 
     if (!data.access_token) {
       console.error("[Auth] Token refresh returned empty access token");
       clearBrowserTokens();
-      throw new Error("Token refresh returned empty access token");
+      return false;
     }
 
     // Store access token in memory; browser mode relies on HttpOnly cookie
@@ -486,8 +484,9 @@ export async function refreshAccessToken(): Promise<boolean> {
     browserState.accessToken = data.access_token;
     if (isTauri) {
       if (!data.refresh_token) {
+        console.error("[Auth] Token refresh returned empty refresh token");
         clearBrowserTokens();
-        throw new Error("Token refresh returned empty refresh token");
+        return false;
       }
       browserState.refreshToken = data.refresh_token;
     }
@@ -512,6 +511,17 @@ if (!isTauri && !browserState.accessToken) {
     refreshAccessToken().catch((error) => {
       console.warn("[Auth] Session restore failed:", error);
     });
+  }
+}
+
+/** Error with HTTP status code for structured error detection. */
+class HttpError extends Error {
+  constructor(
+    public readonly status: number,
+    message: string,
+  ) {
+    super(message);
+    this.name = "HttpError";
   }
 }
 
@@ -602,7 +612,7 @@ async function httpRequest<T>(
       }
     }
 
-    throw new Error(errorMessage);
+    throw new HttpError(response.status, errorMessage);
   }
 
   // Handle empty responses
@@ -804,12 +814,9 @@ export async function logout(): Promise<void> {
   try {
     await httpRequest("POST", "/auth/logout");
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error ?? "");
     const isAuthError =
-      message.includes("401") ||
-      message.includes("403") ||
-      message.includes("Unauthorized") ||
-      message.includes("Forbidden");
+      error instanceof HttpError &&
+      (error.status === 401 || error.status === 403);
 
     if (isAuthError) {
       const refreshed = await refreshAccessToken();

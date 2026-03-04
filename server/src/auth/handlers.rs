@@ -59,8 +59,15 @@ fn extract_refresh_token(body_token: Option<String>, jar: &CookieJar) -> AuthRes
     Err(AuthError::InvalidToken)
 }
 
+/// Returns `true` when the refresh token should be included in the JSON body.
+///
+/// Browser (CORS) requests include the `Origin` header; for those clients the
+/// refresh token is delivered solely via `HttpOnly` cookie.  Non-browser clients
+/// (e.g. Tauri) omit `Origin` and receive the token in the response body.
 fn should_return_refresh_token(headers: &HeaderMap) -> bool {
-    !headers.contains_key(ORIGIN)
+    let has_origin = headers.contains_key(ORIGIN);
+    tracing::debug!(has_origin_header = has_origin, "Refresh token delivery decision");
+    !has_origin
 }
 
 // ============================================================================
@@ -120,11 +127,12 @@ pub struct LogoutRequest {
 }
 
 /// Authentication response with tokens.
-///
 #[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct AuthResponse {
     /// Access token (short-lived).
     pub access_token: String,
+    /// Refresh token (long-lived). Omitted for browser clients that receive
+    /// the refresh token via an `HttpOnly` cookie instead.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub refresh_token: Option<String>,
     /// Access token expiry in seconds.

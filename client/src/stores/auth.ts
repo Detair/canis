@@ -260,7 +260,7 @@ export async function register(
 export async function loginWithOidc(
   serverUrl: string,
   accessToken: string,
-  refreshToken: string,
+  refreshToken: string | undefined,
   expiresIn: number,
   setupRequired: boolean = false,
 ): Promise<void> {
@@ -341,11 +341,12 @@ export async function logout(): Promise<void> {
       error: null,
     });
   } catch (err) {
-    // Still clear local state even if server logout fails
+    console.error("[Auth] Logout failed:", err);
+    const error = err instanceof Error ? err.message : String(err);
     setAuthState({
       user: null,
       isLoading: false,
-      error: null,
+      error,
     });
   }
 }
