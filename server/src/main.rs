@@ -224,6 +224,17 @@ async fn main() -> Result<()> {
             {
                 tracing::error!(error = %e, "Failed to cleanup expired data exports");
             }
+
+            // Recover stale export jobs stuck in pending/processing after crash
+            match vc_server::governance::export::recover_stale_export_jobs(&db_pool_clone).await {
+                Ok(count) if count > 0 => {
+                    tracing::info!(count, "Recovered stale export jobs");
+                }
+                Err(e) => {
+                    tracing::warn!(error = %e, "Failed to recover stale export jobs");
+                }
+                _ => {}
+            }
         }
     });
 

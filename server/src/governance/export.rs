@@ -459,6 +459,25 @@ async fn build_export_archive(pool: &PgPool, user_id: Uuid) -> anyhow::Result<Ve
     Ok(buf)
 }
 
+/// Recover stale export jobs stuck in `pending`/`processing` after a server crash.
+///
+/// Jobs older than 1 hour are marked as `failed` so users can retry.
+/// Returns the number of recovered jobs.
+pub async fn recover_stale_export_jobs(pool: &PgPool) -> anyhow::Result<u64> {
+    let result = sqlx::query(
+        "UPDATE data_export_jobs
+         SET status = 'failed',
+             error_message = COALESCE(error_message, 'Job stale after restart; please retry'),
+             completed_at = NOW()
+         WHERE status IN ('pending', 'processing')
+           AND created_at < NOW() - INTERVAL '1 hour'",
+    )
+    .execute(pool)
+    .await?;
+
+    Ok(result.rows_affected())
+}
+
 /// Cleanup expired export jobs — delete S3 objects and mark as expired.
 pub async fn cleanup_expired_exports(pool: &PgPool, s3: &Option<S3Client>) -> anyhow::Result<()> {
     // If S3 is unavailable, skip cleanup entirely to prevent orphaning objects.
