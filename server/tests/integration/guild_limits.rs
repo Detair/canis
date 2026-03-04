@@ -6,8 +6,8 @@ use vc_server::config::Config;
 
 use super::helpers::{
     add_guild_member, body_to_json, create_bot_application, create_channel, create_guild,
-    create_test_user, delete_bot_application, delete_guild, delete_user, generate_access_token,
-    TestApp,
+    create_guild_with_default_role, create_test_user, delete_bot_application, delete_guild,
+    delete_user, generate_access_token, TestApp,
 };
 
 /// Helper: create a Config with low limits for testing.
@@ -84,7 +84,12 @@ async fn test_member_limit_on_invite_join() {
     let (user3_id, _) = create_test_user(&app.pool).await;
     let owner_token = generate_access_token(&app.config, owner_id);
     let user3_token = generate_access_token(&app.config, user3_id);
-    let guild_id = create_guild(&app.pool, owner_id).await;
+    let guild_id = create_guild_with_default_role(
+        &app.pool,
+        owner_id,
+        vc_server::permissions::GuildPermissions::empty(),
+    )
+    .await;
     let mut guard = app.cleanup_guard();
     guard.add(move |pool| async move {
         delete_guild(&pool, guild_id).await;
@@ -133,23 +138,17 @@ async fn test_channel_limit() {
     let app = TestApp::with_config(low_limit_config()).await;
     let (owner_id, _) = create_test_user(&app.pool).await;
     let token = generate_access_token(&app.config, owner_id);
-    let guild_id = create_guild(&app.pool, owner_id).await;
+    let guild_id = create_guild_with_default_role(
+        &app.pool,
+        owner_id,
+        vc_server::permissions::GuildPermissions::MANAGE_CHANNELS,
+    )
+    .await;
     let mut guard = app.cleanup_guard();
     guard.add(move |pool| async move {
         delete_guild(&pool, guild_id).await;
         delete_user(&pool, owner_id).await;
     });
-
-    // Create @everyone role with MANAGE_CHANNELS
-    sqlx::query(
-        "INSERT INTO guild_roles (id, guild_id, name, permissions, position, is_default) VALUES ($1, $2, 'everyone', $3, 0, true)",
-    )
-    .bind(uuid::Uuid::now_v7())
-    .bind(guild_id)
-    .bind(vc_server::permissions::GuildPermissions::MANAGE_CHANNELS.to_db())
-    .execute(&app.pool)
-    .await
-    .unwrap();
 
     // Create 2 channels (at limit)
     for i in 0..2 {
@@ -197,21 +196,17 @@ async fn test_role_limit() {
     let app = TestApp::with_config(low_limit_config()).await;
     let (owner_id, _) = create_test_user(&app.pool).await;
     let token = generate_access_token(&app.config, owner_id);
-    let guild_id = create_guild(&app.pool, owner_id).await;
+    let guild_id = create_guild_with_default_role(
+        &app.pool,
+        owner_id,
+        vc_server::permissions::GuildPermissions::MANAGE_ROLES,
+    )
+    .await;
     let mut guard = app.cleanup_guard();
     guard.add(move |pool| async move {
         delete_guild(&pool, guild_id).await;
         delete_user(&pool, owner_id).await;
     });
-
-    sqlx::query(
-        "UPDATE guild_roles SET permissions = $1 WHERE guild_id = $2 AND is_default = true",
-    )
-    .bind(vc_server::permissions::GuildPermissions::MANAGE_ROLES.to_db())
-    .bind(guild_id)
-    .execute(&app.pool)
-    .await
-    .unwrap();
 
     // Create 1 more role (2/2)
     let resp = app
@@ -223,24 +218,11 @@ async fn test_role_limit() {
                 .unwrap(),
         )
         .await;
-    let first_role_status = resp.status();
-    let first_role_body = body_to_json(resp).await;
     assert_eq!(
-        first_role_status,
+        resp.status(),
         StatusCode::OK,
-        "First extra role should succeed, body={first_role_body}"
+        "First extra role should succeed"
     );
-
-    let resp = app
-        .oneshot(
-            TestApp::request(Method::POST, &format!("/api/guilds/{guild_id}/roles"))
-                .header("authorization", format!("Bearer {token}"))
-                .header("content-type", "application/json")
-                .body(Body::from(r#"{"name": "Admin"}"#))
-                .unwrap(),
-        )
-        .await;
-    assert_eq!(resp.status(), StatusCode::OK, "Second role should succeed");
 
     // Next role should fail (3/2)
     let resp = app
@@ -248,7 +230,7 @@ async fn test_role_limit() {
             TestApp::request(Method::POST, &format!("/api/guilds/{guild_id}/roles"))
                 .header("authorization", format!("Bearer {token}"))
                 .header("content-type", "application/json")
-                .body(Body::from(r#"{"name": "Overflow"}"#))
+                .body(Body::from(r#"{"name": "Admin"}"#))
                 .unwrap(),
         )
         .await;
@@ -266,19 +248,13 @@ async fn test_bot_limit() {
     let app = TestApp::with_config(low_limit_config()).await;
     let (owner_id, _) = create_test_user(&app.pool).await;
     let token = generate_access_token(&app.config, owner_id);
-    let guild_id = create_guild(&app.pool, owner_id).await;
-    let mut guard = app.cleanup_guard();
-
-    // Create @everyone with MANAGE_GUILD
-    sqlx::query(
-        "INSERT INTO guild_roles (id, guild_id, name, permissions, position, is_default) VALUES ($1, $2, 'everyone', $3, 0, true)",
+    let guild_id = create_guild_with_default_role(
+        &app.pool,
+        owner_id,
+        vc_server::permissions::GuildPermissions::MANAGE_GUILD,
     )
-    .bind(uuid::Uuid::now_v7())
-    .bind(guild_id)
-    .bind(vc_server::permissions::GuildPermissions::MANAGE_GUILD.to_db())
-    .execute(&app.pool)
-    .await
-    .unwrap();
+    .await;
+    let mut guard = app.cleanup_guard();
 
     // Create 2 bots
     let (app1_id, bot1_id, _) = create_bot_application(&app.pool, owner_id).await;
@@ -335,7 +311,12 @@ async fn test_emoji_limit() {
     let app = TestApp::with_config(low_limit_config()).await;
     let (owner_id, _) = create_test_user(&app.pool).await;
     let token = generate_access_token(&app.config, owner_id);
-    let guild_id = create_guild(&app.pool, owner_id).await;
+    let guild_id = create_guild_with_default_role(
+        &app.pool,
+        owner_id,
+        vc_server::permissions::GuildPermissions::empty(),
+    )
+    .await;
     let mut guard = app.cleanup_guard();
     guard.add(move |pool| async move {
         delete_guild(&pool, guild_id).await;
@@ -354,7 +335,14 @@ async fn test_emoji_limit() {
     .await
     .unwrap();
 
-    // Next emoji upload should fail (2/1).
+    // Next emoji upload should fail (2/1) — limit check runs before multipart parsing
+    let boundary = "----TestBoundary";
+    let body = format!(
+        "--{boundary}\r\nContent-Disposition: form-data; name=\"name\"\r\n\r\nover_limit\r\n\
+         --{boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"test.png\"\r\n\
+         Content-Type: image/png\r\n\r\nfake-png-data\r\n\
+         --{boundary}--\r\n"
+    );
 
     let resp = app
         .oneshot(
@@ -362,9 +350,9 @@ async fn test_emoji_limit() {
                 .header("authorization", format!("Bearer {token}"))
                 .header(
                     "content-type",
-                    "multipart/form-data; boundary=----TestBoundary",
+                    format!("multipart/form-data; boundary={boundary}"),
                 )
-                .body(Body::empty())
+                .body(Body::from(body))
                 .unwrap(),
         )
         .await;

@@ -142,7 +142,7 @@ const SEND_MESSAGES: i64 = 1 << 3;
 
 #[tokio::test]
 async fn test_guild_owner_can_view_any_channel() {
-    let app = TestApp::new().await;
+    let app = TestApp::new_isolated().await;
     let (owner_id, _) = create_test_user(&app.pool).await;
     let token = generate_access_token(&app.config, owner_id);
     let guild_id = create_guild_with_owner(&app.pool, owner_id).await;
@@ -161,7 +161,7 @@ async fn test_guild_owner_can_view_any_channel() {
 
 #[tokio::test]
 async fn test_guild_owner_bypasses_channel_overrides() {
-    let app = TestApp::new().await;
+    let app = TestApp::new_isolated().await;
     let (owner_id, _) = create_test_user(&app.pool).await;
     let token = generate_access_token(&app.config, owner_id);
     let guild_id = create_guild_with_owner(&app.pool, owner_id).await;
@@ -190,7 +190,7 @@ async fn test_guild_owner_bypasses_channel_overrides() {
 
 #[tokio::test]
 async fn test_user_with_view_channel_can_access() {
-    let app = TestApp::new().await;
+    let app = TestApp::new_isolated().await;
     let (owner_id, _) = create_test_user(&app.pool).await;
     let (user_id, _) = create_test_user(&app.pool).await;
     let token = generate_access_token(&app.config, user_id);
@@ -215,7 +215,7 @@ async fn test_user_with_view_channel_can_access() {
 
 #[tokio::test]
 async fn test_user_without_view_channel_cannot_access() {
-    let app = TestApp::new().await;
+    let app = TestApp::new_isolated().await;
     let (owner_id, _) = create_test_user(&app.pool).await;
     let (user_id, _) = create_test_user(&app.pool).await;
     let token = generate_access_token(&app.config, user_id);
@@ -240,7 +240,7 @@ async fn test_user_without_view_channel_cannot_access() {
 
 #[tokio::test]
 async fn test_non_guild_member_cannot_access_channel() {
-    let app = TestApp::new().await;
+    let app = TestApp::new_isolated().await;
     let (owner_id, _) = create_test_user(&app.pool).await;
     let (outsider_id, _) = create_test_user(&app.pool).await;
     let token = generate_access_token(&app.config, outsider_id);
@@ -264,7 +264,7 @@ async fn test_non_guild_member_cannot_access_channel() {
 
 #[tokio::test]
 async fn test_channel_override_deny_blocks_access() {
-    let app = TestApp::new().await;
+    let app = TestApp::new_isolated().await;
     let (owner_id, _) = create_test_user(&app.pool).await;
     let (user_id, _) = create_test_user(&app.pool).await;
     let token = generate_access_token(&app.config, user_id);
@@ -292,7 +292,7 @@ async fn test_channel_override_deny_blocks_access() {
 
 #[tokio::test]
 async fn test_channel_override_allow_grants_access() {
-    let app = TestApp::new().await;
+    let app = TestApp::new_isolated().await;
     let (owner_id, _) = create_test_user(&app.pool).await;
     let (user_id, _) = create_test_user(&app.pool).await;
     let token = generate_access_token(&app.config, user_id);
@@ -320,7 +320,7 @@ async fn test_channel_override_allow_grants_access() {
 
 #[tokio::test]
 async fn test_channel_override_deny_wins_over_allow() {
-    let app = TestApp::new().await;
+    let app = TestApp::new_isolated().await;
     let (owner_id, _) = create_test_user(&app.pool).await;
     let (user_id, _) = create_test_user(&app.pool).await;
     let token = generate_access_token(&app.config, user_id);
@@ -360,7 +360,7 @@ async fn test_channel_override_deny_wins_over_allow() {
 
 #[tokio::test]
 async fn test_dm_participant_can_access() {
-    let app = TestApp::new().await;
+    let app = TestApp::new_isolated().await;
     let (user1_id, _) = create_test_user(&app.pool).await;
     let (user2_id, _) = create_test_user(&app.pool).await;
     let token1 = generate_access_token(&app.config, user1_id);
@@ -391,7 +391,7 @@ async fn test_dm_participant_can_access() {
 
 #[tokio::test]
 async fn test_non_dm_participant_cannot_access() {
-    let app = TestApp::new().await;
+    let app = TestApp::new_isolated().await;
     let (user1_id, _) = create_test_user(&app.pool).await;
     let (user2_id, _) = create_test_user(&app.pool).await;
     let (outsider_id, _) = create_test_user(&app.pool).await;
@@ -415,7 +415,7 @@ async fn test_non_dm_participant_cannot_access() {
 
 #[tokio::test]
 async fn test_cannot_send_message_without_view_channel() {
-    let app = TestApp::new().await;
+    let app = TestApp::new_isolated().await;
     let (owner_id, _) = create_test_user(&app.pool).await;
     let (user_id, _) = create_test_user(&app.pool).await;
     let token = generate_access_token(&app.config, user_id);
@@ -447,7 +447,7 @@ async fn test_cannot_send_message_without_view_channel() {
 
 #[tokio::test]
 async fn test_cannot_read_messages_without_view_channel() {
-    let app = TestApp::new().await;
+    let app = TestApp::new_isolated().await;
     let (owner_id, _) = create_test_user(&app.pool).await;
     let (user_id, _) = create_test_user(&app.pool).await;
     let token = generate_access_token(&app.config, user_id);
@@ -477,7 +477,7 @@ async fn test_cannot_read_messages_without_view_channel() {
 
 #[tokio::test]
 async fn test_cannot_favorite_channel_without_view_permission() {
-    let app = TestApp::new().await;
+    let app = TestApp::new_isolated().await;
     let (owner_id, _) = create_test_user(&app.pool).await;
     let (user_id, _) = create_test_user(&app.pool).await;
     let token = generate_access_token(&app.config, user_id);
@@ -502,7 +502,7 @@ async fn test_cannot_favorite_channel_without_view_permission() {
 
 #[tokio::test]
 async fn test_can_favorite_channel_with_view_permission() {
-    let app = TestApp::new().await;
+    let app = TestApp::new_isolated().await;
     let (owner_id, _) = create_test_user(&app.pool).await;
     let (user_id, _) = create_test_user(&app.pool).await;
     let token = generate_access_token(&app.config, user_id);

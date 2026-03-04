@@ -973,31 +973,18 @@ async fn test_guild_search_excludes_hidden_channels() {
     let (member_id, _) = create_test_user(&app.pool).await;
     let token = generate_access_token(&app.config, member_id);
 
-    // @everyone has VIEW_CHANNEL.
     let guild_id =
-        create_guild_with_default_role(&app.pool, owner_id, GuildPermissions::VIEW_CHANNEL).await;
+        create_guild_with_default_role(&app.pool, owner_id, GuildPermissions::empty()).await;
     add_guild_member(&app.pool, guild_id, member_id).await;
+
+    let member_role =
+        create_role_with_perms(&app.pool, guild_id, "VisibleRole", VIEW_CHANNEL_BIT).await;
+    assign_role_to_member(&app.pool, guild_id, member_id, member_role).await;
 
     let visible_ch = create_channel(&app.pool, guild_id, "visible-ch").await;
     let restricted_ch = create_channel(&app.pool, guild_id, "restricted-ch").await;
 
-    // Get the @everyone role ID.
-    let (everyone_role_id,): (Uuid,) =
-        sqlx::query_as("SELECT id FROM guild_roles WHERE guild_id = $1 AND is_default = true")
-            .bind(guild_id)
-            .fetch_one(&app.pool)
-            .await
-            .expect("Failed to fetch @everyone role");
-
-    // Deny VIEW_CHANNEL on `restricted_ch` for @everyone.
-    create_channel_perm_override(
-        &app.pool,
-        restricted_ch,
-        everyone_role_id,
-        0,
-        VIEW_CHANNEL_BIT,
-    )
-    .await;
+    create_channel_perm_override(&app.pool, restricted_ch, member_role, 0, VIEW_CHANNEL_BIT).await;
 
     // One matching message in each channel.
     insert_message(

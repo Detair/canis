@@ -2,16 +2,8 @@
 
 use axum::body::Body;
 use axum::http::{Method, StatusCode};
-use vc_server::config::Config;
 
 use super::helpers::*;
-
-async fn webhook_test_app() -> TestApp {
-    let mut config = Config::default_for_test();
-    config.mfa_encryption_key =
-        Some("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f".to_string());
-    TestApp::with_config(config).await
-}
 
 // ============================================================================
 // CRUD Tests
@@ -19,7 +11,10 @@ async fn webhook_test_app() -> TestApp {
 
 #[tokio::test]
 async fn create_webhook_returns_signing_secret() {
-    let app = webhook_test_app().await;
+    let mut config = vc_server::config::Config::default_for_test();
+    config.mfa_encryption_key =
+        Some("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef".to_string());
+    let app = TestApp::with_config(config).await;
     let (user_id, _) = create_test_user(&app.pool).await;
     let (app_id, _, _) = create_bot_application(&app.pool, user_id).await;
     let token = generate_access_token(&app.config, user_id);
@@ -52,7 +47,7 @@ async fn create_webhook_returns_signing_secret() {
 
 #[tokio::test]
 async fn list_webhooks_does_not_return_secret() {
-    let app = webhook_test_app().await;
+    let app = TestApp::new().await;
     let (user_id, _) = create_test_user(&app.pool).await;
     let (app_id, _, _) = create_bot_application(&app.pool, user_id).await;
     let token = generate_access_token(&app.config, user_id);
@@ -84,7 +79,7 @@ async fn list_webhooks_does_not_return_secret() {
 
 #[tokio::test]
 async fn get_webhook_returns_details() {
-    let app = webhook_test_app().await;
+    let app = TestApp::new().await;
     let (user_id, _) = create_test_user(&app.pool).await;
     let (app_id, _, _) = create_bot_application(&app.pool, user_id).await;
     let token = generate_access_token(&app.config, user_id);
@@ -117,7 +112,7 @@ async fn get_webhook_returns_details() {
 
 #[tokio::test]
 async fn update_webhook_url_and_events() {
-    let app = webhook_test_app().await;
+    let app = TestApp::new().await;
     let (user_id, _) = create_test_user(&app.pool).await;
     let (app_id, _, _) = create_bot_application(&app.pool, user_id).await;
     let token = generate_access_token(&app.config, user_id);
@@ -157,7 +152,7 @@ async fn update_webhook_url_and_events() {
 
 #[tokio::test]
 async fn delete_webhook_succeeds() {
-    let app = webhook_test_app().await;
+    let app = TestApp::new().await;
     let (user_id, _) = create_test_user(&app.pool).await;
     let (app_id, _, _) = create_bot_application(&app.pool, user_id).await;
     let token = generate_access_token(&app.config, user_id);
@@ -190,7 +185,7 @@ async fn delete_webhook_succeeds() {
 
 #[tokio::test]
 async fn non_owner_cannot_manage_webhooks() {
-    let app = webhook_test_app().await;
+    let app = TestApp::new().await;
     let (owner_id, _) = create_test_user(&app.pool).await;
     let (other_id, _) = create_test_user(&app.pool).await;
     let (app_id, _, _) = create_bot_application(&app.pool, owner_id).await;
@@ -223,7 +218,7 @@ async fn non_owner_cannot_manage_webhooks() {
 
 #[tokio::test]
 async fn invalid_url_rejected() {
-    let app = webhook_test_app().await;
+    let app = TestApp::new().await;
     let (user_id, _) = create_test_user(&app.pool).await;
     let (app_id, _, _) = create_bot_application(&app.pool, user_id).await;
     let token = generate_access_token(&app.config, user_id);
@@ -250,7 +245,7 @@ async fn invalid_url_rejected() {
 
 #[tokio::test]
 async fn empty_events_rejected() {
-    let app = webhook_test_app().await;
+    let app = TestApp::new().await;
     let (user_id, _) = create_test_user(&app.pool).await;
     let (app_id, _, _) = create_bot_application(&app.pool, user_id).await;
     let token = generate_access_token(&app.config, user_id);
@@ -277,7 +272,7 @@ async fn empty_events_rejected() {
 
 #[tokio::test]
 async fn max_5_webhooks_enforced() {
-    let app = webhook_test_app().await;
+    let app = TestApp::new().await;
     let (user_id, _) = create_test_user(&app.pool).await;
     let (app_id, _, _) = create_bot_application(&app.pool, user_id).await;
     let token = generate_access_token(&app.config, user_id);
@@ -320,7 +315,7 @@ async fn max_5_webhooks_enforced() {
 
 #[tokio::test]
 async fn delivery_log_initially_empty() {
-    let app = webhook_test_app().await;
+    let app = TestApp::new().await;
     let (user_id, _) = create_test_user(&app.pool).await;
     let (app_id, _, _) = create_bot_application(&app.pool, user_id).await;
     let token = generate_access_token(&app.config, user_id);
