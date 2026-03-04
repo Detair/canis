@@ -180,7 +180,7 @@ const isTauri = typeof window !== "undefined" && "__TAURI__" in window;
 // Auth response type from server
 interface AuthResponse {
   access_token: string;
-  refresh_token: string;
+  refresh_token?: string;
   expires_in: number;
   token_type: string;
   setup_required: boolean;
@@ -350,14 +350,43 @@ const browserState = {
   refreshTimer: null as ReturnType<typeof setTimeout> | null,
 };
 
-// Initialize from localStorage if available
+const SESSION_RESTORE_BLOCK_KEY = "kaiku:skip-session-restore";
+
+function setSessionRestoreBlocked(blocked: boolean) {
+  if (typeof localStorage === "undefined") {
+    return;
+  }
+
+  if (blocked) {
+    localStorage.setItem(SESSION_RESTORE_BLOCK_KEY, "1");
+  } else {
+    localStorage.removeItem(SESSION_RESTORE_BLOCK_KEY);
+  }
+}
+
+function isSessionRestoreBlocked(): boolean {
+  if (typeof localStorage === "undefined") {
+    return false;
+  }
+
+  return localStorage.getItem(SESSION_RESTORE_BLOCK_KEY) === "1";
+}
+
+// Initialize server URL from localStorage (tokens are in-memory only)
 if (typeof localStorage !== "undefined") {
   browserState.serverUrl =
     localStorage.getItem("serverUrl") || browserState.serverUrl;
-  browserState.accessToken = localStorage.getItem("accessToken");
-  browserState.refreshToken = localStorage.getItem("refreshToken");
-  const expiresAt = localStorage.getItem("tokenExpiresAt");
-  browserState.tokenExpiresAt = expiresAt ? parseInt(expiresAt, 10) : null;
+}
+
+/** Clear in-memory browser auth state. */
+function clearBrowserTokens() {
+  if (browserState.refreshTimer) {
+    clearTimeout(browserState.refreshTimer);
+    browserState.refreshTimer = null;
+  }
+  browserState.accessToken = null;
+  browserState.refreshToken = null;
+  browserState.tokenExpiresAt = null;
 }
 
 /**
@@ -371,7 +400,7 @@ function scheduleTokenRefresh() {
     browserState.refreshTimer = null;
   }
 
-  if (!browserState.tokenExpiresAt || !browserState.refreshToken) {
+  if (!browserState.tokenExpiresAt) {
     return;
   }
 
@@ -385,43 +414,50 @@ function scheduleTokenRefresh() {
   );
 
   browserState.refreshTimer = setTimeout(async () => {
-    try {
-      await refreshAccessToken();
-    } catch (error) {
-      console.error("[Auth] Auto-refresh failed:", error);
-      // Token refresh failed - user will need to log in again
+    const success = await refreshAccessToken();
+    if (!success) {
+      console.warn("[Auth] Scheduled token refresh failed — clearing session");
+      clearBrowserTokens();
+      window.dispatchEvent(new CustomEvent("kaiku:session-expired"));
     }
   }, refreshIn);
 }
 
 /**
- * Refresh the access token using the refresh token.
+ * Refresh the access token. Browser mode sends a credentialed request so the
+ * server reads the HttpOnly cookie; Tauri mode sends the refresh token in the
+ * request body.
  */
 export async function refreshAccessToken(): Promise<boolean> {
-  if (!browserState.refreshToken) {
-    console.log("[Auth] No refresh token available");
-    return false;
-  }
-
   try {
     console.log("[Auth] Refreshing access token...");
 
     const baseUrl = browserState.serverUrl.replace(/\/+$/, "");
-    const response = await fetch(`${baseUrl}/auth/refresh`, {
+
+    // Tauri clients send refresh_token in body; browser sends nothing
+    // (server reads the HttpOnly cookie automatically).
+    const fetchOptions: RequestInit = {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ refresh_token: browserState.refreshToken }),
-    });
+      credentials: "include",
+    };
+    if (isTauri) {
+      const refreshToken = browserState.refreshToken;
+      if (!refreshToken) {
+        clearBrowserTokens();
+        return false;
+      }
+
+      fetchOptions.headers = { "Content-Type": "application/json" };
+      fetchOptions.body = JSON.stringify({
+        refresh_token: refreshToken,
+      });
+    }
+
+    const response = await fetch(`${baseUrl}/auth/refresh`, fetchOptions);
 
     if (!response.ok) {
       console.error("[Auth] Token refresh failed:", response.status);
-      // Clear tokens if refresh fails
-      browserState.accessToken = null;
-      browserState.refreshToken = null;
-      browserState.tokenExpiresAt = null;
-      localStorage.removeItem("accessToken");
-      localStorage.removeItem("refreshToken");
-      localStorage.removeItem("tokenExpiresAt");
+      clearBrowserTokens();
       return false;
     }
 
@@ -430,49 +466,31 @@ export async function refreshAccessToken(): Promise<boolean> {
       data = await response.json();
     } catch (parseError) {
       console.error(
-        "[Auth] Failed to parse token refresh response as JSON:",
+        "[Auth] Token refresh returned invalid JSON:",
         parseError,
       );
-
-      // Clear tokens - refresh failed
-      browserState.accessToken = null;
-      browserState.refreshToken = null;
-      browserState.tokenExpiresAt = null;
-      localStorage.removeItem("accessToken");
-      localStorage.removeItem("refreshToken");
-      localStorage.removeItem("tokenExpiresAt");
-
-      throw new Error(
-        `Token refresh returned invalid JSON: ${parseError instanceof Error ? parseError.message : "Parse failed"}`,
-      );
+      clearBrowserTokens();
+      return false;
     }
 
-    // Validate tokens are not empty
-    if (!data.access_token || !data.refresh_token) {
-      console.error("[Auth] Token refresh returned empty tokens");
-
-      // Clear any existing tokens
-      browserState.accessToken = null;
-      browserState.refreshToken = null;
-      browserState.tokenExpiresAt = null;
-      localStorage.removeItem("accessToken");
-      localStorage.removeItem("refreshToken");
-      localStorage.removeItem("tokenExpiresAt");
-
-      throw new Error("Token refresh returned empty tokens");
+    if (!data.access_token) {
+      console.error("[Auth] Token refresh returned empty access token");
+      clearBrowserTokens();
+      return false;
     }
 
-    // Store new tokens
+    // Store access token in memory; browser mode relies on HttpOnly cookie
+    // for the refresh token so we don't keep it in JS-accessible memory.
     browserState.accessToken = data.access_token;
-    browserState.refreshToken = data.refresh_token;
+    if (isTauri) {
+      if (!data.refresh_token) {
+        console.error("[Auth] Token refresh returned empty refresh token");
+        clearBrowserTokens();
+        return false;
+      }
+      browserState.refreshToken = data.refresh_token;
+    }
     browserState.tokenExpiresAt = Date.now() + data.expires_in * 1000;
-
-    localStorage.setItem("accessToken", data.access_token);
-    localStorage.setItem("refreshToken", data.refresh_token);
-    localStorage.setItem(
-      "tokenExpiresAt",
-      browserState.tokenExpiresAt.toString(),
-    );
 
     console.log("[Auth] Token refreshed successfully");
 
@@ -486,9 +504,24 @@ export async function refreshAccessToken(): Promise<boolean> {
   }
 }
 
-// Start token refresh schedule on load if we have tokens
-if (browserState.accessToken && browserState.refreshToken) {
-  scheduleTokenRefresh();
+// On browser load, attempt to restore session from HttpOnly cookie.
+// The cookie is sent automatically; the server returns a fresh access token.
+if (!isTauri && !browserState.accessToken) {
+  if (!isSessionRestoreBlocked()) {
+    // refreshAccessToken never throws (returns false on failure), so no .catch() needed.
+    void refreshAccessToken();
+  }
+}
+
+/** Error with HTTP status code for structured error detection. */
+class HttpError extends Error {
+  constructor(
+    public readonly status: number,
+    message: string,
+  ) {
+    super(message);
+    this.name = "HttpError";
+  }
 }
 
 // HTTP helper for browser mode
@@ -497,12 +530,12 @@ async function httpRequest<T>(
   path: string,
   body?: unknown,
 ): Promise<T> {
-  // Always read token fresh from localStorage to handle HMR reloads
-  const token = browserState.accessToken || localStorage.getItem("accessToken");
+  const token = browserState.accessToken;
 
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
+  const headers: Record<string, string> = {};
+  if (body !== undefined) {
+    headers["Content-Type"] = "application/json";
+  }
 
   if (token) {
     headers["Authorization"] = `Bearer ${token}`;
@@ -536,6 +569,7 @@ async function httpRequest<T>(
     method,
     headers,
     body: body ? JSON.stringify(body) : undefined,
+    credentials: "include",
   });
 
   if (!response.ok) {
@@ -543,17 +577,14 @@ async function httpRequest<T>(
 
     try {
       const errorBody = await response.json();
-      // Detect MFA_REQUIRED from server
+      // Detect MFA_REQUIRED from server — throw before falling into catch
       if (response.status === 403 && errorBody.error === "MFA_REQUIRED") {
-        throw new Error("MFA_REQUIRED");
+        throw new HttpError(403, "MFA_REQUIRED");
       }
       errorMessage = errorBody.message || errorBody.error || errorMessage;
     } catch (parseError) {
-      // Re-throw MFA_REQUIRED without wrapping
-      if (
-        parseError instanceof Error &&
-        parseError.message === "MFA_REQUIRED"
-      ) {
+      // Re-throw HttpError (including MFA_REQUIRED) without wrapping
+      if (parseError instanceof HttpError) {
         throw parseError;
       }
       // Log parse failure but continue with text fallback
@@ -577,13 +608,25 @@ async function httpRequest<T>(
       }
     }
 
-    throw new Error(errorMessage);
+    throw new HttpError(response.status, errorMessage);
   }
 
   // Handle empty responses
   const text = await response.text();
   if (!text) return null as T;
-  return JSON.parse(text);
+
+  try {
+    return JSON.parse(text);
+  } catch (parseError) {
+    console.error(
+      `[httpRequest] Failed to parse success response as JSON for ${cleanPath}:`,
+      text.slice(0, 200),
+    );
+    throw new HttpError(
+      response.status,
+      `Invalid JSON response from ${cleanPath}`,
+    );
+  }
 }
 
 // Auth Commands
@@ -609,6 +652,7 @@ export async function login(
   // Browser mode
   browserState.serverUrl = serverUrl;
   localStorage.setItem("serverUrl", serverUrl);
+  setSessionRestoreBlocked(false);
 
   const body: Record<string, unknown> = { username, password };
   if (mfaCode) {
@@ -617,17 +661,15 @@ export async function login(
 
   const response = await httpRequest<AuthResponse>("POST", "/auth/login", body);
 
-  // Store all token data
+  // Store access token in memory; browser relies on HttpOnly cookie for refresh
   browserState.accessToken = response.access_token;
-  browserState.refreshToken = response.refresh_token;
+  if (isTauri) {
+    if (!response.refresh_token) {
+      throw new Error("Login response missing refresh token");
+    }
+    browserState.refreshToken = response.refresh_token;
+  }
   browserState.tokenExpiresAt = Date.now() + response.expires_in * 1000;
-
-  localStorage.setItem("accessToken", response.access_token);
-  localStorage.setItem("refreshToken", response.refresh_token);
-  localStorage.setItem(
-    "tokenExpiresAt",
-    browserState.tokenExpiresAt.toString(),
-  );
 
   // Schedule automatic token refresh
   scheduleTokenRefresh();
@@ -734,6 +776,7 @@ export async function register(
   // Browser mode
   browserState.serverUrl = serverUrl;
   localStorage.setItem("serverUrl", serverUrl);
+  setSessionRestoreBlocked(false);
 
   const response = await httpRequest<AuthResponse>("POST", "/auth/register", {
     username,
@@ -742,17 +785,15 @@ export async function register(
     display_name: displayName,
   });
 
-  // Store all token data
+  // Store access token in memory; browser relies on HttpOnly cookie for refresh
   browserState.accessToken = response.access_token;
-  browserState.refreshToken = response.refresh_token;
+  if (isTauri) {
+    if (!response.refresh_token) {
+      throw new Error("Registration response missing refresh token");
+    }
+    browserState.refreshToken = response.refresh_token;
+  }
   browserState.tokenExpiresAt = Date.now() + response.expires_in * 1000;
-
-  localStorage.setItem("accessToken", response.access_token);
-  localStorage.setItem("refreshToken", response.refresh_token);
-  localStorage.setItem(
-    "tokenExpiresAt",
-    browserState.tokenExpiresAt.toString(),
-  );
 
   // Schedule automatic token refresh
   scheduleTokenRefresh();
@@ -776,21 +817,41 @@ export async function logout(): Promise<void> {
     return invoke("logout");
   }
 
-  // Browser mode - clear all token state
-  if (browserState.refreshTimer) {
-    clearTimeout(browserState.refreshTimer);
-    browserState.refreshTimer = null;
+  let logoutError: unknown = null;
+
+  try {
+    await httpRequest("POST", "/auth/logout");
+  } catch (error) {
+    const isAuthError =
+      error instanceof HttpError &&
+      (error.status === 401 || error.status === 403);
+
+    if (isAuthError) {
+      const refreshed = await refreshAccessToken();
+      if (refreshed) {
+        try {
+          await httpRequest("POST", "/auth/logout");
+        } catch (retryError) {
+          logoutError = retryError;
+        }
+      } else {
+        logoutError = error;
+      }
+    } else {
+      logoutError = error;
+    }
   }
 
-  browserState.accessToken = null;
-  browserState.refreshToken = null;
-  browserState.tokenExpiresAt = null;
+  clearBrowserTokens();
+  setSessionRestoreBlocked(true);
 
-  localStorage.removeItem("accessToken");
-  localStorage.removeItem("refreshToken");
-  localStorage.removeItem("tokenExpiresAt");
-
-  console.log("[Auth] Logged out, tokens cleared");
+  if (logoutError) {
+    const message =
+      logoutError instanceof Error
+        ? logoutError.message
+        : String(logoutError ?? "unknown error");
+    throw new Error(`Server logout failed: ${message}`);
+  }
 }
 
 export async function getCurrentUser(): Promise<User | null> {
@@ -801,13 +862,9 @@ export async function getCurrentUser(): Promise<User | null> {
 
   // Browser mode - check if we have a token
   if (!browserState.accessToken) {
-    // Try to refresh if we have a refresh token
-    if (browserState.refreshToken) {
-      const refreshed = await refreshAccessToken();
-      if (!refreshed) {
-        return null;
-      }
-    } else {
+    // Try to refresh via HttpOnly cookie
+    const refreshed = await refreshAccessToken();
+    if (!refreshed) {
       return null;
     }
   }
@@ -835,21 +892,11 @@ export async function getCurrentUser(): Promise<User | null> {
       console.error(
         "[Auth] JSON parse error on HTTP response - cannot determine auth state, clearing tokens",
       );
-      // Clear all token state - safest approach when we can't parse server response
-      if (browserState.refreshTimer) {
-        clearTimeout(browserState.refreshTimer);
-        browserState.refreshTimer = null;
-      }
-      browserState.accessToken = null;
-      browserState.refreshToken = null;
-      browserState.tokenExpiresAt = null;
-      localStorage.removeItem("accessToken");
-      localStorage.removeItem("refreshToken");
-      localStorage.removeItem("tokenExpiresAt");
+      clearBrowserTokens();
       return null;
     }
 
-    if (isAuthError && browserState.refreshToken) {
+    if (isAuthError) {
       console.log("[Auth] Token appears invalid, attempting refresh...");
       const refreshed = await refreshAccessToken();
       if (refreshed) {
@@ -865,17 +912,7 @@ export async function getCurrentUser(): Promise<User | null> {
     // Only clear tokens if we confirmed auth failure, not on network errors
     if (isAuthError) {
       console.warn("[Auth] Authentication failed, clearing session");
-      // Clear all token state
-      if (browserState.refreshTimer) {
-        clearTimeout(browserState.refreshTimer);
-        browserState.refreshTimer = null;
-      }
-      browserState.accessToken = null;
-      browserState.refreshToken = null;
-      browserState.tokenExpiresAt = null;
-      localStorage.removeItem("accessToken");
-      localStorage.removeItem("refreshToken");
-      localStorage.removeItem("tokenExpiresAt");
+      clearBrowserTokens();
     } else {
       console.warn("[Auth] Non-auth error, keeping tokens for retry");
     }
@@ -986,7 +1023,7 @@ async function getUploadAuth(): Promise<{
     };
   }
   return {
-    token: browserState.accessToken || localStorage.getItem("accessToken"),
+    token: browserState.accessToken,
     baseUrl: (browserState.serverUrl || window.location.origin).replace(
       /\/+$/,
       "",
@@ -1144,7 +1181,7 @@ export async function sendMessageWithStatus(
     return { message, status: 201 };
   }
 
-  const token = browserState.accessToken || localStorage.getItem("accessToken");
+  const token = browserState.accessToken;
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
@@ -2636,7 +2673,7 @@ export function getServerUrl(): string {
  * Get the current access token (for use in URLs that can't use headers).
  */
 export function getAccessToken(): string | null {
-  return browserState.accessToken || localStorage.getItem("accessToken");
+  return browserState.accessToken;
 }
 
 /**
@@ -4184,21 +4221,24 @@ export async function oidcAuthorize(
 export async function oidcCompleteLogin(
   serverUrl: string,
   accessToken: string,
-  refreshToken: string,
+  refreshToken: string | undefined,
   expiresIn: number,
 ): Promise<void> {
   const baseUrl = serverUrl.replace(/\/+$/, "");
 
-  // Store tokens (browser mode)
+  // Store tokens; browser relies on HttpOnly cookie for refresh
   browserState.serverUrl = baseUrl;
   browserState.accessToken = accessToken;
-  browserState.refreshToken = refreshToken;
+  if (isTauri) {
+    if (!refreshToken) {
+      throw new Error("OIDC login missing refresh token");
+    }
+    browserState.refreshToken = refreshToken;
+  }
   browserState.tokenExpiresAt = Date.now() + expiresIn * 1000;
 
   localStorage.setItem("serverUrl", baseUrl);
-  localStorage.setItem("accessToken", accessToken);
-  localStorage.setItem("refreshToken", refreshToken);
-  localStorage.setItem("tokenExpiresAt", String(browserState.tokenExpiresAt));
+  setSessionRestoreBlocked(false);
 
   scheduleTokenRefresh();
 }

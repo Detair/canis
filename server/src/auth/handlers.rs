@@ -3,10 +3,11 @@
 use std::net::SocketAddr;
 
 use axum::extract::{ConnectInfo, Multipart, Path, State};
-use axum::http::header::USER_AGENT;
-use axum::http::{HeaderMap, StatusCode};
+use axum::http::header::{ORIGIN, USER_AGENT};
+use axum::http::HeaderMap;
 use axum::response::{IntoResponse, Redirect, Response};
 use axum::{Extension, Json};
+use axum_extra::extract::CookieJar;
 use chrono::{Duration, Utc};
 use fred::prelude::*;
 use serde::{Deserialize, Deserializer, Serialize};
@@ -16,6 +17,7 @@ use uuid::Uuid;
 use validator::Validate;
 
 use super::backup_codes::{find_matching_backup_code, generate_backup_codes, BACKUP_CODE_COUNT};
+use super::cookies;
 use super::error::{AuthError, AuthResult};
 use super::jwt::{generate_token_pair, validate_refresh_token};
 use super::mfa_crypto::{decrypt_mfa_secret, encrypt_mfa_secret};
@@ -35,6 +37,38 @@ use crate::db::{
 use crate::ratelimit::NormalizedIp;
 use crate::util::format_file_size;
 use crate::ws::broadcast_user_patch;
+
+/// Extract a refresh token from either the JSON body or `HttpOnly` cookie.
+fn extract_refresh_token(body_token: Option<String>, jar: &CookieJar) -> AuthResult<String> {
+    if let Some(token) = body_token.filter(|t| !t.is_empty()) {
+        tracing::debug!("Refresh token provided via request body");
+        return Ok(token);
+    }
+
+    if let Some(cookie) = jar.get(cookies::REFRESH_COOKIE_NAME) {
+        let value = cookie.value().to_owned();
+        if value.is_empty() {
+            tracing::warn!("Refresh cookie present but empty");
+        } else {
+            tracing::debug!("Refresh token provided via HttpOnly cookie");
+            return Ok(value);
+        }
+    }
+
+    tracing::debug!("No refresh token found in body or cookie");
+    Err(AuthError::InvalidToken)
+}
+
+/// Returns `true` when the refresh token should be included in the JSON body.
+///
+/// Browser (CORS) requests include the `Origin` header; for those clients the
+/// refresh token is delivered solely via `HttpOnly` cookie.  Non-browser clients
+/// (e.g. Tauri) omit `Origin` and receive the token in the response body.
+fn should_return_refresh_token(headers: &HeaderMap) -> bool {
+    let has_origin = headers.contains_key(ORIGIN);
+    tracing::debug!(has_origin_header = has_origin, "Refresh token delivery decision");
+    !has_origin
+}
 
 // ============================================================================
 // Request/Response Types
@@ -97,8 +131,10 @@ pub struct LogoutRequest {
 pub struct AuthResponse {
     /// Access token (short-lived).
     pub access_token: String,
-    /// Refresh token (long-lived).
-    pub refresh_token: String,
+    /// Refresh token (long-lived). Omitted for browser clients that receive
+    /// the refresh token via an `HttpOnly` cookie instead.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub refresh_token: Option<String>,
     /// Access token expiry in seconds.
     pub expires_in: i64,
     /// Token type (always "Bearer").
@@ -293,13 +329,14 @@ mod tests {
     ),
     security(()),
 )]
-#[tracing::instrument(skip(state, body), fields(username = %body.username))]
+#[tracing::instrument(skip(state, jar, body), fields(username = %body.username))]
 pub async fn register(
     State(state): State<AppState>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     headers: HeaderMap,
+    jar: CookieJar,
     Json(body): Json<RegisterRequest>,
-) -> AuthResult<Json<AuthResponse>> {
+) -> AuthResult<(CookieJar, Json<AuthResponse>)> {
     // Validate input first
     body.validate()
         .map_err(|e| AuthError::Validation(e.to_string()))?;
@@ -499,13 +536,24 @@ pub async fn register(
         tracing::info!(user_id = %user.id, username = %user.username, "User registered");
     }
 
-    Ok(Json(AuthResponse {
-        access_token: tokens.access_token,
-        refresh_token: tokens.refresh_token,
-        expires_in: tokens.access_expires_in,
-        token_type: "Bearer".to_string(),
-        setup_required: !setup_complete,
-    }))
+    let include_refresh_token = should_return_refresh_token(&headers);
+
+    let jar = jar.add(cookies::build_refresh_cookie(
+        &tokens.refresh_token,
+        state.config.jwt_refresh_expiry,
+        &state.config,
+    ));
+
+    Ok((
+        jar,
+        Json(AuthResponse {
+            access_token: tokens.access_token,
+            refresh_token: include_refresh_token.then_some(tokens.refresh_token),
+            expires_in: tokens.access_expires_in,
+            token_type: "Bearer".to_string(),
+            setup_required: !setup_complete,
+        }),
+    ))
 }
 
 /// Login with username/password.
@@ -523,14 +571,15 @@ pub async fn register(
     ),
     security(()),
 )]
-#[tracing::instrument(skip(state, body, normalized_ip), fields(username = %body.username))]
+#[tracing::instrument(skip(state, jar, body, normalized_ip), fields(username = %body.username))]
 pub async fn login(
     State(state): State<AppState>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     normalized_ip: Option<Extension<NormalizedIp>>,
     headers: HeaderMap,
+    jar: CookieJar,
     Json(body): Json<LoginRequest>,
-) -> AuthResult<Json<AuthResponse>> {
+) -> AuthResult<(CookieJar, Json<AuthResponse>)> {
     // Helper macro to record failed auth (if rate limiter is configured)
     // SECURITY: Fails request if rate limiter is down (fail-closed pattern)
     macro_rules! record_failed_auth {
@@ -681,13 +730,24 @@ pub async fn login(
     tracing::info!(user_id = %user.id, setup_required = !setup_complete, "User logged in");
     crate::observability::metrics::record_auth_login_attempt(true);
 
-    Ok(Json(AuthResponse {
-        access_token: tokens.access_token,
-        refresh_token: tokens.refresh_token,
-        expires_in: tokens.access_expires_in,
-        token_type: "Bearer".to_string(),
-        setup_required: !setup_complete,
-    }))
+    let include_refresh_token = should_return_refresh_token(&headers);
+
+    let jar = jar.add(cookies::build_refresh_cookie(
+        &tokens.refresh_token,
+        state.config.jwt_refresh_expiry,
+        &state.config,
+    ));
+
+    Ok((
+        jar,
+        Json(AuthResponse {
+            access_token: tokens.access_token,
+            refresh_token: include_refresh_token.then_some(tokens.refresh_token),
+            expires_in: tokens.access_expires_in,
+            token_type: "Bearer".to_string(),
+            setup_required: !setup_complete,
+        }),
+    ))
 }
 
 /// Refresh access token using refresh token.
@@ -701,27 +761,31 @@ pub async fn login(
     post,
     path = "/auth/refresh",
     tag = "auth",
-    request_body = RefreshRequest,
+    request_body(content = RefreshRequest, description = "Required for Tauri clients; browser clients use HttpOnly cookie instead"),
     responses(
         (status = 200, description = "Token refreshed successfully", body = AuthResponse),
         (status = 401, description = "Invalid or expired token"),
     ),
     security(()),
 )]
-#[tracing::instrument(skip(state, body))]
+#[tracing::instrument(skip(state, jar, body))]
 pub async fn refresh_token(
     State(state): State<AppState>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     headers: HeaderMap,
-    Json(body): Json<RefreshRequest>,
-) -> AuthResult<Json<AuthResponse>> {
+    jar: CookieJar,
+    body: Option<Json<RefreshRequest>>,
+) -> AuthResult<(CookieJar, Json<AuthResponse>)> {
+    // Read refresh token from JSON body (Tauri) or HttpOnly cookie (browser)
+    let raw_token = extract_refresh_token(body.map(|b| b.0.refresh_token), &jar)?;
+
     // Validate the refresh token (JWT validation)
-    let claims = validate_refresh_token(&body.refresh_token, &state.config.jwt_public_key)?;
+    let claims = validate_refresh_token(&raw_token, &state.config.jwt_public_key)?;
 
     // Parse user ID
     let user_id: Uuid = claims.sub.parse().map_err(|_| AuthError::InvalidToken)?;
 
-    let token_hash = hash_token(&body.refresh_token);
+    let token_hash = hash_token(&raw_token);
 
     // Wrap session lookup, deletion, and creation in a transaction with FOR UPDATE
     // to prevent race conditions in token rotation.
@@ -798,13 +862,24 @@ pub async fn refresh_token(
     tracing::info!(user_id = %user_id, "Token refreshed");
     crate::observability::metrics::record_token_refresh(true);
 
-    Ok(Json(AuthResponse {
-        access_token: new_tokens.access_token,
-        refresh_token: new_tokens.refresh_token,
-        expires_in: new_tokens.access_expires_in,
-        token_type: "Bearer".to_string(),
-        setup_required: !setup_complete,
-    }))
+    let include_refresh_token = should_return_refresh_token(&headers);
+
+    let jar = jar.add(cookies::build_refresh_cookie(
+        &new_tokens.refresh_token,
+        state.config.jwt_refresh_expiry,
+        &state.config,
+    ));
+
+    Ok((
+        jar,
+        Json(AuthResponse {
+            access_token: new_tokens.access_token,
+            refresh_token: include_refresh_token.then_some(new_tokens.refresh_token),
+            expires_in: new_tokens.access_expires_in,
+            token_type: "Bearer".to_string(),
+            setup_required: !setup_complete,
+        }),
+    ))
 }
 
 /// Logout and invalidate session.
@@ -814,20 +889,24 @@ pub async fn refresh_token(
     post,
     path = "/auth/logout",
     tag = "auth",
-    request_body = LogoutRequest,
+    request_body(content = LogoutRequest, description = "Required for Tauri clients; browser clients use HttpOnly cookie instead"),
     responses(
         (status = 200, description = "Logged out successfully"),
     ),
     security(("bearer_auth" = [])),
 )]
-#[tracing::instrument(skip(state, body), fields(user_id = %auth_user.id))]
+#[tracing::instrument(skip(state, jar, body), fields(user_id = %auth_user.id))]
 pub async fn logout(
     State(state): State<AppState>,
     auth_user: AuthUser,
-    Json(body): Json<LogoutRequest>,
-) -> AuthResult<()> {
+    jar: CookieJar,
+    body: Option<Json<LogoutRequest>>,
+) -> AuthResult<CookieJar> {
+    // Read refresh token from JSON body (Tauri) or HttpOnly cookie (browser)
+    let raw_token = extract_refresh_token(body.map(|b| b.0.refresh_token), &jar)?;
+
     // Verify the session belongs to the authenticated user before deleting
-    let token_hash = hash_token(&body.refresh_token);
+    let token_hash = hash_token(&raw_token);
     let session = find_session_by_token_hash(&state.db, &token_hash)
         .await?
         .ok_or(AuthError::InvalidToken)?;
@@ -840,7 +919,7 @@ pub async fn logout(
 
     tracing::info!(user_id = %auth_user.id, "User logged out");
 
-    Ok(())
+    Ok(jar.add(cookies::build_clear_cookie(&state.config)))
 }
 
 /// Get current user profile.
@@ -1740,9 +1819,10 @@ pub async fn oidc_authorize(
         (status = 400, description = "Invalid callback parameters"),
     ),
 )]
-#[tracing::instrument(skip(state, query))]
+#[tracing::instrument(skip(state, jar, query))]
 pub async fn oidc_callback(
     State(state): State<AppState>,
+    jar: CookieJar,
     axum::extract::Query(query): axum::extract::Query<OidcCallbackQuery>,
 ) -> Result<Response, AuthError> {
     let oidc_manager = state
@@ -1972,12 +2052,17 @@ pub async fn oidc_callback(
             .append_pair("setup_required", &(!setup_complete).to_string());
         Ok(Redirect::temporary(redirect_url.as_str()).into_response())
     } else {
-        // Browser flow: return HTML with postMessage to opener
+        // Browser flow: set HttpOnly refresh cookie + return HTML with postMessage
+        let jar = jar.add(cookies::build_refresh_cookie(
+            &tokens.refresh_token,
+            state.config.jwt_refresh_expiry,
+            &state.config,
+        ));
+
         // JSON-encode tokens to prevent any injection via token values
         let payload = serde_json::json!({
             "type": "oidc-callback",
             "access_token": tokens.access_token,
-            "refresh_token": tokens.refresh_token,
             "expires_in": tokens.access_expires_in,
             "setup_required": !setup_complete,
         });
@@ -1992,7 +2077,7 @@ if (window.opener) {{
 }}
 </script></body></html>"#,
         );
-        Ok((StatusCode::OK, axum::response::Html(html)).into_response())
+        Ok((jar, axum::response::Html(html)).into_response())
     }
 }
 

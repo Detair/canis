@@ -26,7 +26,7 @@ use fred::interfaces::ClientLike;
 use serde::Serialize;
 use sqlx::PgPool;
 use tower_http::compression::CompressionLayer;
-use tower_http::cors::{Any, CorsLayer};
+use tower_http::cors::{AllowOrigin, Any, CorsLayer};
 use tower_http::request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer};
 use tower_http::trace::TraceLayer;
 use utoipa::OpenApi;
@@ -114,14 +114,17 @@ impl AppState {
 /// Create the main application router.
 pub fn create_router(state: AppState) -> Router {
     // Configure CORS based on allowed origins
-    // In production, set CORS_ALLOWED_ORIGINS to specific origins
     let cors = if state.config.cors_allowed_origins.iter().any(|o| o == "*") {
-        tracing::warn!("CORS configured with wildcard origin — restrict via CORS_ALLOWED_ORIGINS in production");
-        // Development mode: allow any origin
+        // Wildcard `*` is incompatible with `allow_credentials(true)` per the
+        // CORS spec, so mirror the request Origin header instead.
+        tracing::warn!(
+            "CORS wildcard mirrors Origin header; set CORS_ALLOWED_ORIGINS explicitly in production"
+        );
         CorsLayer::new()
-            .allow_origin(Any)
+            .allow_origin(AllowOrigin::mirror_request())
             .allow_methods(Any)
             .allow_headers(Any)
+            .allow_credentials(true)
     } else {
         // Production mode: restrict to configured origins
         use axum::http::{header, HeaderName, Method};

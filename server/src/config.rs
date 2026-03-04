@@ -144,6 +144,19 @@ pub struct Config {
     /// Set to specific origins in production (e.g., "<https://app.example.com>")
     pub cors_allowed_origins: Vec<String>,
 
+    /// Whether to set the Secure flag on auth cookies (default: true in release, false in debug).
+    /// Override via `COOKIE_SECURE` env var.
+    pub cookie_secure: bool,
+
+    /// Optional domain for auth cookies. If unset, cookies are scoped to the request host.
+    /// Override via `COOKIE_DOMAIN` env var.
+    pub cookie_domain: Option<String>,
+
+    /// `SameSite` policy for auth cookies: `lax`, `strict`, or `none` (default: `lax`).
+    /// Use `strict` for same-origin deployments, `none` for cross-origin (requires Secure).
+    /// Override via `COOKIE_SAMESITE` env var.
+    pub cookie_same_site: String,
+
     /// SMTP server hostname (optional, enables password reset emails)
     pub smtp_host: Option<String>,
 
@@ -234,7 +247,7 @@ pub struct Config {
 impl Config {
     /// Load configuration from environment variables.
     pub fn from_env() -> Result<Self> {
-        Ok(Self {
+        let config = Self {
             bind_address: env::var("BIND_ADDRESS").unwrap_or_else(|_| "0.0.0.0:8080".into()),
             database_url: env::var("DATABASE_URL").context("DATABASE_URL must be set")?,
             redis_url: env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379".into()),
@@ -303,6 +316,21 @@ impl Config {
                         .collect()
                 })
                 .unwrap_or_else(|| vec!["*".to_string()]),
+            cookie_secure: env::var("COOKIE_SECURE")
+                .ok()
+                .map(|v| v.to_lowercase() == "true" || v == "1")
+                .unwrap_or(!cfg!(debug_assertions)),
+            cookie_domain: env::var("COOKIE_DOMAIN").ok().filter(|d| !d.is_empty()),
+            cookie_same_site: {
+                let value = env::var("COOKIE_SAMESITE")
+                    .unwrap_or_else(|_| "lax".to_string())
+                    .to_lowercase();
+                anyhow::ensure!(
+                    matches!(value.as_str(), "lax" | "strict" | "none"),
+                    "Invalid COOKIE_SAMESITE value '{value}'. Must be one of: lax, strict, none"
+                );
+                value
+            },
             smtp_host: env::var("SMTP_HOST").ok(),
             smtp_port: env::var("SMTP_PORT")
                 .ok()
@@ -381,7 +409,16 @@ impl Config {
             tempo_url: env::var("TEMPO_URL").ok(),
             loki_url: env::var("LOKI_URL").ok(),
             prometheus_url: env::var("PROMETHEUS_URL").ok(),
-        })
+        };
+
+        // SameSite=None requires the Secure flag — browsers reject the cookie otherwise
+        anyhow::ensure!(
+            config.cookie_same_site != "none" || config.cookie_secure,
+            "COOKIE_SAMESITE=none requires COOKIE_SECURE=true; \
+             browsers will reject the refresh cookie without the Secure flag"
+        );
+
+        Ok(config)
     }
 
     /// Check if OIDC is configured.
@@ -448,6 +485,9 @@ impl Config {
             require_e2ee_setup: false,
             block_check_fail_open: false,
             cors_allowed_origins: vec!["*".to_string()],
+            cookie_secure: false,
+            cookie_domain: None,
+            cookie_same_site: "lax".to_string(),
             smtp_host: None,
             smtp_port: 587,
             smtp_username: None,
