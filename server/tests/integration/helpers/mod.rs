@@ -27,7 +27,6 @@ use axum::body::Body;
 use axum::http::{self, Method, Request, Response};
 use axum::Router;
 use http_body_util::BodyExt;
-use sqlx::postgres::PgPoolOptions;
 use sqlx::PgPool;
 use tokio::sync::OnceCell;
 use tokio::task::JoinHandle;
@@ -50,18 +49,6 @@ static SHARED_POOL: OnceCell<PgPool> = OnceCell::const_new();
 
 /// Shared config across all tests in the same binary.
 static SHARED_CONFIG: OnceCell<Config> = OnceCell::const_new();
-
-async fn create_test_pool(database_url: &str) -> PgPool {
-    PgPoolOptions::new()
-        .min_connections(0)
-        .max_connections(5)
-        .acquire_timeout(Duration::from_secs(5))
-        .idle_timeout(Duration::from_secs(60))
-        .test_before_acquire(true)
-        .connect(database_url)
-        .await
-        .expect("Failed to connect to test DB")
-}
 
 /// Get or create a shared database pool.
 ///
@@ -180,20 +167,29 @@ impl Drop for CleanupGuard {
         }
 
         let pool = self.pool.clone();
-        let _ = std::thread::spawn(move || {
-            if let Ok(runtime) = tokio::runtime::Builder::new_current_thread()
+        std::thread::spawn(move || {
+            let runtime = tokio::runtime::Builder::new_current_thread()
                 .enable_all()
                 .build()
-            {
-                runtime.block_on(async move {
-                    for action in actions {
-                        action(pool.clone()).await;
-                    }
-                });
-            }
+                .expect("Failed to create cleanup runtime");
+            runtime.block_on(async move {
+                for action in actions {
+                    action(pool.clone()).await;
+                }
+            });
         })
-        .join();
+        .join()
+        .expect("Cleanup thread panicked");
     }
+}
+
+pub async fn rustfs_available() -> bool {
+    tokio::time::timeout(
+        std::time::Duration::from_millis(300),
+        tokio::net::TcpStream::connect("127.0.0.1:9000"),
+    )
+    .await
+    .is_ok_and(|result| result.is_ok())
 }
 
 // ============================================================================
@@ -210,12 +206,8 @@ pub struct TestApp {
 impl TestApp {
     /// Create a new test app using shared DB pool and fresh Redis client.
     pub async fn new() -> Self {
-        Self::new_isolated().await
-    }
-
-    /// Create a test app with a custom config (for limit testing).
-    pub async fn with_config(config: Config) -> Self {
-        let pool = create_test_pool(&config.database_url).await;
+        let pool = shared_pool().await.clone();
+        let config = shared_config().await.clone();
         let redis = db::create_redis_client(&config.redis_url)
             .await
             .expect("Failed to connect to test Redis");
@@ -242,9 +234,9 @@ impl TestApp {
         }
     }
 
-    pub async fn new_isolated() -> Self {
-        let config = shared_config().await.clone();
-        let pool = create_test_pool(&config.database_url).await;
+    /// Create a test app with a custom config (for limit testing).
+    pub async fn with_config(config: Config) -> Self {
+        let pool = shared_pool().await.clone();
         let redis = db::create_redis_client(&config.redis_url)
             .await
             .expect("Failed to connect to test Redis");
@@ -447,10 +439,19 @@ pub fn generate_access_token(config: &Config, user_id: Uuid) -> String {
 
 /// Delete a user by ID (cascades to friendships, reports, etc.).
 pub async fn delete_user(pool: &PgPool, user_id: Uuid) {
-    let _ = sqlx::query("DELETE FROM users WHERE id = $1")
-        .bind(user_id)
-        .execute(pool)
-        .await;
+    for attempt in 0..5 {
+        match sqlx::query("DELETE FROM users WHERE id = $1")
+            .bind(user_id)
+            .execute(pool)
+            .await
+        {
+            Ok(_) => return,
+            Err(sqlx::Error::PoolTimedOut) if attempt < 4 => {
+                tokio::time::sleep(std::time::Duration::from_millis(50 * (attempt + 1))).await;
+            }
+            Err(err) => panic!("Failed to delete test user: {err}"),
+        }
+    }
 }
 
 /// Create an accepted friendship between two users.
@@ -764,8 +765,8 @@ pub async fn delete_guild(pool: &PgPool, guild_id: Uuid) {
 pub async fn create_bot_application(pool: &PgPool, owner_id: Uuid) -> (Uuid, Uuid, String) {
     let app_id = Uuid::now_v7();
     let bot_user_id = Uuid::now_v7();
-    let random_suffix = Uuid::new_v4().to_string();
-    let bot_username = format!("bot_{}", &random_suffix[..8]);
+    let bot_username_seed = bot_user_id.simple().to_string();
+    let bot_username = format!("bot_{}", &bot_username_seed[20..]);
 
     // Create bot user
     sqlx::query(
