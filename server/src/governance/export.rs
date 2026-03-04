@@ -218,10 +218,13 @@ pub async fn process_export_job(
     Ok(())
 }
 
-/// Build the export ZIP archive in memory.
+/// Build the export ZIP archive, writing to a temp file to bound memory usage.
+///
+/// High-cardinality sections (messages, reactions, attachments, audit log) are
+/// capped with `LIMIT` to prevent OOM on large accounts.
 async fn build_export_archive(pool: &PgPool, user_id: Uuid) -> anyhow::Result<Vec<u8>> {
-    let mut buf = Vec::new();
-    let mut zip = ZipWriter::new(std::io::Cursor::new(&mut buf));
+    let tmp = tempfile::NamedTempFile::new()?;
+    let mut zip = ZipWriter::new(std::io::BufWriter::new(tmp.as_file().try_clone()?));
     let options = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
 
     // 1. Profile
@@ -243,21 +246,24 @@ async fn build_export_archive(pool: &PgPool, user_id: Uuid) -> anyhow::Result<Ve
     zip.start_file("profile.json", options)?;
     serde_json::to_writer_pretty(&mut zip, &profile)?;
 
-    // 2. Messages (non-deleted, includes encrypted)
+    // 2. Messages (non-deleted, includes encrypted) — capped at 500K rows
     let messages: Vec<ExportMessage> = sqlx::query_as(
         "SELECT id, channel_id, content, encrypted, created_at, edited_at
          FROM messages
          WHERE user_id = $1 AND deleted_at IS NULL
-         ORDER BY created_at ASC",
+         ORDER BY created_at ASC
+         LIMIT 500000",
     )
     .bind(user_id)
     .fetch_all(pool)
     .await?;
 
+    tracing::info!(section = "messages", rows = messages.len(), "Export section collected");
     zip.start_file("messages.json", options)?;
     serde_json::to_writer_pretty(&mut zip, &messages)?;
+    drop(messages);
 
-    // 3. Guild memberships
+    // 3. Guild memberships (naturally bounded)
     let guilds: Vec<ExportGuildMembership> = sqlx::query_as(
         "SELECT gm.guild_id, g.name as guild_name, gm.joined_at
          FROM guild_members gm
@@ -272,7 +278,7 @@ async fn build_export_archive(pool: &PgPool, user_id: Uuid) -> anyhow::Result<Ve
     zip.start_file("guilds.json", options)?;
     serde_json::to_writer_pretty(&mut zip, &guilds)?;
 
-    // 4. Friends
+    // 4. Friends (naturally bounded)
     let friends: Vec<ExportFriend> = sqlx::query_as(
         "SELECT
             CASE WHEN fr.requester_id = $1 THEN fr.addressee_id ELSE fr.requester_id END as friend_id,
@@ -291,7 +297,7 @@ async fn build_export_archive(pool: &PgPool, user_id: Uuid) -> anyhow::Result<Ve
     zip.start_file("friends.json", options)?;
     serde_json::to_writer_pretty(&mut zip, &friends)?;
 
-    // 5. Preferences
+    // 5. Preferences (single row)
     let prefs: Option<ExportPreferences> =
         sqlx::query_as("SELECT preferences FROM user_preferences WHERE user_id = $1")
             .bind(user_id)
@@ -303,7 +309,7 @@ async fn build_export_archive(pool: &PgPool, user_id: Uuid) -> anyhow::Result<Ve
         serde_json::to_writer_pretty(&mut zip, &p.preferences)?;
     }
 
-    // 6. Direct messages
+    // 6. Direct messages (naturally bounded)
     let direct_messages: Vec<ExportDirectMessage> = sqlx::query_as(
         "SELECT
             dp.channel_id,
@@ -325,7 +331,7 @@ async fn build_export_archive(pool: &PgPool, user_id: Uuid) -> anyhow::Result<Ve
     zip.start_file("direct_messages.json", options)?;
     serde_json::to_writer_pretty(&mut zip, &direct_messages)?;
 
-    // 7. Blocked users
+    // 7. Blocked users (naturally bounded)
     let blocked_users: Vec<ExportBlockedUser> = sqlx::query_as(
         "SELECT
             fr.addressee_id as blocked_user_id,
@@ -343,36 +349,42 @@ async fn build_export_archive(pool: &PgPool, user_id: Uuid) -> anyhow::Result<Ve
     zip.start_file("blocked_users.json", options)?;
     serde_json::to_writer_pretty(&mut zip, &blocked_users)?;
 
-    // 8. Reactions
+    // 8. Reactions — capped at 500K rows
     let reactions: Vec<ExportReaction> = sqlx::query_as(
         "SELECT id, message_id, emoji, created_at
          FROM message_reactions
          WHERE user_id = $1
-         ORDER BY created_at ASC",
+         ORDER BY created_at ASC
+         LIMIT 500000",
     )
     .bind(user_id)
     .fetch_all(pool)
     .await?;
 
+    tracing::info!(section = "reactions", rows = reactions.len(), "Export section collected");
     zip.start_file("reactions.json", options)?;
     serde_json::to_writer_pretty(&mut zip, &reactions)?;
+    drop(reactions);
 
-    // 9. Attachments (metadata only, no S3 keys)
+    // 9. Attachments (metadata only, no S3 keys) — capped at 100K rows
     let attachments: Vec<ExportAttachment> = sqlx::query_as(
         "SELECT fa.id, fa.filename, fa.mime_type, fa.size_bytes, fa.created_at
          FROM file_attachments fa
          JOIN messages m ON m.id = fa.message_id
          WHERE m.user_id = $1
-         ORDER BY fa.created_at ASC",
+         ORDER BY fa.created_at ASC
+         LIMIT 100000",
     )
     .bind(user_id)
     .fetch_all(pool)
     .await?;
 
+    tracing::info!(section = "attachments", rows = attachments.len(), "Export section collected");
     zip.start_file("attachments.json", options)?;
     serde_json::to_writer_pretty(&mut zip, &attachments)?;
+    drop(attachments);
 
-    // 10. Sessions (no token_hash)
+    // 10. Sessions (naturally bounded — no token_hash)
     let sessions: Vec<ExportSession> = sqlx::query_as(
         "SELECT id, host(ip_address) as ip_address, user_agent, created_at, expires_at
          FROM sessions
@@ -386,7 +398,7 @@ async fn build_export_archive(pool: &PgPool, user_id: Uuid) -> anyhow::Result<Ve
     zip.start_file("sessions.json", options)?;
     serde_json::to_writer_pretty(&mut zip, &sessions)?;
 
-    // 11. Devices and key backups (no raw key material)
+    // 11. Devices (naturally bounded — no raw key material)
     let devices: Vec<ExportDevice> = sqlx::query_as(
         "SELECT id, device_name, created_at, last_seen_at, is_verified
          FROM user_devices
@@ -400,7 +412,7 @@ async fn build_export_archive(pool: &PgPool, user_id: Uuid) -> anyhow::Result<Ve
     zip.start_file("devices.json", options)?;
     serde_json::to_writer_pretty(&mut zip, &devices)?;
 
-    // 12. Key backup metadata (no encrypted data)
+    // 12. Key backup metadata (naturally bounded — no encrypted data)
     let key_backups: Vec<ExportKeyBackup> = sqlx::query_as(
         "SELECT version, created_at
          FROM key_backups
@@ -414,20 +426,23 @@ async fn build_export_archive(pool: &PgPool, user_id: Uuid) -> anyhow::Result<Ve
     zip.start_file("key_backups.json", options)?;
     serde_json::to_writer_pretty(&mut zip, &key_backups)?;
 
-    // 13. Audit log
+    // 13. Audit log — capped at 100K rows
     let audit_log: Vec<ExportAuditLogEntry> = sqlx::query_as(
         "SELECT action, target_type, target_id, details,
                 host(ip_address) as ip_address, created_at
          FROM system_audit_log
          WHERE actor_id = $1
-         ORDER BY created_at ASC",
+         ORDER BY created_at ASC
+         LIMIT 100000",
     )
     .bind(user_id)
     .fetch_all(pool)
     .await?;
 
+    tracing::info!(section = "audit_log", rows = audit_log.len(), "Export section collected");
     zip.start_file("audit_log.json", options)?;
     serde_json::to_writer_pretty(&mut zip, &audit_log)?;
+    drop(audit_log);
 
     // Manifest
     let manifest = ExportManifest {
@@ -456,7 +471,9 @@ async fn build_export_archive(pool: &PgPool, user_id: Uuid) -> anyhow::Result<Ve
 
     zip.finish()?;
 
-    Ok(buf)
+    // Read finished archive from temp file for S3 upload
+    let archive_data = std::fs::read(tmp.path())?;
+    Ok(archive_data)
 }
 
 /// Recover stale export jobs stuck in `pending`/`processing` after a server crash.
