@@ -1745,7 +1745,7 @@ async fn get_friends_presence(
     user_id: Uuid,
 ) -> Result<Vec<(Uuid, String)>, sqlx::Error> {
     let rows: Vec<(Uuid, String)> = sqlx::query_as(
-        r#"
+        r"
         SELECT
             CASE
                 WHEN f.requester_id = $1 THEN f.addressee_id
@@ -1759,7 +1759,7 @@ async fn get_friends_presence(
         END
         WHERE (f.requester_id = $1 OR f.addressee_id = $1)
           AND f.status = 'accepted'
-        "#,
+        ",
     )
     .bind(user_id)
     .fetch_all(db)
