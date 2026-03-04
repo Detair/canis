@@ -3,7 +3,7 @@
 use std::net::SocketAddr;
 
 use axum::extract::{ConnectInfo, Multipart, Path, State};
-use axum::http::header::USER_AGENT;
+use axum::http::header::{ORIGIN, USER_AGENT};
 use axum::http::HeaderMap;
 use axum::response::{IntoResponse, Redirect, Response};
 use axum::{Extension, Json};
@@ -40,13 +40,27 @@ use crate::ws::broadcast_user_patch;
 
 /// Extract a refresh token from either the JSON body or `HttpOnly` cookie.
 fn extract_refresh_token(body_token: Option<String>, jar: &CookieJar) -> AuthResult<String> {
-    body_token
-        .or_else(|| {
-            jar.get(cookies::REFRESH_COOKIE_NAME)
-                .map(|c| c.value().to_owned())
-        })
-        .filter(|t| !t.is_empty())
-        .ok_or(AuthError::InvalidToken)
+    if let Some(token) = body_token.filter(|t| !t.is_empty()) {
+        tracing::debug!("Refresh token provided via request body");
+        return Ok(token);
+    }
+
+    if let Some(cookie) = jar.get(cookies::REFRESH_COOKIE_NAME) {
+        let value = cookie.value().to_owned();
+        if value.is_empty() {
+            tracing::warn!("Refresh cookie present but empty");
+        } else {
+            tracing::debug!("Refresh token provided via HttpOnly cookie");
+            return Ok(value);
+        }
+    }
+
+    tracing::debug!("No refresh token found in body or cookie");
+    Err(AuthError::InvalidToken)
+}
+
+fn should_return_refresh_token(headers: &HeaderMap) -> bool {
+    !headers.contains_key(ORIGIN)
 }
 
 // ============================================================================
@@ -107,16 +121,12 @@ pub struct LogoutRequest {
 
 /// Authentication response with tokens.
 ///
-/// The `refresh_token` is always included in the JSON body for Tauri client
-/// compatibility. In browser mode the refresh token is also delivered as an
-/// `HttpOnly` cookie (the secure channel); the JSON copy is transient and
-/// not persisted by the client.
 #[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct AuthResponse {
     /// Access token (short-lived).
     pub access_token: String,
-    /// Refresh token (long-lived).
-    pub refresh_token: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub refresh_token: Option<String>,
     /// Access token expiry in seconds.
     pub expires_in: i64,
     /// Token type (always "Bearer").
@@ -518,6 +528,8 @@ pub async fn register(
         tracing::info!(user_id = %user.id, username = %user.username, "User registered");
     }
 
+    let include_refresh_token = should_return_refresh_token(&headers);
+
     let jar = jar.add(cookies::build_refresh_cookie(
         &tokens.refresh_token,
         state.config.jwt_refresh_expiry,
@@ -528,7 +540,7 @@ pub async fn register(
         jar,
         Json(AuthResponse {
             access_token: tokens.access_token,
-            refresh_token: tokens.refresh_token,
+            refresh_token: include_refresh_token.then_some(tokens.refresh_token),
             expires_in: tokens.access_expires_in,
             token_type: "Bearer".to_string(),
             setup_required: !setup_complete,
@@ -710,6 +722,8 @@ pub async fn login(
     tracing::info!(user_id = %user.id, setup_required = !setup_complete, "User logged in");
     crate::observability::metrics::record_auth_login_attempt(true);
 
+    let include_refresh_token = should_return_refresh_token(&headers);
+
     let jar = jar.add(cookies::build_refresh_cookie(
         &tokens.refresh_token,
         state.config.jwt_refresh_expiry,
@@ -720,7 +734,7 @@ pub async fn login(
         jar,
         Json(AuthResponse {
             access_token: tokens.access_token,
-            refresh_token: tokens.refresh_token,
+            refresh_token: include_refresh_token.then_some(tokens.refresh_token),
             expires_in: tokens.access_expires_in,
             token_type: "Bearer".to_string(),
             setup_required: !setup_complete,
@@ -840,6 +854,8 @@ pub async fn refresh_token(
     tracing::info!(user_id = %user_id, "Token refreshed");
     crate::observability::metrics::record_token_refresh(true);
 
+    let include_refresh_token = should_return_refresh_token(&headers);
+
     let jar = jar.add(cookies::build_refresh_cookie(
         &new_tokens.refresh_token,
         state.config.jwt_refresh_expiry,
@@ -850,7 +866,7 @@ pub async fn refresh_token(
         jar,
         Json(AuthResponse {
             access_token: new_tokens.access_token,
-            refresh_token: new_tokens.refresh_token,
+            refresh_token: include_refresh_token.then_some(new_tokens.refresh_token),
             expires_in: new_tokens.access_expires_in,
             token_type: "Bearer".to_string(),
             setup_required: !setup_complete,
@@ -2039,7 +2055,6 @@ pub async fn oidc_callback(
         let payload = serde_json::json!({
             "type": "oidc-callback",
             "access_token": tokens.access_token,
-            "refresh_token": tokens.refresh_token,
             "expires_in": tokens.access_expires_in,
             "setup_required": !setup_complete,
         });

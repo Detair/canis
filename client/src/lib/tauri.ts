@@ -180,7 +180,7 @@ const isTauri = typeof window !== "undefined" && "__TAURI__" in window;
 // Auth response type from server
 interface AuthResponse {
   access_token: string;
-  refresh_token: string;
+  refresh_token?: string;
   expires_in: number;
   token_type: string;
   setup_required: boolean;
@@ -350,6 +350,28 @@ const browserState = {
   refreshTimer: null as ReturnType<typeof setTimeout> | null,
 };
 
+const SESSION_RESTORE_BLOCK_KEY = "kaiku:skip-session-restore";
+
+function setSessionRestoreBlocked(blocked: boolean) {
+  if (typeof localStorage === "undefined") {
+    return;
+  }
+
+  if (blocked) {
+    localStorage.setItem(SESSION_RESTORE_BLOCK_KEY, "1");
+  } else {
+    localStorage.removeItem(SESSION_RESTORE_BLOCK_KEY);
+  }
+}
+
+function isSessionRestoreBlocked(): boolean {
+  if (typeof localStorage === "undefined") {
+    return false;
+  }
+
+  return localStorage.getItem(SESSION_RESTORE_BLOCK_KEY) === "1";
+}
+
 // Initialize server URL from localStorage (tokens are in-memory only)
 if (typeof localStorage !== "undefined") {
   browserState.serverUrl =
@@ -394,6 +416,7 @@ function scheduleTokenRefresh() {
   browserState.refreshTimer = setTimeout(async () => {
     const success = await refreshAccessToken();
     if (!success) {
+      console.warn("[Auth] Scheduled refresh failed — session expired");
       clearBrowserTokens();
       window.dispatchEvent(new CustomEvent("kaiku:session-expired"));
     }
@@ -417,11 +440,16 @@ export async function refreshAccessToken(): Promise<boolean> {
       method: "POST",
       credentials: "include",
     };
-    if (browserState.refreshToken) {
-      // Tauri / explicit token flow
+    if (isTauri) {
+      const refreshToken = browserState.refreshToken;
+      if (!refreshToken) {
+        clearBrowserTokens();
+        return false;
+      }
+
       fetchOptions.headers = { "Content-Type": "application/json" };
       fetchOptions.body = JSON.stringify({
-        refresh_token: browserState.refreshToken,
+        refresh_token: refreshToken,
       });
     }
 
@@ -457,6 +485,10 @@ export async function refreshAccessToken(): Promise<boolean> {
     // for the refresh token so we don't keep it in JS-accessible memory.
     browserState.accessToken = data.access_token;
     if (isTauri) {
+      if (!data.refresh_token) {
+        clearBrowserTokens();
+        throw new Error("Token refresh returned empty refresh token");
+      }
       browserState.refreshToken = data.refresh_token;
     }
     browserState.tokenExpiresAt = Date.now() + data.expires_in * 1000;
@@ -476,9 +508,11 @@ export async function refreshAccessToken(): Promise<boolean> {
 // On browser load, attempt to restore session from HttpOnly cookie.
 // The cookie is sent automatically; the server returns a fresh access token.
 if (!isTauri && !browserState.accessToken) {
-  refreshAccessToken().catch((error) => {
-    console.warn("[Auth] Session restore failed:", error);
-  });
+  if (!isSessionRestoreBlocked()) {
+    refreshAccessToken().catch((error) => {
+      console.warn("[Auth] Session restore failed:", error);
+    });
+  }
 }
 
 // HTTP helper for browser mode
@@ -600,6 +634,7 @@ export async function login(
   // Browser mode
   browserState.serverUrl = serverUrl;
   localStorage.setItem("serverUrl", serverUrl);
+  setSessionRestoreBlocked(false);
 
   const body: Record<string, unknown> = { username, password };
   if (mfaCode) {
@@ -611,6 +646,9 @@ export async function login(
   // Store access token in memory; browser relies on HttpOnly cookie for refresh
   browserState.accessToken = response.access_token;
   if (isTauri) {
+    if (!response.refresh_token) {
+      throw new Error("Login response missing refresh token");
+    }
     browserState.refreshToken = response.refresh_token;
   }
   browserState.tokenExpiresAt = Date.now() + response.expires_in * 1000;
@@ -720,6 +758,7 @@ export async function register(
   // Browser mode
   browserState.serverUrl = serverUrl;
   localStorage.setItem("serverUrl", serverUrl);
+  setSessionRestoreBlocked(false);
 
   const response = await httpRequest<AuthResponse>("POST", "/auth/register", {
     username,
@@ -731,6 +770,9 @@ export async function register(
   // Store access token in memory; browser relies on HttpOnly cookie for refresh
   browserState.accessToken = response.access_token;
   if (isTauri) {
+    if (!response.refresh_token) {
+      throw new Error("Registration response missing refresh token");
+    }
     browserState.refreshToken = response.refresh_token;
   }
   browserState.tokenExpiresAt = Date.now() + response.expires_in * 1000;
@@ -757,17 +799,44 @@ export async function logout(): Promise<void> {
     return invoke("logout");
   }
 
-  // Browser mode — server clears the HttpOnly cookie via Set-Cookie header.
-  // If this fails the cookie persists (JS cannot clear HttpOnly cookies).
+  let logoutError: unknown = null;
+
   try {
     await httpRequest("POST", "/auth/logout");
-  } catch (e) {
-    console.warn(
-      "[Auth] Server logout failed — HttpOnly cookie may persist until it expires:",
-      e,
-    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error ?? "");
+    const isAuthError =
+      message.includes("401") ||
+      message.includes("403") ||
+      message.includes("Unauthorized") ||
+      message.includes("Forbidden");
+
+    if (isAuthError) {
+      const refreshed = await refreshAccessToken();
+      if (refreshed) {
+        try {
+          await httpRequest("POST", "/auth/logout");
+        } catch (retryError) {
+          logoutError = retryError;
+        }
+      } else {
+        logoutError = error;
+      }
+    } else {
+      logoutError = error;
+    }
   }
+
   clearBrowserTokens();
+  setSessionRestoreBlocked(true);
+
+  if (logoutError) {
+    const message =
+      logoutError instanceof Error
+        ? logoutError.message
+        : String(logoutError ?? "unknown error");
+    throw new Error(`Server logout failed: ${message}`);
+  }
 }
 
 export async function getCurrentUser(): Promise<User | null> {
@@ -4137,7 +4206,7 @@ export async function oidcAuthorize(
 export async function oidcCompleteLogin(
   serverUrl: string,
   accessToken: string,
-  refreshToken: string,
+  refreshToken: string | undefined,
   expiresIn: number,
 ): Promise<void> {
   const baseUrl = serverUrl.replace(/\/+$/, "");
@@ -4146,11 +4215,15 @@ export async function oidcCompleteLogin(
   browserState.serverUrl = baseUrl;
   browserState.accessToken = accessToken;
   if (isTauri) {
+    if (!refreshToken) {
+      throw new Error("OIDC login missing refresh token");
+    }
     browserState.refreshToken = refreshToken;
   }
   browserState.tokenExpiresAt = Date.now() + expiresIn * 1000;
 
   localStorage.setItem("serverUrl", baseUrl);
+  setSessionRestoreBlocked(false);
 
   scheduleTokenRefresh();
 }

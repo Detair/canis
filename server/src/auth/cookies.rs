@@ -13,26 +13,14 @@ use crate::config::Config;
 pub const REFRESH_COOKIE_NAME: &str = "kaiku_refresh";
 
 /// Parse the configured `SameSite` policy string into the enum variant.
+///
+/// Assumes the value has already been validated at startup (`Config::from_env`).
 fn parse_same_site(config: &Config) -> SameSite {
     match config.cookie_same_site.as_str() {
         "strict" => SameSite::Strict,
-        "none" => {
-            if !config.cookie_secure {
-                tracing::warn!(
-                    "COOKIE_SAMESITE=none requires COOKIE_SECURE=true; \
-                     browsers will reject the refresh cookie without the Secure flag"
-                );
-            }
-            SameSite::None
-        }
-        "lax" => SameSite::Lax,
-        other => {
-            tracing::warn!(
-                value = %other,
-                "Unknown COOKIE_SAMESITE value, defaulting to Lax"
-            );
-            SameSite::Lax
-        }
+        "none" => SameSite::None,
+        // "lax" is the validated default
+        _ => SameSite::Lax,
     }
 }
 
