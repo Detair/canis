@@ -133,6 +133,13 @@ h1, h2, h3, .logo-text {
     background-clip: text;
 }
 
+.text-gradient .char {
+    background: inherit;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
 /* Navbar */
 .navbar {
     position: fixed;
@@ -269,6 +276,7 @@ h1, h2, h3, .logo-text {
     line-height: 1.1;
     margin-bottom: 1.5rem;
     font-weight: 900;
+    white-space: nowrap;
 }
 
 .hero-title .char {
@@ -744,6 +752,7 @@ footer {
 
     .hero-title {
         font-size: 3rem;
+        white-space: normal;
     }
 
     .hero-subtitle {
