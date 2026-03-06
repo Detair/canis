@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Release note structure source: `docs/project/RELEASE_NOTES_TEMPLATE.md`
 
 ### Added
+- Session expiry notification — automatic token refresh when returning to background tabs, silent retry on session loss, and non-dismissable modal prompting re-login when session is truly expired (#341)
 - Inline message editing — edit own messages via context menu or hover pencil button with Enter to save, Escape to cancel
 - Emoji picker button in message input — click the smiley icon next to the textarea to browse and insert emojis at cursor position
 - Guild bans — per-guild ban enforcement via `guild_bans` table; banned users are blocked from joining via discovery or invite codes, with support for temporary bans via `expires_at` (#272)
