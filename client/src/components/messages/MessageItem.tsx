@@ -2,6 +2,7 @@ import {
   Component,
   Show,
   createMemo,
+  createEffect,
   For,
   onMount,
   onCleanup,
@@ -335,6 +336,13 @@ const MessageItem: Component<MessageItemProps> = (props) => {
     editTextareaRef.style.height = `${newHeight}px`;
   };
 
+  // Reset editing state if this component unmounts mid-edit (e.g., channel navigation)
+  onCleanup(() => {
+    if (editingMessageId() === props.message.id) {
+      setEditingMessageId(null);
+    }
+  });
+
   const hasReactions = () =>
     props.message.reactions && props.message.reactions.length > 0;
 
@@ -342,15 +350,20 @@ const MessageItem: Component<MessageItemProps> = (props) => {
   onMount(() => ensureReactionShortcutListener());
 
   // Setup spoiler click-to-reveal functionality.
-  // State is persisted in the module-level `revealedSpoilers` set so revealed
-  // spoilers stay revealed when the component remounts (e.g. virtual scroll).
-  onMount(() => {
-    if (contentRef) {
+  // Uses createEffect so listeners are re-attached when the content div
+  // remounts after exiting edit mode (Show unmounts/remounts children).
+  createEffect(() => {
+    // Only attach when NOT editing (content div is mounted)
+    if (isBeingEdited()) return;
+
+    // Wait for next frame so contentRef is populated after Show remount
+    requestAnimationFrame(() => {
+      if (!contentRef) return;
+
       const messageId = props.message.id;
       const spoilerEls = contentRef.querySelectorAll(
         '.spoiler[data-spoiler="true"]',
       );
-      const listeners: Array<{ element: Element; handler: EventListener }> = [];
 
       spoilerEls.forEach((spoiler, index) => {
         // Restore previously revealed state
@@ -363,15 +376,8 @@ const MessageItem: Component<MessageItemProps> = (props) => {
           revealSpoiler(messageId, index);
         };
         spoiler.addEventListener("click", handler);
-        listeners.push({ element: spoiler, handler });
       });
-
-      onCleanup(() => {
-        listeners.forEach(({ element, handler }) => {
-          element.removeEventListener("click", handler);
-        });
-      });
-    }
+    });
   });
 
   const handleAddReaction = async (emoji: string) => {
