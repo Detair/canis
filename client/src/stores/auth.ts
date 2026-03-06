@@ -93,12 +93,14 @@ function registerSessionExpiredListener() {
 
     console.warn("[Kaiku:Auth] Silent retry: failed — showing expiry modal");
 
-    // Clean up connections
+    // Clean up connections and drafts
     try {
       await wsDisconnect();
       await cleanupWebSocket();
       stopIdleDetectionCleanup();
       cleanupPresence();
+      clearAllDrafts();
+      cleanupDrafts();
     } catch (err) {
       console.error("[Auth] Cleanup during session expiry failed:", err);
     }

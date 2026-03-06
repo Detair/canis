@@ -533,9 +533,11 @@ if (!isTauri && typeof document !== "undefined") {
       if (success) {
         console.log("[Kaiku:Auth] Visibility refresh: success");
       }
-      // If refresh fails, refreshAccessToken already handles cleanup
-      // and the kaiku:session-expired event will be dispatched by the
-      // scheduled refresh failure handler.
+      // If refresh fails, refreshAccessToken clears in-memory tokens.
+      // The scheduled refresh timer (if it fires late after being throttled)
+      // will dispatch kaiku:session-expired, which the auth store handles.
+      // This visibility handler is a fallback for when the timer was
+      // throttled in a background tab and hasn't fired yet.
     }
   });
 }
