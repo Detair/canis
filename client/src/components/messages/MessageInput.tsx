@@ -53,6 +53,7 @@ const MessageInput: Component<MessageInputProps> = (props) => {
     const channelId = props.channelId;
     const draft = getDraft(channelId);
     setContent(draft);
+    setShowEmojiPicker(false);
     // Resize after setting content
     setTimeout(() => resizeTextarea(), 0);
   });
