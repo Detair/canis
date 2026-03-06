@@ -40,6 +40,7 @@ import E2EESetupPrompt from "./components/E2EESetupPrompt";
 import { PageFallback, LazyErrorBoundary } from "./components/ui/LazyFallback";
 import SetupWizard from "./components/SetupWizard";
 import OnboardingWizard from "./components/OnboardingWizard";
+import SessionExpiredModal from "./components/auth/SessionExpiredModal";
 import BlockConfirmModal from "./components/modals/BlockConfirmModal";
 import ReportModal from "./components/modals/ReportModal";
 import type { ReportTarget } from "./components/modals/ReportModal";
@@ -88,6 +89,7 @@ const Layout: Component<ParentProps> = (props) => {
     <div class="h-screen bg-background-tertiary text-text-primary">
       {props.children}
       <ToastContainer />
+      <SessionExpiredModal />
       <ContextMenuContainer />
 
       <Show when={blockTarget()}>
