@@ -285,6 +285,7 @@ const MessageItem: Component<MessageItemProps> = (props) => {
   let editTextareaRef: HTMLTextAreaElement | undefined;
 
   const startEdit = () => {
+    if (props.message.encrypted) return;
     setEditContent(props.message.content);
     setEditingMessageId(props.message.id);
   };
@@ -531,13 +532,18 @@ const MessageItem: Component<MessageItemProps> = (props) => {
     }
 
     if (isOwn()) {
+      if (!msg.encrypted) {
+        items.push(
+          { separator: true },
+          {
+            label: "Edit Message",
+            icon: Pencil,
+            action: () => startEdit(),
+          },
+        );
+      }
       items.push(
-        { separator: true },
-        {
-          label: "Edit Message",
-          icon: Pencil,
-          action: () => startEdit(),
-        },
+        ...(!msg.encrypted ? [] : [{ separator: true } as ContextMenuEntry]),
         {
           label: "Delete Message",
           icon: Trash2,
@@ -616,7 +622,7 @@ const MessageItem: Component<MessageItemProps> = (props) => {
         }
         threadsEnabled={props.threadsEnabled}
         isOwn={isOwn()}
-        onEdit={startEdit}
+        onEdit={props.message.encrypted ? undefined : startEdit}
       />
 
       {/* Content column */}
