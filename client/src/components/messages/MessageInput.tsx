@@ -303,6 +303,16 @@ const MessageInput: Component<MessageInputProps> = (props) => {
   const handleSubmit = async (e: Event) => {
     e.preventDefault();
     const text = content().trim();
+
+    // Intercept /? command to open keyboard shortcuts dialog
+    if (text === "/?") {
+      setContent("");
+      if (textareaRef) textareaRef.style.height = "auto";
+      clearDraft(props.channelId);
+      window.dispatchEvent(new CustomEvent("open-shortcuts-dialog"));
+      return;
+    }
+
     const files = pendingFiles();
 
     // Need either text or files to send, and text must be within the limit
