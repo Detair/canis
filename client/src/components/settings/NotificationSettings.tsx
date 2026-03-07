@@ -334,6 +334,7 @@ const NotificationSettings: Component = () => {
               { type: "message_dm", channelId: "test", isDm: true },
               { username: "Kaiku", content: "This is a test notification!", guildName: null, channelName: null },
               preferences().notifications?.show_content ?? true,
+              true,
             );
           }}
           disabled={!(preferences().notifications?.os_enabled ?? true)}

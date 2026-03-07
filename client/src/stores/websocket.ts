@@ -159,9 +159,7 @@ function handleMessageNotification(message: Message): void {
   }
 
   // Build notification context for OS notifications
-  const guild = isDm ? null : guildsState.guilds.find((g) =>
-    g.channels?.some((c: { id: string }) => c.id === message.channel_id)
-  );
+  const guild = isDm ? null : guildsState.guilds.find((g) => g.id === channel?.guild_id);
   const notifCtx: NotificationContext = {
     username: message.author.display_name || message.author.username,
     content: message.encrypted ? null : message.content,
@@ -1974,9 +1972,7 @@ function handleThreadNotification(message: Message): void {
   const isDm = channel?.channel_type === "dm" || channel?.guild_id === null;
 
   // Build notification context for OS notifications
-  const guild = isDm ? null : guildsState.guilds.find((g) =>
-    g.channels?.some((c: { id: string }) => c.id === message.channel_id)
-  );
+  const guild = isDm ? null : guildsState.guilds.find((g) => g.id === channel?.guild_id);
   const notifCtx: NotificationContext = {
     username: message.author.display_name || message.author.username,
     content: message.encrypted ? null : message.content,

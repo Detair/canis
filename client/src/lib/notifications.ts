@@ -172,15 +172,17 @@ export function formatNotificationContent(
 // ============================================================================
 
 /**
- * Send an OS notification. Only sends when the window is not focused.
+ * Send an OS notification. By default, only sends when the window is not focused.
+ * Pass `force: true` to bypass the focus check (e.g. for test notifications).
  */
 export async function sendOsNotification(
   event: SoundEvent,
   ctx: NotificationContext,
   showContent: boolean,
+  force = false,
 ): Promise<void> {
-  // Only notify when window is not focused
-  if (!document.hidden) return;
+  // Only notify when window is not focused (unless forced)
+  if (!force && !document.hidden) return;
 
   // Permission not granted
   if (!permissionGranted) return;
