@@ -331,7 +331,7 @@ const NotificationSettings: Component = () => {
         <button
           onClick={() => {
             sendOsNotification(
-              { type: "message_dm", channelId: "test" },
+              { type: "message_dm", channelId: "test", isDm: true },
               { username: "Kaiku", content: "This is a test notification!", guildName: null, channelName: null },
               preferences().notifications?.show_content ?? true,
             );
