@@ -239,6 +239,9 @@ pub struct UpdatePasswordRequest {
     /// New password (8-128 characters).
     #[validate(length(min = 8, max = 128))]
     pub new_password: String,
+    /// Whether to revoke all other sessions after password change.
+    #[serde(default)]
+    pub revoke_others: bool,
 }
 
 impl std::fmt::Debug for UpdatePasswordRequest {
@@ -246,6 +249,7 @@ impl std::fmt::Debug for UpdatePasswordRequest {
         f.debug_struct("UpdatePasswordRequest")
             .field("current_password", &"[REDACTED]")
             .field("new_password", &"[REDACTED]")
+            .field("revoke_others", &self.revoke_others)
             .finish()
     }
 }
@@ -1443,6 +1447,7 @@ pub async fn update_profile(
 pub async fn update_password(
     State(state): State<AppState>,
     auth_user: AuthUser,
+    jar: CookieJar,
     Json(body): Json<UpdatePasswordRequest>,
 ) -> AuthResult<Json<serde_json::Value>> {
     body.validate()
@@ -1467,7 +1472,7 @@ pub async fn update_password(
 
     let new_hash = hash_password(&body.new_password).map_err(|_| AuthError::PasswordHash)?;
 
-    // Transaction: update password + invalidate all sessions (matches reset_password pattern)
+    // Transaction: update password + optionally revoke other sessions
     let mut tx = state.db.begin().await.map_err(AuthError::Database)?;
 
     sqlx::query("UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2")
@@ -1477,20 +1482,28 @@ pub async fn update_password(
         .await
         .map_err(AuthError::Database)?;
 
-    // Invalidate all sessions — force re-login after password change
-    sqlx::query("DELETE FROM sessions WHERE user_id = $1")
-        .bind(auth_user.id)
-        .execute(&mut *tx)
-        .await
-        .map_err(AuthError::Database)?;
+    let revoked_count = if body.revoke_others {
+        let current_hash = jar
+            .get(cookies::REFRESH_COOKIE_NAME)
+            .map(|c| hash_token(c.value()));
+        sqlx::query("DELETE FROM sessions WHERE user_id = $1 AND token_hash != $2")
+            .bind(auth_user.id)
+            .bind(current_hash.as_deref().unwrap_or(""))
+            .execute(&mut *tx)
+            .await
+            .map_err(AuthError::Database)?
+            .rows_affected()
+    } else {
+        0u64
+    };
 
     tx.commit().await.map_err(AuthError::Database)?;
-    tracing::info!(user_id = %auth_user.id, "Password updated and all sessions invalidated");
+    tracing::info!(user_id = %auth_user.id, revoked_others = body.revoke_others, revoked_count, "Password updated");
 
     Ok(Json(serde_json::json!({
         "success": true,
-        "message": "Password updated successfully. All sessions have been invalidated — please log in again.",
-        "requires_reauth": true
+        "message": "Password updated successfully.",
+        "revoked_count": revoked_count
     })))
 }
 
