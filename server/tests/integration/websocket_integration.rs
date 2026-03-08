@@ -191,6 +191,7 @@ impl PermissionTestContext {
             s3: None,
             sfu,
             rate_limiter: None,
+            screen_share_limiter: None,
             email: None,
             oidc_manager: None,
             http_client: reqwest::Client::new(),

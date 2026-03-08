@@ -328,6 +328,7 @@ pub async fn fresh_test_app_with_s3() -> (TestApp, String) {
         s3: Some(s3),
         sfu,
         rate_limiter: None,
+        screen_share_limiter: None,
         email: None,
         oidc_manager: None,
         http_client: reqwest::Client::new(),
@@ -609,6 +610,21 @@ pub async fn create_channel(pool: &PgPool, guild_id: Uuid, name: &str) -> Uuid {
     .await
     .expect("Failed to create channel");
 
+    channel_id
+}
+
+/// Create a voice channel in a guild and return its ID.
+pub async fn create_voice_channel(pool: &PgPool, guild_id: Uuid, name: &str) -> Uuid {
+    let channel_id = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO channels (id, guild_id, name, channel_type) VALUES ($1, $2, $3, 'voice')",
+    )
+    .bind(channel_id)
+    .bind(guild_id)
+    .bind(name)
+    .execute(pool)
+    .await
+    .expect("Failed to create voice channel");
     channel_id
 }
 
