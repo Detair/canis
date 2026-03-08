@@ -44,6 +44,12 @@ pub struct CreateGuildRequest {
     pub name: String,
     #[validate(length(max = 1000, message = "Description must be at most 1000 characters"))]
     pub description: Option<String>,
+    /// Whether this guild should be listed in public discovery.
+    pub discoverable: Option<bool>,
+    /// Tags for discovery categorization (max 5, each 2-32 chars, alphanumeric + hyphens).
+    pub tags: Option<Vec<String>>,
+    /// Banner image URL for discovery listing (must use HTTPS).
+    pub banner_url: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Validate, utoipa::ToSchema)]
@@ -181,6 +187,8 @@ pub struct GuildSettings {
     pub discoverable: bool,
     pub tags: Vec<String>,
     pub banner_url: Option<String>,
+    /// Whether the current user has dismissed the discovery setup prompt.
+    pub discovery_prompt_dismissed: bool,
 }
 
 /// Request to update guild settings.

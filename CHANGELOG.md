@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Layout areas (ServerRail, Sidebar, Main Stage) now separated by solid border lines for clearer visual structure
 
 ### Added
+- Discovery setup step in guild creation flow — new servers can be made discoverable with tags and banner during creation, with a mini preview card showing how the guild will appear in the server browser
 - Custom status backend support: users can set a text + emoji status with optional expiry via WebSocket. Server enforces validation (128-char text, 10-emoji limit, Unicode safety including Zalgo prevention), broadcasts updates to friends in real time, and runs a 60-second expiry sweep. Custom status is hidden when offline/invisible. Connect flow now sends full presence snapshot (status + activity + custom status) to fix pre-existing gap. (#346)
 - Message formatting toolbar — Bold, Italic, Code, and Spoiler buttons above the message input with keyboard shortcuts (Ctrl+B, Ctrl+I, Ctrl+E) and selection wrapping support
 - Keyboard shortcuts help dialog — press `Ctrl+/`, `?`, or type `/?` in chat to view all shortcuts
@@ -86,6 +87,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - "Mark All as Read" bulk actions — mark all channels in a guild, all DMs, or everything as read at once
 - Per-guild thread toggle — guild managers can enable/disable message threads from Server Settings > General
 - Error toast notifications for user-initiated actions that previously failed silently (friend requests, message send/edit/delete, thread replies, favorites, categories)
+- Channel-scoped search — search within a single channel using scope selector (This Channel / This Server / All) with `Ctrl+F` shortcut to open search scoped to the current channel
+- Scroll-to-message highlighting — clicking a search result scrolls to and briefly highlights the target message with a fade-out animation
 - Relevance-ranked search results using PostgreSQL `ts_rank` with sort toggle (Relevance / Date)
 - Server-side search snippet highlighting using PostgreSQL `ts_headline` with `<mark>` tags
 - Global search across all guilds and DMs (`GET /api/search`, Ctrl+Shift+F shortcut)

@@ -1418,13 +1418,29 @@ export async function getGuild(guildId: string): Promise<Guild> {
 export async function createGuild(
   name: string,
   description?: string,
+  discovery?: {
+    discoverable: boolean;
+    tags?: string[];
+    banner_url?: string;
+  },
 ): Promise<Guild> {
-  if (isTauri) {
-    const { invoke } = await import("@tauri-apps/api/core");
-    return invoke("create_guild", { name, description });
+  const body: Record<string, unknown> = { name, description };
+  if (discovery) {
+    body.discoverable = discovery.discoverable;
+    if (discovery.tags && discovery.tags.length > 0) {
+      body.tags = discovery.tags;
+    }
+    if (discovery.banner_url) {
+      body.banner_url = discovery.banner_url;
+    }
   }
 
-  return httpRequest<Guild>("POST", "/api/guilds", { name, description });
+  if (isTauri) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return invoke("create_guild", body);
+  }
+
+  return httpRequest<Guild>("POST", "/api/guilds", body);
 }
 
 export async function updateGuild(
@@ -1530,6 +1546,15 @@ export async function updateGuildSettings(
   return fetchApi<GuildSettings>(`/api/guilds/${guildId}/settings`, {
     method: "PATCH",
     body: settings,
+  });
+}
+
+/**
+ * Dismiss the discovery setup prompt for the current user in a guild.
+ */
+export async function dismissDiscoveryPrompt(guildId: string): Promise<void> {
+  await fetchApi<void>(`/api/guilds/${guildId}/dismiss-discovery-prompt`, {
+    method: "POST",
   });
 }
 
@@ -1655,6 +1680,7 @@ export async function searchGlobalMessages(
   });
   if (filters?.date_from) params.set("date_from", filters.date_from);
   if (filters?.date_to) params.set("date_to", filters.date_to);
+  if (filters?.channel_id) params.set("channel_id", filters.channel_id);
   if (filters?.author_id) params.set("author_id", filters.author_id);
   if (filters?.has) params.set("has", filters.has);
   if (filters?.sort) params.set("sort", filters.sort);

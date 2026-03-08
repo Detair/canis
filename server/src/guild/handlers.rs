@@ -143,6 +143,41 @@ pub async fn create_guild(
     body.validate()
         .map_err(|e| GuildError::Validation(e.to_string()))?;
 
+    // Validate tags if provided
+    if let Some(ref tags) = body.tags {
+        if tags.len() > 5 {
+            return Err(GuildError::Validation("Maximum 5 tags allowed".to_string()));
+        }
+        for tag in tags {
+            if tag.len() < 2 || tag.len() > 32 {
+                return Err(GuildError::Validation(
+                    "Each tag must be 2-32 characters".to_string(),
+                ));
+            }
+            if !TAG_REGEX.is_match(tag) {
+                return Err(GuildError::Validation(
+                    "Tags may only contain letters, numbers, and hyphens".to_string(),
+                ));
+            }
+        }
+    }
+
+    // Validate banner_url if provided
+    if let Some(ref url) = body.banner_url {
+        if !url.is_empty() {
+            if url.len() > 2048 {
+                return Err(GuildError::Validation(
+                    "Banner URL too long (max 2048 characters)".to_string(),
+                ));
+            }
+            if !url.starts_with("https://") {
+                return Err(GuildError::Validation(
+                    "Banner URL must use HTTPS".to_string(),
+                ));
+            }
+        }
+    }
+
     let mut tx = state.db.begin().await?;
 
     // Serialize guild creation per owner to enforce strict user guild limits.
@@ -163,17 +198,30 @@ pub async fn create_guild(
         )));
     }
 
-    // Insert guild
+    // Prepare discovery fields
+    let discoverable = body.discoverable.unwrap_or(false);
+    let tags: Vec<String> = body
+        .tags
+        .map(|t| t.into_iter().map(|s| s.to_lowercase()).collect())
+        .unwrap_or_default();
+    let banner_url: Option<String> = body
+        .banner_url
+        .and_then(|u| if u.is_empty() { None } else { Some(u) });
+
+    // Insert guild with discovery fields
     let guild_id = Uuid::now_v7();
     let guild = sqlx::query_as::<_, Guild>(
-        r"INSERT INTO guilds (id, name, owner_id, description)
-           VALUES ($1, $2, $3, $4)
+        r"INSERT INTO guilds (id, name, owner_id, description, discoverable, tags, banner_url)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)
            RETURNING id, name, owner_id, icon_url, description, threads_enabled, discoverable, tags, banner_url, plan, created_at",
     )
     .bind(guild_id)
     .bind(&body.name)
     .bind(auth.id)
     .bind(&body.description)
+    .bind(discoverable)
+    .bind(&tags)
+    .bind(&banner_url)
     .fetch_one(&mut *tx)
     .await?;
 
@@ -1110,10 +1158,15 @@ pub async fn get_guild_settings(
         return Err(GuildError::Forbidden);
     }
 
-    let settings: (bool, bool, Vec<String>, Option<String>) = sqlx::query_as(
-        "SELECT threads_enabled, discoverable, tags, banner_url FROM guilds WHERE id = $1",
+    let settings: (bool, bool, Vec<String>, Option<String>, bool) = sqlx::query_as(
+        r"SELECT g.threads_enabled, g.discoverable, g.tags, g.banner_url,
+                 (gm.discovery_prompt_dismissed_at IS NOT NULL) AS dismissed
+          FROM guilds g
+          INNER JOIN guild_members gm ON gm.guild_id = g.id AND gm.user_id = $2
+          WHERE g.id = $1",
     )
     .bind(guild_id)
+    .bind(auth.id)
     .fetch_optional(&state.db)
     .await?
     .ok_or(GuildError::NotFound)?;
@@ -1123,6 +1176,7 @@ pub async fn get_guild_settings(
         discoverable: settings.1,
         tags: settings.2,
         banner_url: settings.3,
+        discovery_prompt_dismissed: settings.4,
     }))
 }
 
@@ -1229,12 +1283,61 @@ pub async fn update_guild_settings(
         .fetch_one(&state.db)
         .await?;
 
+    // Fetch per-member discovery prompt dismissal status
+    let dismissed: (bool,) = sqlx::query_as(
+        "SELECT (discovery_prompt_dismissed_at IS NOT NULL) FROM guild_members WHERE guild_id = $1 AND user_id = $2",
+    )
+    .bind(guild_id)
+    .bind(auth.id)
+    .fetch_one(&state.db)
+    .await?;
+
     Ok(Json(GuildSettings {
         threads_enabled,
         discoverable,
         tags,
         banner_url,
+        discovery_prompt_dismissed: dismissed.0,
     }))
+}
+
+/// Dismiss the discovery setup prompt for the current user in a guild.
+/// POST /api/guilds/{id}/dismiss-discovery-prompt
+#[utoipa::path(
+    post,
+    path = "/api/guilds/{id}/dismiss-discovery-prompt",
+    tag = "guilds",
+    params(("id" = Uuid, Path, description = "Guild ID")),
+    responses(
+        (status = 204, description = "Prompt dismissed successfully"),
+        (status = 403, description = "Not a member of this guild"),
+    ),
+    security(("bearer_auth" = []))
+)]
+#[tracing::instrument(skip(state))]
+pub async fn dismiss_discovery_prompt(
+    State(state): State<AppState>,
+    auth: AuthUser,
+    Path(guild_id): Path<Uuid>,
+) -> Result<StatusCode, GuildError> {
+    // Verify guild membership
+    let is_member = db::is_guild_member(&state.db, guild_id, auth.id).await?;
+    if !is_member {
+        return Err(GuildError::Forbidden);
+    }
+
+    sqlx::query(
+        r"UPDATE guild_members
+          SET discovery_prompt_dismissed_at = NOW()
+          WHERE guild_id = $1 AND user_id = $2
+            AND discovery_prompt_dismissed_at IS NULL",
+    )
+    .bind(guild_id)
+    .bind(auth.id)
+    .execute(&state.db)
+    .await?;
+
+    Ok(StatusCode::NO_CONTENT)
 }
 
 // ============================================================================
