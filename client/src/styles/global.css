@@ -128,3 +128,21 @@ textarea.bg-transparent {
   background-color: inherit;
   color: inherit;
 }
+
+/* Message highlight (search result scroll-to) */
+.message-highlight {
+  animation: highlight-fade 2s ease-out forwards;
+}
+
+@keyframes highlight-fade {
+  0% {
+    background-color: color-mix(
+      in srgb,
+      var(--color-accent-primary) 20%,
+      transparent
+    );
+  }
+  100% {
+    background-color: transparent;
+  }
+}

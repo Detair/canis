@@ -86,6 +86,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - "Mark All as Read" bulk actions — mark all channels in a guild, all DMs, or everything as read at once
 - Per-guild thread toggle — guild managers can enable/disable message threads from Server Settings > General
 - Error toast notifications for user-initiated actions that previously failed silently (friend requests, message send/edit/delete, thread replies, favorites, categories)
+- Channel-scoped search — search within a single channel using scope selector (This Channel / This Server / All) with `Ctrl+F` shortcut to open search scoped to the current channel
+- Scroll-to-message highlighting — clicking a search result scrolls to and briefly highlights the target message with a fade-out animation
 - Relevance-ranked search results using PostgreSQL `ts_rank` with sort toggle (Relevance / Date)
 - Server-side search snippet highlighting using PostgreSQL `ts_headline` with `<mark>` tags
 - Global search across all guilds and DMs (`GET /api/search`, Ctrl+Shift+F shortcut)

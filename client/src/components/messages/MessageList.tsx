@@ -8,6 +8,7 @@ import {
   createSignal,
   onCleanup,
 } from "solid-js";
+import { useSearchParams } from "@solidjs/router";
 import { createVirtualizer } from "@/lib/virtualizer";
 import {
   Loader2,
@@ -45,6 +46,8 @@ const MessageList: Component<MessageListProps> = (props) => {
   /** Synchronous guard against double-firing IntersectionObserver */
   let isLoadingMore = false;
 
+  const [searchParams, setSearchParams] = useSearchParams();
+
   // Track scroll state
   const [isAtBottom, setIsAtBottom] = createSignal(true);
   const [hasNewMessages, setHasNewMessages] = createSignal(false);
@@ -52,6 +55,12 @@ const MessageList: Component<MessageListProps> = (props) => {
   const [paginationError, setPaginationError] = createSignal<string | null>(
     null,
   );
+
+  // --- Highlight support (for search result navigation) ---
+  const [highlightedId, setHighlightedId] = createSignal<string | null>(null);
+  /** Message ID we want to scroll to once messages finish loading */
+  let pendingHighlightId: string | null = null;
+  let highlightTimer: ReturnType<typeof setTimeout> | null = null;
 
   // Use createMemo for proper reactive tracking of store values
   const messages = createMemo(() => {
@@ -137,6 +146,30 @@ const MessageList: Component<MessageListProps> = (props) => {
       setHasNewMessages(false);
       setNewMessageCount(0);
     }
+  };
+
+  // --- Scroll to a specific message and highlight it ---
+  const scrollToMessage = (messageId: string) => {
+    const msgs = messagesWithCompact();
+    const index = msgs.findIndex((m) => m.message.id === messageId);
+
+    if (index !== -1) {
+      // Message found in current buffer — scroll to it
+      virtualizer.scrollToIndex(index, { align: "center", behavior: "smooth" });
+
+      // Apply highlight with fade-out
+      setHighlightedId(messageId);
+      if (highlightTimer) clearTimeout(highlightTimer);
+      highlightTimer = setTimeout(() => {
+        setHighlightedId(null);
+        highlightTimer = null;
+      }, 2000);
+
+      pendingHighlightId = null;
+      return true;
+    }
+
+    return false;
   };
 
   // --- Infinite scroll: load older messages ---
@@ -239,8 +272,30 @@ const MessageList: Component<MessageListProps> = (props) => {
     ),
   );
 
+  // Clean up highlight timer on unmount
+  onCleanup(() => {
+    if (highlightTimer) clearTimeout(highlightTimer);
+  });
+
   // Track message count for auto-scroll / new-message indicator
   let prevMessageCount = 0;
+
+  // --- Watch for ?highlight= search param ---
+  createEffect(() => {
+    const highlightId = searchParams.highlight;
+    if (highlightId && typeof highlightId === "string") {
+      // Store as pending and consume the param
+      pendingHighlightId = highlightId;
+      setSearchParams({ highlight: undefined }, { replace: true });
+
+      // Try to scroll immediately if messages are already loaded
+      const found = scrollToMessage(highlightId);
+      if (!found) {
+        // Messages may not be loaded yet; the pending ID will be
+        // picked up by the message-count tracking effect below.
+      }
+    }
+  });
 
   // --- Load messages when channelId changes ---
   createEffect(
@@ -265,6 +320,16 @@ const MessageList: Component<MessageListProps> = (props) => {
     const currentCount = messages().length;
 
     if (currentCount > prevMessageCount && prevMessageCount > 0) {
+      // Check for pending highlight before auto-scrolling
+      if (pendingHighlightId) {
+        const found = scrollToMessage(pendingHighlightId);
+        if (found) {
+          // Highlight handled; skip normal scroll behavior
+          prevMessageCount = currentCount;
+          return;
+        }
+      }
+
       if (isAtBottom()) {
         setTimeout(() => scrollToBottom(true), 50);
       } else {
@@ -274,8 +339,23 @@ const MessageList: Component<MessageListProps> = (props) => {
         );
       }
     } else if (currentCount > 0 && prevMessageCount === 0) {
-      // Initial load — scroll to bottom instantly
-      setTimeout(() => scrollToBottom(false), 50);
+      // Initial load complete
+      if (pendingHighlightId) {
+        // Try to scroll to the pending highlight message
+        setTimeout(() => {
+          if (pendingHighlightId) {
+            const found = scrollToMessage(pendingHighlightId);
+            if (!found) {
+              // Message not in buffer (too old) — fall back to bottom
+              pendingHighlightId = null;
+              scrollToBottom(false);
+            }
+          }
+        }, 50);
+      } else {
+        // No highlight — scroll to bottom instantly
+        setTimeout(() => scrollToBottom(false), 50);
+      }
     }
 
     prevMessageCount = currentCount;
@@ -380,6 +460,9 @@ const MessageList: Component<MessageListProps> = (props) => {
           <For each={virtualizer.getVirtualItems()}>
             {(virtualItem) => {
               const item = () => messagesWithCompact()[virtualItem.index];
+              const isHighlighted = () =>
+                item()?.message.id != null &&
+                highlightedId() === item()?.message.id;
               return (
                 <div
                   role="listitem"
@@ -388,6 +471,7 @@ const MessageList: Component<MessageListProps> = (props) => {
                     el.setAttribute("data-index", String(virtualItem.index));
                     virtualizer.measureElement(el);
                   }}
+                  class={isHighlighted() ? "message-highlight" : undefined}
                   style={{
                     position: "absolute",
                     top: `${virtualItem.start}px`,
