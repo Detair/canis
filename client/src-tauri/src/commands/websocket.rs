@@ -93,6 +93,20 @@ pub async fn ws_send_activity(
     send_event(&state, ClientEvent::SetActivity { activity }).await
 }
 
+/// Send custom status update to server via WebSocket.
+#[command]
+pub async fn ws_send_custom_status(
+    state: State<'_, AppState>,
+    custom_status: Option<serde_json::Value>,
+) -> Result<(), String> {
+    debug!("Sending custom status update: {:?}", custom_status);
+    send_event(
+        &state,
+        ClientEvent::SetCustomStatus { custom_status },
+    )
+    .await
+}
+
 /// Helper to send an event.
 async fn send_event(state: &State<'_, AppState>, event: ClientEvent) -> Result<(), String> {
     let ws = state.websocket.read().await;

@@ -53,6 +53,9 @@ pub enum ClientEvent {
     SetActivity {
         activity: Option<serde_json::Value>,
     },
+    SetCustomStatus {
+        custom_status: Option<serde_json::Value>,
+    },
 }
 
 /// Server events received from the server.
@@ -130,6 +133,10 @@ pub enum ServerEvent {
     VoiceError {
         code: String,
         message: String,
+    },
+    CustomStatusUpdate {
+        user_id: String,
+        custom_status: Option<serde_json::Value>,
     },
     Error {
         code: String,
@@ -545,6 +552,7 @@ fn handle_server_message(app: &AppHandle, text: &str) {
                 ServerEvent::VoiceUserUnmuted { .. } => "ws:voice_user_unmuted",
                 ServerEvent::VoiceRoomState { .. } => "ws:voice_room_state",
                 ServerEvent::VoiceError { .. } => "ws:voice_error",
+                ServerEvent::CustomStatusUpdate { .. } => "ws:custom_status_update",
                 ServerEvent::Error { .. } => "ws:error",
                 // Call events
                 ServerEvent::IncomingCall { .. } => "ws:incoming_call",

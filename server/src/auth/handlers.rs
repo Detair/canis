@@ -206,8 +206,7 @@ pub struct UpdateProfileRequest {
     /// New email address (optional, set to null to clear).
     #[validate(email)]
     pub email: Option<String>,
-    /// Custom status message (Some(Some("text")) = set, Some(None) = clear, None = no change).
-    /// Not yet wired to database — prepared for future custom status feature.
+    /// Custom status message via REST (unused — custom status is handled via WebSocket).
     #[allow(dead_code)]
     #[serde(default, deserialize_with = "deserialize_double_option")]
     #[allow(clippy::option_option)]
@@ -1132,6 +1131,12 @@ pub async fn update_profile(
     // Validate request
     body.validate()
         .map_err(|e| AuthError::Validation(e.to_string()))?;
+
+    // Validate display_name for unicode safety (control chars, bidi overrides, Zalgo)
+    if let Some(ref display_name) = body.display_name {
+        crate::presence::validate_unicode_text(display_name, 64)
+            .map_err(|e| AuthError::Validation(e.to_string()))?;
+    }
 
     // Check if there's anything to update
     if body.display_name.is_none() && body.email.is_none() && body.status_message.is_none() {

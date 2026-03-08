@@ -371,7 +371,7 @@ async fn test_websocket_subscribe_denied_without_permission() {
     let (tx, mut rx) = mpsc::channel(10);
     let subscribed_channels = Arc::new(tokio::sync::RwLock::new(std::collections::HashSet::new()));
     let admin_subscribed = Arc::new(tokio::sync::RwLock::new(false));
-    let mut activity_state = vc_server::ws::ActivityState::default();
+    let mut msg_state = vc_server::ws::ClientMessageState::default();
 
     let subscribe_event = serde_json::json!({
         "type": "subscribe",
@@ -386,7 +386,7 @@ async fn test_websocket_subscribe_denied_without_permission() {
         &tx,
         &subscribed_channels,
         &admin_subscribed,
-        &mut activity_state,
+        &mut msg_state,
     )
     .await;
 
@@ -427,7 +427,7 @@ async fn test_websocket_subscribe_allowed_with_permission() {
     let (tx, mut rx) = mpsc::channel(10);
     let subscribed_channels = Arc::new(tokio::sync::RwLock::new(std::collections::HashSet::new()));
     let admin_subscribed = Arc::new(tokio::sync::RwLock::new(false));
-    let mut activity_state = vc_server::ws::ActivityState::default();
+    let mut msg_state = vc_server::ws::ClientMessageState::default();
 
     let subscribe_event = serde_json::json!({
         "type": "subscribe",
@@ -441,7 +441,7 @@ async fn test_websocket_subscribe_allowed_with_permission() {
         &tx,
         &subscribed_channels,
         &admin_subscribed,
-        &mut activity_state,
+        &mut msg_state,
     )
     .await;
 
@@ -481,7 +481,7 @@ async fn test_websocket_subscribe_owner_bypass() {
     let (tx, mut rx) = mpsc::channel(10);
     let subscribed_channels = Arc::new(tokio::sync::RwLock::new(std::collections::HashSet::new()));
     let admin_subscribed = Arc::new(tokio::sync::RwLock::new(false));
-    let mut activity_state = vc_server::ws::ActivityState::default();
+    let mut msg_state = vc_server::ws::ClientMessageState::default();
 
     let subscribe_event = serde_json::json!({
         "type": "subscribe",
@@ -495,7 +495,7 @@ async fn test_websocket_subscribe_owner_bypass() {
         &tx,
         &subscribed_channels,
         &admin_subscribed,
-        &mut activity_state,
+        &mut msg_state,
     )
     .await;
 
