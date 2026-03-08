@@ -24,6 +24,7 @@ use crate::{db, permissions};
 #[derive(Debug)]
 pub enum GlobalSearchError {
     InvalidQuery(String),
+    Forbidden,
     Database(sqlx::Error),
 }
 
@@ -33,6 +34,10 @@ impl IntoResponse for GlobalSearchError {
             Self::InvalidQuery(msg) => (
                 StatusCode::BAD_REQUEST,
                 serde_json::json!({"error": "INVALID_QUERY", "message": msg}),
+            ),
+            Self::Forbidden => (
+                StatusCode::FORBIDDEN,
+                serde_json::json!({"error": "FORBIDDEN", "message": "You do not have access to this channel"}),
             ),
             Self::Database(_) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
@@ -64,6 +69,8 @@ pub struct GlobalSearchQuery {
     pub date_from: Option<DateTime<Utc>>,
     pub date_to: Option<DateTime<Utc>>,
     pub author_id: Option<Uuid>,
+    /// Filter results to a specific channel
+    pub channel_id: Option<Uuid>,
     pub has: Option<String>,
     pub sort: Option<String>,
 }
@@ -248,6 +255,14 @@ pub async fn search_all(
     let dm_channels = dm::list_user_dms(&state.db, auth.id).await?;
     let dm_channel_ids: Vec<Uuid> = dm_channels.iter().map(|c| c.id).collect();
     all_channel_ids.extend(&dm_channel_ids);
+
+    // 3b. Apply channel_id filter if provided
+    if let Some(channel_id) = query.channel_id {
+        if !all_channel_ids.contains(&channel_id) {
+            return Err(GlobalSearchError::Forbidden);
+        }
+        all_channel_ids = vec![channel_id];
+    }
 
     // If no channels at all, return empty
     if all_channel_ids.is_empty() {
