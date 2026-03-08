@@ -1655,6 +1655,7 @@ export async function searchGlobalMessages(
   });
   if (filters?.date_from) params.set("date_from", filters.date_from);
   if (filters?.date_to) params.set("date_to", filters.date_to);
+  if (filters?.channel_id) params.set("channel_id", filters.channel_id);
   if (filters?.author_id) params.set("author_id", filters.author_id);
   if (filters?.has) params.set("has", filters.has);
   if (filters?.sort) params.set("sort", filters.sort);

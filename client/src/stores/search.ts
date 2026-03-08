@@ -189,11 +189,18 @@ export async function searchDMs(
 
 /**
  * Search messages across all guilds and DMs.
+ * Optionally scope to a single channel via channelId.
  */
 export async function searchGlobal(
   query: string,
   filters: SearchFilters = {},
+  channelId?: string,
 ): Promise<void> {
+  // Merge channelId into filters if provided
+  const effectiveFilters: SearchFilters = channelId
+    ? { ...filters, channel_id: channelId }
+    : filters;
+
   // Skip if query is too short
   if (query.trim().length < 2) {
     setSearchState({
@@ -205,7 +212,7 @@ export async function searchGlobal(
       isSearching: false,
       guildId: null,
       context: "global",
-      filters,
+      filters: effectiveFilters,
     });
     return;
   }
@@ -217,7 +224,7 @@ export async function searchGlobal(
     guildId: null,
     context: "global",
     offset: 0,
-    filters,
+    filters: effectiveFilters,
   });
 
   try {
@@ -225,7 +232,7 @@ export async function searchGlobal(
       query.trim(),
       searchState.limit,
       0,
-      filters,
+      effectiveFilters,
     );
 
     setSearchState({
