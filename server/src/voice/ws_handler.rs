@@ -4,7 +4,6 @@
 
 use std::sync::Arc;
 
-use fred::clients::Client;
 use sqlx::{PgPool, Row};
 use tokio::sync::mpsc;
 use tracing::{debug, error, info, warn};
@@ -15,8 +14,7 @@ use webrtc::rtp_transceiver::rtp_codec::RTPCodecType;
 use super::error::VoiceError;
 use super::metrics::{finalize_session, get_guild_id, store_metrics};
 use super::screen_share::{
-    stop_screen_share, try_start_screen_share, validate_source_label, ScreenShareError,
-    ScreenShareInfo,
+    validate_source_label, ScreenShareError, ScreenShareInfo, ScreenShareLimiter,
 };
 use super::sfu::SfuServer;
 use super::stats::VoiceStats;
@@ -29,10 +27,10 @@ use crate::ws::{ClientEvent, ServerEvent, VoiceParticipant};
 pub async fn handle_voice_event(
     sfu: &Arc<SfuServer>,
     pool: &PgPool,
-    redis: &Client,
     user_id: Uuid,
     event: ClientEvent,
     tx: &mpsc::Sender<ServerEvent>,
+    screen_share_limiter: Option<&ScreenShareLimiter>,
 ) -> Result<(), VoiceError> {
     match event {
         ClientEvent::VoiceJoin { channel_id } => {
@@ -41,7 +39,7 @@ pub async fn handle_voice_event(
             result
         }
         ClientEvent::VoiceLeave { channel_id } => {
-            handle_leave(sfu, pool, redis, user_id, channel_id).await
+            handle_leave(sfu, pool, user_id, channel_id, screen_share_limiter).await
         }
         ClientEvent::VoiceAnswer { channel_id, sdp } => {
             handle_answer(sfu, user_id, channel_id, &sdp).await
@@ -82,7 +80,6 @@ pub async fn handle_voice_event(
             handle_screen_share_start(
                 sfu,
                 pool,
-                redis,
                 HandleScreenShareStartParams {
                     user_id,
                     channel_id,
@@ -90,11 +87,12 @@ pub async fn handle_voice_event(
                     has_audio,
                     source_label: &source_label,
                 },
+                screen_share_limiter,
             )
             .await
         }
         ClientEvent::VoiceScreenShareStop { channel_id } => {
-            handle_screen_share_stop(sfu, redis, user_id, channel_id).await
+            handle_screen_share_stop(sfu, user_id, channel_id, screen_share_limiter).await
         }
         ClientEvent::VoiceWebcamStart {
             channel_id,
@@ -251,9 +249,9 @@ async fn handle_join(
 async fn handle_leave(
     sfu: &Arc<SfuServer>,
     pool: &PgPool,
-    redis: &Client,
     user_id: Uuid,
     channel_id: Uuid,
+    screen_share_limiter: Option<&ScreenShareLimiter>,
 ) -> Result<(), VoiceError> {
     info!(user_id = %user_id, channel_id = %channel_id, "User leaving voice channel");
 
@@ -269,7 +267,9 @@ async fn handle_leave(
 
     // Check if sharing screen and stop it
     if room.remove_screen_share(user_id).await.is_some() {
-        stop_screen_share(redis, channel_id).await;
+        if let Some(limiter) = screen_share_limiter {
+            limiter.stop(channel_id).await;
+        }
 
         room.broadcast_except(
             user_id,
@@ -539,9 +539,6 @@ async fn handle_voice_stats(
     Ok(())
 }
 
-/// Default max screen shares per channel.
-const DEFAULT_MAX_SCREEN_SHARES: u32 = 2;
-
 /// Parameters for starting a screen share.
 struct HandleScreenShareStartParams<'a> {
     user_id: Uuid,
@@ -555,8 +552,8 @@ struct HandleScreenShareStartParams<'a> {
 async fn handle_screen_share_start(
     sfu: &Arc<SfuServer>,
     pool: &PgPool,
-    redis: &Client,
     params: HandleScreenShareStartParams<'_>,
+    screen_share_limiter: Option<&ScreenShareLimiter>,
 ) -> Result<(), VoiceError> {
     info!(user_id = %params.user_id, channel_id = %params.channel_id, quality = ?params.quality, "User starting screen share");
 
@@ -595,17 +592,27 @@ async fn handle_screen_share_start(
         }
     }
 
-    // Try to reserve a slot (Redis limit check)
-    // TODO: Get max_screen_shares from channel settings
-    let max_shares = DEFAULT_MAX_SCREEN_SHARES;
+    // Fetch max_screen_shares from channel settings
+    let max_screen_shares: i32 =
+        sqlx::query_scalar("SELECT max_screen_shares FROM channels WHERE id = $1")
+            .bind(params.channel_id)
+            .fetch_optional(pool)
+            .await
+            .ok()
+            .flatten()
+            .unwrap_or(1);
+    let max_shares: u32 = max_screen_shares.try_into().unwrap_or(1);
 
-    if let Err(e) = try_start_screen_share(redis, params.channel_id, max_shares).await {
-        warn!(user_id = %params.user_id, channel_id = %params.channel_id, error = ?e, "Screen share limit check failed");
-        return Err(VoiceError::Signaling(match e {
-            ScreenShareError::LimitReached => "Screen share limit reached".to_string(),
-            ScreenShareError::InternalError => "Internal error".to_string(),
-            _ => format!("{e:?}"),
-        }));
+    // Try to reserve a slot via limiter
+    if let Some(limiter) = screen_share_limiter {
+        if let Err(e) = limiter.start(params.channel_id, max_shares).await {
+            warn!(user_id = %params.user_id, channel_id = %params.channel_id, error = ?e, "Screen share limit check failed");
+            return Err(VoiceError::Signaling(match e {
+                ScreenShareError::LimitReached => "Screen share limit reached".to_string(),
+                ScreenShareError::InternalError => "Internal error".to_string(),
+                _ => format!("{e:?}"),
+            }));
+        }
     }
 
     // Queue pending track sources so setup_track_handler can identify them
@@ -668,9 +675,9 @@ async fn handle_screen_share_start(
 /// Handle stopping a screen share.
 async fn handle_screen_share_stop(
     sfu: &Arc<SfuServer>,
-    redis: &Client,
     user_id: Uuid,
     channel_id: Uuid,
+    screen_share_limiter: Option<&ScreenShareLimiter>,
 ) -> Result<(), VoiceError> {
     info!(user_id = %user_id, channel_id = %channel_id, "User stopping screen share");
 
@@ -690,7 +697,9 @@ async fn handle_screen_share_stop(
     };
 
     // Decrement Redis counter
-    stop_screen_share(redis, channel_id).await;
+    if let Some(limiter) = screen_share_limiter {
+        limiter.stop(channel_id).await;
+    }
 
     // Clean up screen share tracks from the track router
     room.track_router

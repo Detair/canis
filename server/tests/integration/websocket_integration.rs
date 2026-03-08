@@ -31,6 +31,7 @@ async fn test_websocket_broadcast_flow() {
         s3: None,
         sfu,
         rate_limiter: None,
+        screen_share_limiter: None,
         email: None,
         oidc_manager: None,
         http_client: reqwest::Client::new(),

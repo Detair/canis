@@ -1476,10 +1476,10 @@ pub async fn handle_client_message(
             if let Err(e) = crate::voice::ws_handler::handle_voice_event(
                 &state.sfu,
                 &state.db,
-                &state.redis,
                 user_id,
                 event,
                 tx,
+                state.screen_share_limiter.as_ref(),
             )
             .await
             {

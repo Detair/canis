@@ -117,6 +117,26 @@ async fn main() -> Result<()> {
         }
     };
 
+    // Initialize screen share limiter
+    let screen_share_limiter = {
+        use vc_server::voice::ScreenShareLimiter;
+
+        let mut limiter = ScreenShareLimiter::new(redis.clone());
+        match limiter.init().await {
+            Ok(()) => {
+                info!("Screen share limiter initialized");
+                Some(limiter)
+            }
+            Err(e) => {
+                tracing::warn!(
+                    "Screen share limiter initialization failed: {}. Screen share limits disabled.",
+                    e
+                );
+                None
+            }
+        }
+    };
+
     // Initialize SFU server for voice
     // Pass config and rate limiter
     let sfu = voice::SfuServer::new(std::sync::Arc::new(config.clone()), rate_limiter.clone())?;
@@ -337,6 +357,7 @@ async fn main() -> Result<()> {
         s3,
         sfu,
         rate_limiter,
+        screen_share_limiter,
         email: email_service,
         oidc_manager,
         http_client: reqwest::Client::builder()
