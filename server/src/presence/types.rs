@@ -140,6 +140,10 @@ impl Activity {
             return Err("Activity name cannot be empty");
         }
         validate_unicode_text(&self.name, MAX_ACTIVITY_NAME_LEN)?;
+        // Activity names are single-line display values — reject newlines.
+        if self.name.contains('\n') {
+            return Err("Activity name must not contain newlines");
+        }
         if let Some(ref details) = self.details {
             validate_unicode_text(details, MAX_ACTIVITY_DETAILS_LEN)?;
         }
@@ -265,6 +269,28 @@ mod tests {
             details: Some("x".repeat(MAX_ACTIVITY_DETAILS_LEN + 1)),
         };
         assert!(activity.validate().is_err());
+    }
+
+    #[test]
+    fn test_activity_validation_name_rejects_newlines() {
+        let activity = Activity {
+            activity_type: ActivityType::Game,
+            name: "Game\nTitle".to_string(),
+            started_at: Utc::now(),
+            details: None,
+        };
+        assert!(activity.validate().is_err());
+    }
+
+    #[test]
+    fn test_activity_validation_details_allows_newlines() {
+        let activity = Activity {
+            activity_type: ActivityType::Game,
+            name: "Minecraft".to_string(),
+            started_at: Utc::now(),
+            details: Some("Line1\nLine2".to_string()),
+        };
+        assert!(activity.validate().is_ok());
     }
 
     #[test]

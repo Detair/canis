@@ -58,6 +58,8 @@ pub struct ActivityState {
 }
 
 /// State for custom status rate limiting and deduplication.
+///
+/// **Internal:** Exposed for integration tests only.
 #[derive(Default)]
 pub struct CustomStatusState {
     /// Last custom status update timestamp.
@@ -66,6 +68,17 @@ pub struct CustomStatusState {
     /// `None` = never sent, `Some(None)` = cleared, `Some(Some(..))` = active status.
     #[allow(clippy::option_option)]
     last_custom_status: Option<Option<crate::presence::CustomStatus>>,
+}
+
+/// Bundled per-connection mutable state for client message handling.
+///
+/// **Internal:** Exposed for integration tests only.
+#[derive(Default)]
+pub struct ClientMessageState {
+    /// Activity rate limiting and deduplication state.
+    pub activity: ActivityState,
+    /// Custom status rate limiting and deduplication state.
+    pub custom_status: CustomStatusState,
 }
 
 /// WebSocket protocol header name for authentication.
@@ -1280,9 +1293,8 @@ async fn handle_socket(socket: WebSocket, state: AppState, user_id: Uuid) {
         }
     });
 
-    // Activity rate limiting state
-    let mut activity_state = ActivityState::default();
-    let mut custom_status_state = CustomStatusState::default();
+    // Per-connection mutable state for rate limiting and deduplication
+    let mut msg_state = ClientMessageState::default();
 
     // Handle incoming messages
     while let Some(msg) = ws_receiver.next().await {
@@ -1295,8 +1307,7 @@ async fn handle_socket(socket: WebSocket, state: AppState, user_id: Uuid) {
                     &tx,
                     &subscribed_channels,
                     &admin_subscribed,
-                    &mut activity_state,
-                    &mut custom_status_state,
+                    &mut msg_state,
                 )
                 .await
                 {
@@ -1341,9 +1352,9 @@ async fn handle_socket(socket: WebSocket, state: AppState, user_id: Uuid) {
 /// Handle a client message.
 ///
 /// **Internal:** Exposed for integration tests only.
-#[allow(clippy::implicit_hasher, clippy::too_many_arguments)]
+#[allow(clippy::implicit_hasher)]
 #[tracing::instrument(
-    skip(state, tx, subscribed_channels, admin_subscribed, activity_state, custom_status_state, text),
+    skip(state, tx, subscribed_channels, admin_subscribed, msg_state, text),
     fields(user_id = %user_id)
 )]
 pub async fn handle_client_message(
@@ -1353,8 +1364,7 @@ pub async fn handle_client_message(
     tx: &mpsc::Sender<ServerEvent>,
     subscribed_channels: &Arc<tokio::sync::RwLock<HashSet<Uuid>>>,
     admin_subscribed: &Arc<tokio::sync::RwLock<bool>>,
-    activity_state: &mut ActivityState,
-    custom_status_state: &mut CustomStatusState,
+    msg_state: &mut ClientMessageState,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let event: ClientEvent = serde_json::from_str(text)?;
     crate::observability::metrics::record_ws_message(event.variant_name());
@@ -1491,7 +1501,7 @@ pub async fn handle_client_message(
 
             // Rate limiting: enforce minimum interval between updates
             let now = Instant::now();
-            if let Some(last_update) = activity_state.last_update {
+            if let Some(last_update) = msg_state.activity.last_update {
                 let elapsed = now.duration_since(last_update);
                 if elapsed < ACTIVITY_UPDATE_INTERVAL {
                     let remaining = ACTIVITY_UPDATE_INTERVAL.saturating_sub(elapsed);
@@ -1504,7 +1514,7 @@ pub async fn handle_client_message(
             }
 
             // Deduplication: skip update if activity is unchanged
-            if activity == activity_state.last_activity {
+            if activity == msg_state.activity.last_activity {
                 debug!("Skipping activity update: unchanged for user={}", user_id);
                 return Ok(());
             }
@@ -1518,8 +1528,8 @@ pub async fn handle_client_message(
                 .map_err(|e| format!("Failed to update activity: {e}"))?;
 
             // Update state for rate limiting and deduplication
-            activity_state.last_update = Some(now);
-            activity.clone_into(&mut activity_state.last_activity);
+            msg_state.activity.last_update = Some(now);
+            activity.clone_into(&mut msg_state.activity.last_activity);
 
             // Broadcast to user's presence subscribers
             let event = ServerEvent::RichPresenceUpdate { user_id, activity };
@@ -1562,7 +1572,7 @@ pub async fn handle_client_message(
 
             // Rate limiting
             let now = Instant::now();
-            if let Some(last_update) = custom_status_state.last_update {
+            if let Some(last_update) = msg_state.custom_status.last_update {
                 let elapsed = now.duration_since(last_update);
                 if elapsed < ACTIVITY_UPDATE_INTERVAL {
                     let remaining = ACTIVITY_UPDATE_INTERVAL.saturating_sub(elapsed);
@@ -1575,7 +1585,7 @@ pub async fn handle_client_message(
             }
 
             // Deduplication
-            if custom_status_state.last_custom_status.as_ref() == Some(&custom_status) {
+            if msg_state.custom_status.last_custom_status.as_ref() == Some(&custom_status) {
                 debug!(
                     "Skipping custom status update: unchanged for user={}",
                     user_id
@@ -1595,8 +1605,8 @@ pub async fn handle_client_message(
                 .map_err(|e| format!("Failed to update custom status: {e}"))?;
 
             // Update rate limiting state
-            custom_status_state.last_update = Some(now);
-            custom_status_state.last_custom_status = Some(custom_status.clone());
+            msg_state.custom_status.last_update = Some(now);
+            msg_state.custom_status.last_custom_status = Some(custom_status.clone());
 
             // Broadcast to presence subscribers
             let event = ServerEvent::CustomStatusUpdate {

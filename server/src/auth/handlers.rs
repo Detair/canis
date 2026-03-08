@@ -206,8 +206,7 @@ pub struct UpdateProfileRequest {
     /// New email address (optional, set to null to clear).
     #[validate(email)]
     pub email: Option<String>,
-    /// Custom status message (Some(Some("text")) = set, Some(None) = clear, None = no change).
-    /// Not yet wired to database — prepared for future custom status feature.
+    /// Custom status message via REST (unused — custom status is handled via WebSocket).
     #[allow(dead_code)]
     #[serde(default, deserialize_with = "deserialize_double_option")]
     #[allow(clippy::option_option)]
