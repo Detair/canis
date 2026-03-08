@@ -64,7 +64,7 @@ const Main: Component = () => {
     // Ctrl+F → channel-scoped search (must be checked after Ctrl+Shift+F)
     if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === "f") {
       e.preventDefault();
-      setChannelSearchScope(true);
+      setChannelSearchScope(!!channel());
       setShowGlobalSearch(true);
       return;
     }
