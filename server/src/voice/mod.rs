@@ -32,7 +32,8 @@ use axum::Router;
 pub use error::VoiceError;
 pub use quality::Quality;
 pub use screen_share::{
-    ScreenShareCheckResponse, ScreenShareError, ScreenShareInfo, ScreenShareStartRequest,
+    ScreenShareCheckResponse, ScreenShareError, ScreenShareInfo, ScreenShareLimiter,
+    ScreenShareStartRequest,
 };
 pub use sfu::{ParticipantInfo, Room, SfuServer};
 pub use stats::{UserStats, VoiceStats};

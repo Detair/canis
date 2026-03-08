@@ -1,7 +1,11 @@
 //! Screen sharing data types and state.
 
-use fred::prelude::*;
+use std::sync::Arc;
+
+use fred::clients::Client;
+use fred::interfaces::LuaInterface;
 use serde::{Deserialize, Serialize};
+use tokio::sync::RwLock;
 use tracing::{error, warn};
 use uuid::Uuid;
 
@@ -128,123 +132,138 @@ impl ScreenShareCheckResponse {
     }
 }
 
-/// Check if screen share limit is reached for a channel (without incrementing).
-pub async fn check_limit(
-    redis: &Client,
-    channel_id: Uuid,
-    max_shares: u32,
-) -> Result<(), ScreenShareError> {
-    let key = format!("screenshare:limit:{channel_id}");
+/// Embedded Lua script for atomic screen share limit management.
+const SCREEN_SHARE_LIMIT_SCRIPT: &str = include_str!("screen_share_limit.lua");
 
-    // Get current count
-    match redis.get::<Option<u32>, _>(&key).await {
-        Ok(Some(count)) => {
-            if count >= max_shares {
-                return Err(ScreenShareError::LimitReached);
-            }
-        }
-        Ok(None) => {
-            // No active shares, so limit not reached (unless max_shares is 0)
-            if max_shares == 0 {
-                return Err(ScreenShareError::LimitReached);
-            }
-        }
-        Err(e) => {
-            error!(channel_id = %channel_id, error = %e, "Redis GET failed in check_limit");
-            return Err(ScreenShareError::InternalError);
-        }
-    }
-
-    Ok(())
+/// Atomic screen share limit manager backed by a Redis Lua script.
+///
+/// Provides `check()`, `start()`, and `stop()` operations that are each
+/// executed as a single atomic Redis command (via EVALSHA).
+#[derive(Clone)]
+pub struct ScreenShareLimiter {
+    redis: Client,
+    script_sha: Arc<RwLock<String>>,
 }
 
-/// Try to start screen sharing using atomic Redis WATCH/MULTI/EXEC.
-/// Uses optimistic locking to prevent race conditions.
-pub async fn try_start_screen_share(
-    redis: &Client,
-    channel_id: Uuid,
-    max_shares: u32,
-) -> Result<(), ScreenShareError> {
-    let key = format!("screenshare:limit:{channel_id}");
+impl ScreenShareLimiter {
+    /// Create a new limiter. Call [`init`] before use to load the script.
+    pub fn new(redis: Client) -> Self {
+        Self {
+            redis,
+            script_sha: Arc::new(RwLock::new(String::new())),
+        }
+    }
 
-    // Get current count first
-    let current: i64 = match redis.get(&key).await {
-        Ok(val) => val,
-        Err(e) => {
-            error!(
-                %channel_id,
-                error = %e,
-                "Redis GET failed for screen share count, denying request"
-            );
+    /// Load the Lua script into Redis. Must be called at startup.
+    pub async fn init(&mut self) -> Result<(), fred::error::Error> {
+        let sha: String = self.redis.script_load(SCREEN_SHARE_LIMIT_SCRIPT).await?;
+        tracing::info!(sha = %sha, "Screen share limit script loaded");
+        *self.script_sha.write().await = sha;
+        Ok(())
+    }
+
+    /// Reload script on NOSCRIPT error.
+    async fn reload_script(&self) -> Result<String, fred::error::Error> {
+        let sha: String = self.redis.script_load(SCREEN_SHARE_LIMIT_SCRIPT).await?;
+        *self.script_sha.write().await = sha.clone();
+        Ok(sha)
+    }
+
+    /// Run the Lua script with retry on NOSCRIPT.
+    async fn run_script(
+        &self,
+        channel_id: Uuid,
+        max_shares: u32,
+        op: &str,
+    ) -> Result<(bool, i64), ScreenShareError> {
+        let key = format!("screenshare:limit:{channel_id}");
+        let sha = self.script_sha.read().await.clone();
+        let args: Vec<String> = vec![max_shares.to_string(), op.to_string()];
+
+        match self
+            .redis
+            .evalsha::<Vec<i64>, _, _, _>(&sha, vec![key.as_str()], args.clone())
+            .await
+        {
+            Ok(result) => Self::parse_result(&result),
+            Err(e) if e.to_string().contains("NOSCRIPT") => {
+                warn!(
+                    channel_id = %channel_id,
+                    "NOSCRIPT error, reloading screen share limit script"
+                );
+                let new_sha = self.reload_script().await.map_err(|e| {
+                    error!(error = %e, "Failed to reload screen share limit script");
+                    ScreenShareError::InternalError
+                })?;
+                let result = self
+                    .redis
+                    .evalsha::<Vec<i64>, _, _, _>(&new_sha, vec![key.as_str()], args)
+                    .await
+                    .map_err(|e| {
+                        error!(
+                            channel_id = %channel_id,
+                            error = %e,
+                            "EVALSHA failed after reload"
+                        );
+                        ScreenShareError::InternalError
+                    })?;
+                Self::parse_result(&result)
+            }
+            Err(e) => {
+                error!(
+                    channel_id = %channel_id,
+                    error = %e,
+                    "Redis EVALSHA failed"
+                );
+                Err(ScreenShareError::InternalError)
+            }
+        }
+    }
+
+    fn parse_result(result: &[i64]) -> Result<(bool, i64), ScreenShareError> {
+        if result.len() < 2 {
+            error!("Unexpected Lua script result length: {}", result.len());
             return Err(ScreenShareError::InternalError);
         }
-    };
-
-    // Check if we would exceed limit
-    if current >= i64::from(max_shares) {
-        return Err(ScreenShareError::LimitReached);
+        Ok((result[0] == 1, result[1]))
     }
 
-    // Increment atomically
-    let new_count: i64 = redis.incr(&key).await.map_err(|e| {
-        error!(
-            channel_id = %channel_id,
-            error = %e,
-            "Redis INCR failed in try_start_screen_share"
-        );
-        ScreenShareError::InternalError
-    })?;
-
-    // Double-check after increment (handles race condition)
-    if new_count > i64::from(max_shares) {
-        // We exceeded the limit, decrement back
-        if let Err(e) = redis.decr::<i64, _>(&key).await {
-            warn!(
-                channel_id = %channel_id,
-                error = %e,
-                "Redis DECR failed after limit exceeded - counter may be desynchronized"
-            );
+    /// Check if a screen share slot is available (does not reserve it).
+    pub async fn check(
+        &self,
+        channel_id: Uuid,
+        max_shares: u32,
+    ) -> Result<(), ScreenShareError> {
+        let (allowed, _) = self.run_script(channel_id, max_shares, "check").await?;
+        if allowed {
+            Ok(())
+        } else {
+            Err(ScreenShareError::LimitReached)
         }
-        return Err(ScreenShareError::LimitReached);
     }
 
-    // Set expiration (5 minutes to allow recovery from crashes)
-    if let Err(e) = redis.expire::<(), _>(&key, 300, None).await {
-        warn!(
-            channel_id = %channel_id,
-            error = %e,
-            "Redis EXPIRE failed - stale keys may accumulate"
-        );
-    }
-
-    Ok(())
-}
-
-/// Stop screen sharing, decrementing the limit counter.
-/// Logs errors but continues, as cleanup must complete.
-pub async fn stop_screen_share(redis: &Client, channel_id: Uuid) {
-    let key = format!("screenshare:limit:{channel_id}");
-
-    // Get current count to prevent going negative
-    let current: i64 = match redis.get(&key).await {
-        Ok(val) => val,
-        Err(e) => {
-            warn!(
-                channel_id = %channel_id,
-                error = %e,
-                "Redis GET failed in stop_screen_share - skipping decrement"
-            );
-            return;
+    /// Atomically reserve a screen share slot. Returns error if limit reached.
+    pub async fn start(
+        &self,
+        channel_id: Uuid,
+        max_shares: u32,
+    ) -> Result<(), ScreenShareError> {
+        let (allowed, _) = self.run_script(channel_id, max_shares, "start").await?;
+        if allowed {
+            Ok(())
+        } else {
+            Err(ScreenShareError::LimitReached)
         }
-    };
+    }
 
-    // Only decrement if count is positive
-    if current > 0 {
-        if let Err(e) = redis.decr::<i64, _>(&key).await {
+    /// Release a screen share slot (decrements if count > 0).
+    pub async fn stop(&self, channel_id: Uuid) {
+        // max_shares arg is unused by "stop" op, pass 0
+        if let Err(e) = self.run_script(channel_id, 0, "stop").await {
             warn!(
                 channel_id = %channel_id,
-                error = %e,
-                "Redis DECR failed in stop_screen_share - counter may be desynchronized"
+                error = ?e,
+                "Failed to decrement screen share counter"
             );
         }
     }
