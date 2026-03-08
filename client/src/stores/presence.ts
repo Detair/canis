@@ -423,11 +423,8 @@ export async function setMyCustomStatus(
     // Send via WebSocket
     if (isTauri) {
       const { invoke } = await import("@tauri-apps/api/core");
-      await invoke("ws_send", {
-        message: JSON.stringify({
-          type: "set_custom_status",
-          custom_status: status,
-        }),
+      await invoke("ws_send_custom_status", {
+        customStatus: status,
       });
     } else {
       const ws = getBrowserWebSocket();
