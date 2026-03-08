@@ -5,6 +5,7 @@
 mod backup_codes;
 pub(crate) mod cookies;
 pub(crate) mod error;
+pub mod geoip;
 pub(crate) mod handlers;
 pub mod jwt;
 pub mod mfa_crypto;
