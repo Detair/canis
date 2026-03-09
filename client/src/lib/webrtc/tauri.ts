@@ -26,7 +26,6 @@ export class TauriVoiceAdapter implements VoiceAdapter {
   private muted = false;
   private deafened = false;
   private noiseSuppression = false;
-  private screenSharing = false;
   private webcamActive = false;
 
   // Screen share state (native Rust capture) — multi-stream
@@ -72,7 +71,6 @@ export class TauriVoiceAdapter implements VoiceAdapter {
         }
       }
       this.activeScreenShares.clear();
-      this.screenSharing = false;
     }
 
     try {
@@ -379,7 +377,6 @@ export class TauriVoiceAdapter implements VoiceAdapter {
         sourceName,
         withAudio: options.withAudio ?? false,
       });
-      this.screenSharing = true;
 
       console.log(`[TauriVoiceAdapter] Native screen share started: ${streamId}`);
       return { ok: true, value: undefined };
@@ -405,7 +402,6 @@ export class TauriVoiceAdapter implements VoiceAdapter {
       await invoke("stop_screen_share", { streamId: targetId });
 
       this.activeScreenShares.delete(targetId);
-      this.screenSharing = this.activeScreenShares.size > 0;
 
       console.log(`[TauriVoiceAdapter] Screen share stopped: ${targetId}`);
       return { ok: true, value: undefined };
@@ -425,7 +421,6 @@ export class TauriVoiceAdapter implements VoiceAdapter {
       }
     }
     this.activeScreenShares.clear();
-    this.screenSharing = false;
     return { ok: true, value: undefined };
   }
 
@@ -496,7 +491,6 @@ export class TauriVoiceAdapter implements VoiceAdapter {
       invoke("stop_screen_share", { streamId }).catch(() => {});
     }
     this.activeScreenShares.clear();
-    this.screenSharing = false;
 
     this.unlisteners.forEach((unlisten) => unlisten());
     this.unlisteners = [];

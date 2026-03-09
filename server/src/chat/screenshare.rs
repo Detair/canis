@@ -31,7 +31,7 @@ impl IntoResponse for ScreenShareError {
             }
             Self::InternalError => (StatusCode::INTERNAL_SERVER_ERROR, "Internal error"),
             Self::InvalidSourceLabel => (StatusCode::BAD_REQUEST, "Invalid source label"),
-            Self::AlreadySharing => (StatusCode::CONFLICT, "Already sharing screen"),
+            Self::AlreadySharing => (StatusCode::CONFLICT, "Maximum 3 concurrent screen shares per user"),
         };
         (status, Json(serde_json::json!({ "error": msg }))).into_response()
     }
@@ -59,10 +59,10 @@ async fn fetch_channel_settings(
     });
 
     let raw: i32 = row.try_get("max_screen_shares").unwrap_or_else(|e| {
-        warn!(channel_id = %channel_id, error = %e, "Failed to read max_screen_shares, defaulting to 1");
-        1
+        warn!(channel_id = %channel_id, error = %e, "Failed to read max_screen_shares, defaulting to 6");
+        6
     });
-    let max_screen_shares: u32 = raw.try_into().unwrap_or(1);
+    let max_screen_shares: u32 = raw.try_into().unwrap_or(6);
 
     Ok((guild_id, max_screen_shares))
 }

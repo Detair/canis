@@ -886,7 +886,7 @@ export class BrowserVoiceAdapter implements VoiceAdapter {
     }
 
     try {
-      const [firstId] = this.screenShares.keys().next().value!;
+      const firstId = this.screenShares.keys().next().value!;
       const firstEntry = this.screenShares.get(firstId)!;
       this.cleanupSingleScreenShare(firstId, firstEntry);
       console.log("[BrowserVoiceAdapter] Screen share stopped:", firstId);

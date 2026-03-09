@@ -604,7 +604,7 @@ async fn handle_screen_share_start(
         const MAX_STREAMS_PER_USER: usize = 3;
         let count = room.get_user_stream_count(params.user_id).await;
         if count >= MAX_STREAMS_PER_USER {
-            return Err(VoiceError::Signaling("Already sharing screen".to_string()));
+            return Err(VoiceError::Signaling("Maximum 3 concurrent screen shares per user".to_string()));
         }
     }
 
@@ -616,8 +616,8 @@ async fn handle_screen_share_start(
             .await
             .ok()
             .flatten()
-            .unwrap_or(1);
-    let max_shares: u32 = max_screen_shares.try_into().unwrap_or(1);
+            .unwrap_or(6);
+    let max_shares: u32 = max_screen_shares.try_into().unwrap_or(6);
 
     // Try to reserve a slot via limiter
     let limiter = screen_share_limiter
@@ -718,19 +718,18 @@ async fn handle_screen_share_stop(
         shares.get(&stream_id).cloned()
     };
 
-    let _had_audio = if let Some(info) = share_info {
+    if let Some(info) = share_info {
         // Verify the requesting user owns this stream
         if info.user_id != user_id {
             warn!(user_id = %user_id, stream_id = %stream_id, "User tried to stop a screen share they don't own");
             return Err(VoiceError::Signaling("Not your screen share".to_string()));
         }
         room.remove_screen_share(stream_id).await;
-        info.has_audio
     } else {
         // User wasn't sharing, but that's okay - idempotent
         debug!(user_id = %user_id, "User tried to stop screen share but wasn't sharing");
         return Ok(());
-    };
+    }
 
     // Decrement Redis counter
     if let Some(limiter) = screen_share_limiter {

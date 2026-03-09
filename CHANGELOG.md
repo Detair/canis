@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Release note structure source: `docs/project/RELEASE_NOTES_TEMPLATE.md`
 
 ### Changed
+- Screen share WebSocket events now include `stream_id` field — clients must update to handle multi-stream protocol
+- Default `max_screen_shares` per channel increased from 1 to 6 to support multi-stream sharing
 - Screen share limits now use atomic Redis Lua script for reliable concurrent slot management
 - Default theme updated to CachyOS Nordic color palette with true Nord Polar Night surfaces and Snow Storm text, aligning the client with the landing page
 - Layout areas (ServerRail, Sidebar, Main Stage) now separated by solid border lines for clearer visual structure
