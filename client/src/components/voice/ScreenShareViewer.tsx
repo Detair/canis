@@ -166,6 +166,13 @@ const ScreenShareViewer: Component = () => {
           setViewMode("spotlight");
         }
         break;
+      case "g":
+      case "G":
+        if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+          e.preventDefault();
+          toggleLayoutMode();
+        }
+        break;
     }
   };
 
@@ -180,37 +187,45 @@ const ScreenShareViewer: Component = () => {
   return (
     <Show when={viewerState.viewingStreamId && viewerState.videoTrack}>
       <Portal>
-        <Show when={viewerState.viewMode === "spotlight"}>
-          <SpotlightView
-            videoRef={(el) => (videoRef = el)}
-            sharerName={sharerName()}
-            onClose={handleClose}
-            onCycleMode={cycleViewMode}
-            onToggleLayout={toggleLayoutMode}
-            autoplayBlocked={autoplayBlocked()}
-            onClickToPlay={handleClickToPlay}
-          />
+        {/* Grid layout mode */}
+        <Show when={viewerState.layoutMode === "grid"}>
+          <GridView onClose={handleClose} onToggleLayout={toggleLayoutMode} />
         </Show>
-        <Show when={viewerState.viewMode === "pip"}>
-          <PipView
-            videoRef={(el) => (videoRef = el)}
-            sharerName={sharerName()}
-            onClose={handleClose}
-            onCycleMode={cycleViewMode}
-            autoplayBlocked={autoplayBlocked()}
-            onClickToPlay={handleClickToPlay}
-          />
-        </Show>
-        <Show when={viewerState.viewMode === "theater"}>
-          <TheaterView
-            videoRef={(el) => (videoRef = el)}
-            sharerName={sharerName()}
-            onClose={handleClose}
-            onCycleMode={cycleViewMode}
-            onToggleLayout={toggleLayoutMode}
-            autoplayBlocked={autoplayBlocked()}
-            onClickToPlay={handleClickToPlay}
-          />
+
+        {/* Focus layout mode — spotlight/pip/theater */}
+        <Show when={viewerState.layoutMode === "focus"}>
+          <Show when={viewerState.viewMode === "spotlight"}>
+            <SpotlightView
+              videoRef={(el) => (videoRef = el)}
+              sharerName={sharerName()}
+              onClose={handleClose}
+              onCycleMode={cycleViewMode}
+              onToggleLayout={toggleLayoutMode}
+              autoplayBlocked={autoplayBlocked()}
+              onClickToPlay={handleClickToPlay}
+            />
+          </Show>
+          <Show when={viewerState.viewMode === "pip"}>
+            <PipView
+              videoRef={(el) => (videoRef = el)}
+              sharerName={sharerName()}
+              onClose={handleClose}
+              onCycleMode={cycleViewMode}
+              autoplayBlocked={autoplayBlocked()}
+              onClickToPlay={handleClickToPlay}
+            />
+          </Show>
+          <Show when={viewerState.viewMode === "theater"}>
+            <TheaterView
+              videoRef={(el) => (videoRef = el)}
+              sharerName={sharerName()}
+              onClose={handleClose}
+              onCycleMode={cycleViewMode}
+              onToggleLayout={toggleLayoutMode}
+              autoplayBlocked={autoplayBlocked()}
+              onClickToPlay={handleClickToPlay}
+            />
+          </Show>
         </Show>
       </Portal>
     </Show>
@@ -490,6 +505,116 @@ const LayoutToggleButton: Component<{
         <Maximize class="w-5 h-5" />
       )}
     </button>
+  );
+};
+
+/** Grid view — show up to 4 streams in a 2x2 grid */
+const GridView: Component<{
+  onClose: () => void;
+  onToggleLayout: () => void;
+}> = (props) => {
+  const streams = () =>
+    viewerState.gridStreamIds
+      .map((id) => {
+        const info = viewerState.availableTracks.get(id);
+        if (!info) return null;
+        return { streamId: id, ...info };
+      })
+      .filter(
+        (
+          s,
+        ): s is {
+          streamId: string;
+          track: MediaStreamTrack;
+          userId: string;
+          username: string;
+          sourceLabel: string;
+        } => s !== null,
+      );
+
+  const count = () => streams().length;
+
+  /** Resolve a display name for a stream entry */
+  const streamDisplayName = (entry: {
+    userId: string;
+    username: string;
+    sourceLabel: string;
+  }) => {
+    const participant = voiceState.participants[entry.userId];
+    const name =
+      participant?.display_name ||
+      participant?.username ||
+      entry.username ||
+      entry.userId.slice(0, 8);
+    if (entry.sourceLabel && entry.sourceLabel !== "Screen") {
+      return `${name} — ${entry.sourceLabel}`;
+    }
+    return name;
+  };
+
+  /** CSS grid classes based on stream count */
+  const gridClasses = () => {
+    const c = count();
+    if (c <= 1) return "grid-cols-1";
+    if (c === 2) return "grid-cols-2 grid-rows-1";
+    // 3 or 4 streams: 2x2 grid
+    return "grid-cols-2 grid-rows-2";
+  };
+
+  return (
+    <div class="fixed inset-0 z-50 bg-black flex flex-col">
+      {/* Grid container */}
+      <div class={`flex-1 grid gap-1 p-1 ${gridClasses()}`}>
+        <For each={streams()}>
+          {(stream, index) => {
+            // For 3 streams, center the last item by spanning 2 columns
+            const shouldSpan = () => count() === 3 && index() === 2;
+
+            return (
+              <div
+                class={`relative bg-black flex items-center justify-center overflow-hidden ${
+                  shouldSpan() ? "col-span-2 max-w-[50%] mx-auto w-full" : ""
+                }`}
+              >
+                <video
+                  ref={(el) => {
+                    if (stream && el) {
+                      const mediaStream = new MediaStream([stream.track]);
+                      el.srcObject = mediaStream;
+                    }
+                  }}
+                  autoplay
+                  muted
+                  playsinline
+                  class="max-w-full max-h-full object-contain"
+                />
+                <div class="absolute bottom-2 left-2 bg-black/70 text-sm px-2 py-1 rounded text-white">
+                  {streamDisplayName(stream)}
+                </div>
+              </div>
+            );
+          }}
+        </For>
+      </div>
+
+      {/* Footer bar with controls */}
+      <div class="p-2 bg-zinc-900/90 flex items-center justify-between">
+        <VolumeControl />
+        <div class="flex items-center gap-2">
+          <LayoutToggleButton
+            layoutMode={viewerState.layoutMode}
+            onToggle={props.onToggleLayout}
+          />
+          <button
+            onClick={props.onClose}
+            class="p-2 text-white/70 hover:text-white transition-colors"
+            title="Close"
+          >
+            <X class="w-5 h-5" />
+          </button>
+        </div>
+      </div>
+    </div>
   );
 };
 
