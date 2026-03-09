@@ -136,10 +136,12 @@ pub async fn check(
     }
 
     // Check limits via limiter
-    if let Some(ref limiter) = state.screen_share_limiter {
-        if let Err(e) = limiter.check(channel_id, max_screen_shares).await {
-            return Ok(Json(ScreenShareCheckResponse::denied(e)));
-        }
+    let limiter = state
+        .screen_share_limiter
+        .as_ref()
+        .ok_or(ScreenShareError::InternalError)?;
+    if let Err(e) = limiter.check(channel_id, max_screen_shares).await {
+        return Ok(Json(ScreenShareCheckResponse::denied(e)));
     }
 
     let granted_quality = resolve_quality(&state.db, user.id, req.quality).await?;
@@ -200,9 +202,11 @@ pub async fn start(
     }
 
     // Reserve slot via limiter
-    if let Some(ref limiter) = state.screen_share_limiter {
-        limiter.start(channel_id, max_screen_shares).await?;
-    }
+    let limiter = state
+        .screen_share_limiter
+        .as_ref()
+        .ok_or(ScreenShareError::InternalError)?;
+    limiter.start(channel_id, max_screen_shares).await?;
 
     // Update room & broadcast
     let info = ScreenShareInfo::new(
@@ -259,6 +263,8 @@ pub async fn stop(
     if had_screen_share {
         if let Some(ref limiter) = state.screen_share_limiter {
             limiter.stop(channel_id).await;
+        } else {
+            tracing::warn!("Screen share limiter unavailable during stop — counter not decremented");
         }
     }
 

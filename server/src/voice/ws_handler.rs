@@ -269,6 +269,8 @@ async fn handle_leave(
     if room.remove_screen_share(user_id).await.is_some() {
         if let Some(limiter) = screen_share_limiter {
             limiter.stop(channel_id).await;
+        } else {
+            tracing::warn!("Screen share limiter unavailable during leave — counter not decremented");
         }
 
         room.broadcast_except(
@@ -604,15 +606,16 @@ async fn handle_screen_share_start(
     let max_shares: u32 = max_screen_shares.try_into().unwrap_or(1);
 
     // Try to reserve a slot via limiter
-    if let Some(limiter) = screen_share_limiter {
-        if let Err(e) = limiter.start(params.channel_id, max_shares).await {
-            warn!(user_id = %params.user_id, channel_id = %params.channel_id, error = ?e, "Screen share limit check failed");
-            return Err(VoiceError::Signaling(match e {
-                ScreenShareError::LimitReached => "Screen share limit reached".to_string(),
-                ScreenShareError::InternalError => "Internal error".to_string(),
-                _ => format!("{e:?}"),
-            }));
-        }
+    let limiter = screen_share_limiter.ok_or_else(|| {
+        VoiceError::Signaling("Screen share limiter unavailable".to_string())
+    })?;
+    if let Err(e) = limiter.start(params.channel_id, max_shares).await {
+        warn!(user_id = %params.user_id, channel_id = %params.channel_id, error = ?e, "Screen share limit check failed");
+        return Err(VoiceError::Signaling(match e {
+            ScreenShareError::LimitReached => "Screen share limit reached".to_string(),
+            ScreenShareError::InternalError => "Internal error".to_string(),
+            _ => format!("{e:?}"),
+        }));
     }
 
     // Queue pending track sources so setup_track_handler can identify them
@@ -699,6 +702,8 @@ async fn handle_screen_share_stop(
     // Decrement Redis counter
     if let Some(limiter) = screen_share_limiter {
         limiter.stop(channel_id).await;
+    } else {
+        tracing::warn!("Screen share limiter unavailable during stop — counter not decremented");
     }
 
     // Clean up screen share tracks from the track router
