@@ -57,6 +57,48 @@ export function resolveState(
 }
 
 // ---------------------------------------------------------------------------
+// Key code mapping
+// ---------------------------------------------------------------------------
+
+/** Convert a browser `event.code` value to a human-readable label. */
+export function keyCodeToLabel(code: string): string {
+  const map: Record<string, string> = {
+    Space: "Space", CapsLock: "Caps Lock", Backquote: "~", Tab: "Tab",
+    Escape: "Esc", ShiftLeft: "Left Shift", ShiftRight: "Right Shift",
+    ControlLeft: "Left Ctrl", ControlRight: "Right Ctrl",
+    AltLeft: "Left Alt", AltRight: "Right Alt",
+  };
+  if (map[code]) return map[code];
+  const letterMatch = code.match(/^Key([A-Z])$/);
+  if (letterMatch) return letterMatch[1];
+  const digitMatch = code.match(/^Digit(\d)$/);
+  if (digitMatch) return digitMatch[1];
+  const fnMatch = code.match(/^(F\d{1,2})$/);
+  if (fnMatch) return fnMatch[1];
+  const numpadMatch = code.match(/^Numpad(\d)$/);
+  if (numpadMatch) return `Numpad ${numpadMatch[1]}`;
+  return code;
+}
+
+/** Map a browser `event.code` to a Tauri accelerator string, or `null`. */
+export function mapCodeToTauriShortcut(code: string): string | null {
+  const map: Record<string, string> = {
+    Space: "Space", CapsLock: "CapsLock", Backquote: "`", Tab: "Tab",
+  };
+  if (map[code]) return map[code];
+  const letterMatch = code.match(/^Key([A-Z])$/);
+  if (letterMatch) return letterMatch[1];
+  const digitMatch = code.match(/^Digit(\d)$/);
+  if (digitMatch) return digitMatch[1];
+  const fnMatch = code.match(/^(F\d{1,2})$/);
+  if (fnMatch) return fnMatch[1];
+  const numpadMatch = code.match(/^Numpad(\d)$/);
+  if (numpadMatch) return `Num${numpadMatch[1]}`;
+  console.warn(`[PTT] Cannot map key code "${code}" to Tauri shortcut`);
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // Controller
 // ---------------------------------------------------------------------------
 
@@ -191,5 +233,85 @@ export class PttController {
       clearTimeout(this.releaseTimer);
       this.releaseTimer = null;
     }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Browser event listeners
+// ---------------------------------------------------------------------------
+
+/**
+ * Wire browser `keydown` / `keyup` / `blur` events to a {@link PttController}.
+ * Returns a cleanup function that removes all listeners.
+ */
+export function createBrowserPttListeners(controller: PttController): () => void {
+  const onKeyDown = (e: KeyboardEvent) => { controller.handleKeyDown(e.code); };
+  const onKeyUp = (e: KeyboardEvent) => { controller.handleKeyUp(e.code); };
+  const onBlur = () => { controller.releaseAll(); };
+
+  window.addEventListener("keydown", onKeyDown);
+  window.addEventListener("keyup", onKeyUp);
+  window.addEventListener("blur", onBlur);
+
+  return () => {
+    window.removeEventListener("keydown", onKeyDown);
+    window.removeEventListener("keyup", onKeyUp);
+    window.removeEventListener("blur", onBlur);
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Tauri global-shortcut listeners
+// ---------------------------------------------------------------------------
+
+const isTauri = typeof window !== "undefined" && "__TAURI__" in window;
+
+/**
+ * Register Tauri global shortcuts for PTT/PTM keys (works even when the
+ * window is not focused) and fall back to browser-only listeners when
+ * running outside of Tauri or when registration fails.
+ */
+export async function createTauriPttListeners(
+  controller: PttController,
+  config: PttFullConfig,
+): Promise<() => void> {
+  const cleanupBrowser = createBrowserPttListeners(controller);
+  if (!isTauri) return cleanupBrowser;
+
+  try {
+    const { register, unregister } = await import("@tauri-apps/plugin-global-shortcut");
+    const registeredKeys: string[] = [];
+
+    if (config.pttEnabled && config.pttKey) {
+      const tauriKey = mapCodeToTauriShortcut(config.pttKey);
+      if (tauriKey) {
+        await register(tauriKey, (event) => {
+          if (event.state === "Pressed") controller.handleKeyDown(config.pttKey!);
+          if (event.state === "Released") controller.handleKeyUp(config.pttKey!);
+        });
+        registeredKeys.push(tauriKey);
+      }
+    }
+
+    if (config.ptmEnabled && config.ptmKey) {
+      const tauriKey = mapCodeToTauriShortcut(config.ptmKey);
+      if (tauriKey) {
+        await register(tauriKey, (event) => {
+          if (event.state === "Pressed") controller.handleKeyDown(config.ptmKey!);
+          if (event.state === "Released") controller.handleKeyUp(config.ptmKey!);
+        });
+        registeredKeys.push(tauriKey);
+      }
+    }
+
+    return async () => {
+      cleanupBrowser();
+      for (const key of registeredKeys) {
+        try { await unregister(key); } catch { /* ignore cleanup errors */ }
+      }
+    };
+  } catch (err) {
+    console.warn("[PTT] Failed to register global shortcuts, using browser-only:", err);
+    return cleanupBrowser;
   }
 }

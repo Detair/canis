@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockSetMute = vi.fn().mockResolvedValue(undefined);
 
-import { resolveState, PttConfig, PttController, PttFullConfig } from "@/lib/pttManager";
+import { resolveState, PttConfig, PttController, PttFullConfig, mapCodeToTauriShortcut, keyCodeToLabel } from "@/lib/pttManager";
 
 describe("resolveState", () => {
   it("returns muted when PTT enabled and no keys held", () => {
@@ -182,4 +182,25 @@ describe("PttController", () => {
     controller.releaseAll();
     expect(mockSetMute).toHaveBeenCalledWith(true);
   });
+});
+
+describe("mapCodeToTauriShortcut", () => {
+  it("maps Space", () => expect(mapCodeToTauriShortcut("Space")).toBe("Space"));
+  it("maps letter keys", () => expect(mapCodeToTauriShortcut("KeyV")).toBe("V"));
+  it("maps digit keys", () => expect(mapCodeToTauriShortcut("Digit5")).toBe("5"));
+  it("maps function keys", () => expect(mapCodeToTauriShortcut("F5")).toBe("F5"));
+  it("maps CapsLock", () => expect(mapCodeToTauriShortcut("CapsLock")).toBe("CapsLock"));
+  it("maps Backquote", () => expect(mapCodeToTauriShortcut("Backquote")).toBe("`"));
+  it("returns null for unmappable keys", () => expect(mapCodeToTauriShortcut("ContextMenu")).toBeNull());
+});
+
+describe("keyCodeToLabel", () => {
+  it("maps Space", () => expect(keyCodeToLabel("Space")).toBe("Space"));
+  it("maps letter keys", () => expect(keyCodeToLabel("KeyV")).toBe("V"));
+  it("maps CapsLock", () => expect(keyCodeToLabel("CapsLock")).toBe("Caps Lock"));
+  it("maps Backquote to ~", () => expect(keyCodeToLabel("Backquote")).toBe("~"));
+  it("maps digit keys", () => expect(keyCodeToLabel("Digit3")).toBe("3"));
+  it("maps function keys", () => expect(keyCodeToLabel("F12")).toBe("F12"));
+  it("maps numpad keys", () => expect(keyCodeToLabel("Numpad5")).toBe("Numpad 5"));
+  it("returns raw code for unknown keys", () => expect(keyCodeToLabel("ContextMenu")).toBe("ContextMenu"));
 });
