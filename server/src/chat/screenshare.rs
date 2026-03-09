@@ -4,7 +4,7 @@ use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::Json;
-use sqlx::Row;
+use sqlx::{PgPool, Row};
 use tracing::{error, warn};
 use uuid::Uuid;
 
@@ -12,9 +12,7 @@ use crate::api::AppState;
 use crate::auth::AuthUser;
 use crate::db::user_features::UserFeatures;
 use crate::permissions::{require_guild_permission, GuildPermissions};
-use crate::voice::screen_share::{
-    check_limit, stop_screen_share, try_start_screen_share, validate_source_label,
-};
+use crate::voice::screen_share::validate_source_label;
 use crate::voice::{
     Quality, ScreenShareCheckResponse, ScreenShareError, ScreenShareInfo, ScreenShareStartRequest,
 };
@@ -38,6 +36,70 @@ impl IntoResponse for ScreenShareError {
     }
 }
 
+/// Fetch channel voice settings for screen share checks.
+/// Returns `(guild_id, max_screen_shares)`.
+async fn fetch_channel_settings(
+    pool: &PgPool,
+    channel_id: Uuid,
+) -> Result<(Option<Uuid>, u32), ScreenShareError> {
+    let row = sqlx::query("SELECT guild_id, max_screen_shares FROM channels WHERE id = $1")
+        .bind(channel_id)
+        .fetch_optional(pool)
+        .await
+        .map_err(|e| {
+            error!(channel_id = %channel_id, error = %e, "Database error fetching channel");
+            ScreenShareError::InternalError
+        })?
+        .ok_or(ScreenShareError::InternalError)?;
+
+    let guild_id: Option<Uuid> = row.try_get("guild_id").unwrap_or_else(|e| {
+        warn!(channel_id = %channel_id, error = %e, "Failed to read guild_id, defaulting to None");
+        None
+    });
+
+    let raw: i32 = row.try_get("max_screen_shares").unwrap_or_else(|e| {
+        warn!(channel_id = %channel_id, error = %e, "Failed to read max_screen_shares, defaulting to 1");
+        1
+    });
+    let max_screen_shares: u32 = raw.try_into().unwrap_or(1);
+
+    Ok((guild_id, max_screen_shares))
+}
+
+/// Resolve the granted quality tier based on user feature flags.
+/// Downgrades Premium to High if user lacks `PREMIUM_VIDEO`.
+async fn resolve_quality(
+    pool: &PgPool,
+    user_id: Uuid,
+    requested: Quality,
+) -> Result<Quality, ScreenShareError> {
+    if requested != Quality::Premium {
+        return Ok(requested);
+    }
+
+    let user_row = sqlx::query("SELECT feature_flags FROM users WHERE id = $1")
+        .bind(user_id)
+        .fetch_optional(pool)
+        .await
+        .map_err(|e| {
+            error!(user_id = %user_id, error = %e, "Database error fetching user features");
+            ScreenShareError::InternalError
+        })?
+        .ok_or(ScreenShareError::InternalError)?;
+
+    let flags: i64 = user_row.try_get("feature_flags").unwrap_or_else(|e| {
+        warn!(user_id = %user_id, error = %e, "Failed to read feature_flags, defaulting to 0");
+        0
+    });
+    let features = UserFeatures::from_bits_truncate(flags);
+
+    if features.contains(UserFeatures::PREMIUM_VIDEO) {
+        Ok(Quality::Premium)
+    } else {
+        Ok(Quality::High)
+    }
+}
+
 /// Check if screen sharing is allowed.
 #[utoipa::path(
     post,
@@ -56,34 +118,14 @@ pub async fn check(
     Path(channel_id): Path<Uuid>,
     Json(req): Json<ScreenShareStartRequest>,
 ) -> Result<Json<ScreenShareCheckResponse>, ScreenShareError> {
-    // 0. Validate source_label
     validate_source_label(&req.source_label)?;
 
-    // 1. Get channel
-    let channel_row =
-        sqlx::query("SELECT id, guild_id, max_screen_shares FROM channels WHERE id = $1")
-            .bind(channel_id)
-            .fetch_optional(&state.db)
-            .await
-            .map_err(|e| {
-                error!(channel_id = %channel_id, error = %e, "Database error fetching channel");
-                ScreenShareError::InternalError
-            })?
-            .ok_or(ScreenShareError::InternalError)?;
+    let (guild_id, max_screen_shares) = fetch_channel_settings(&state.db, channel_id).await?;
 
-    let guild_id: Option<Uuid> = channel_row.try_get("guild_id").unwrap_or_else(|e| {
-        warn!(channel_id = %channel_id, error = %e, "Failed to read guild_id, defaulting to None");
-        None
-    });
-    let max_screen_shares: i32 = channel_row.try_get("max_screen_shares").unwrap_or_else(|e| {
-        warn!(channel_id = %channel_id, error = %e, "Failed to read max_screen_shares, defaulting to 1");
-        1
-    });
-
-    // 2. Check Permissions if guild (SCREEN_SHARE + VOICE_CONNECT)
+    // Check guild permissions
     if let Some(gid) = guild_id {
-        let required_perms = GuildPermissions::SCREEN_SHARE | GuildPermissions::VOICE_CONNECT;
-        if require_guild_permission(&state.db, gid, user.id, required_perms)
+        let required = GuildPermissions::SCREEN_SHARE | GuildPermissions::VOICE_CONNECT;
+        if require_guild_permission(&state.db, gid, user.id, required)
             .await
             .is_err()
         {
@@ -93,35 +135,16 @@ pub async fn check(
         }
     }
 
-    // 3. Check limits
-    if let Err(e) = check_limit(&state.redis, channel_id, max_screen_shares as u32).await {
+    // Check limits via limiter
+    let limiter = state
+        .screen_share_limiter
+        .as_ref()
+        .ok_or(ScreenShareError::InternalError)?;
+    if let Err(e) = limiter.check(channel_id, max_screen_shares).await {
         return Ok(Json(ScreenShareCheckResponse::denied(e)));
     }
 
-    // 4. Check Premium
-    let mut granted_quality = req.quality;
-    if req.quality == Quality::Premium {
-        let user_row = sqlx::query("SELECT feature_flags FROM users WHERE id = $1")
-            .bind(user.id)
-            .fetch_optional(&state.db)
-            .await
-            .map_err(|e| {
-                error!(user_id = %user.id, error = %e, "Database error fetching user features");
-                ScreenShareError::InternalError
-            })?
-            .ok_or(ScreenShareError::InternalError)?;
-
-        let flags: i64 = user_row.try_get("feature_flags").unwrap_or_else(|e| {
-            warn!(user_id = %user.id, error = %e, "Failed to read feature_flags, defaulting to 0");
-            0
-        });
-        let features = UserFeatures::from_bits_truncate(flags);
-
-        if !features.contains(UserFeatures::PREMIUM_VIDEO) {
-            granted_quality = Quality::High; // Downgrade
-        }
-    }
-
+    let granted_quality = resolve_quality(&state.db, user.id, req.quality).await?;
     Ok(Json(ScreenShareCheckResponse::allowed(granted_quality)))
 }
 
@@ -143,34 +166,14 @@ pub async fn start(
     Path(channel_id): Path<Uuid>,
     Json(req): Json<ScreenShareStartRequest>,
 ) -> Result<Json<ScreenShareCheckResponse>, ScreenShareError> {
-    // 0. Validate source_label
     validate_source_label(&req.source_label)?;
 
-    // 1. Get channel
-    let channel_row =
-        sqlx::query("SELECT id, guild_id, max_screen_shares FROM channels WHERE id = $1")
-            .bind(channel_id)
-            .fetch_optional(&state.db)
-            .await
-            .map_err(|e| {
-                error!(channel_id = %channel_id, error = %e, "Database error fetching channel");
-                ScreenShareError::InternalError
-            })?
-            .ok_or(ScreenShareError::InternalError)?;
+    let (guild_id, max_screen_shares) = fetch_channel_settings(&state.db, channel_id).await?;
 
-    let guild_id: Option<Uuid> = channel_row.try_get("guild_id").unwrap_or_else(|e| {
-        warn!(channel_id = %channel_id, error = %e, "Failed to read guild_id, defaulting to None");
-        None
-    });
-    let max_screen_shares: i32 = channel_row.try_get("max_screen_shares").unwrap_or_else(|e| {
-        warn!(channel_id = %channel_id, error = %e, "Failed to read max_screen_shares, defaulting to 1");
-        1
-    });
-
-    // 2. Check Permissions (SCREEN_SHARE + VOICE_CONNECT)
+    // Check guild permissions
     if let Some(gid) = guild_id {
-        let required_perms = GuildPermissions::SCREEN_SHARE | GuildPermissions::VOICE_CONNECT;
-        if require_guild_permission(&state.db, gid, user.id, required_perms)
+        let required = GuildPermissions::SCREEN_SHARE | GuildPermissions::VOICE_CONNECT;
+        if require_guild_permission(&state.db, gid, user.id, required)
             .await
             .is_err()
         {
@@ -178,43 +181,19 @@ pub async fn start(
         }
     }
 
-    // 3. Check Premium
-    let mut granted_quality = req.quality;
-    if req.quality == Quality::Premium {
-        let user_row = sqlx::query("SELECT feature_flags FROM users WHERE id = $1")
-            .bind(user.id)
-            .fetch_optional(&state.db)
-            .await
-            .map_err(|e| {
-                error!(user_id = %user.id, error = %e, "Database error fetching user features");
-                ScreenShareError::InternalError
-            })?
-            .ok_or(ScreenShareError::InternalError)?;
+    let granted_quality = resolve_quality(&state.db, user.id, req.quality).await?;
 
-        let flags: i64 = user_row.try_get("feature_flags").unwrap_or_else(|e| {
-            warn!(user_id = %user.id, error = %e, "Failed to read feature_flags, defaulting to 0");
-            0
-        });
-        let features = UserFeatures::from_bits_truncate(flags);
-
-        if !features.contains(UserFeatures::PREMIUM_VIDEO) {
-            granted_quality = Quality::High; // Downgrade
-        }
-    }
-
-    // 4. Check room membership BEFORE incrementing counter (security fix)
+    // Check room membership BEFORE reserving slot
     let room = state
         .sfu
         .get_room(channel_id)
         .await
         .ok_or(ScreenShareError::NotInChannel)?;
-
-    // 4a. Check if user is actually in the room
     if room.get_peer(user.id).await.is_none() {
         return Err(ScreenShareError::NotInChannel);
     }
 
-    // 4b. Check if user already has an active screen share
+    // Check not already sharing
     {
         let screen_shares = room.screen_shares.read().await;
         if screen_shares.contains_key(&user.id) {
@@ -222,10 +201,14 @@ pub async fn start(
         }
     }
 
-    // 5. Try start (Redis INCR) - only after all checks pass
-    try_start_screen_share(&state.redis, channel_id, max_screen_shares as u32).await?;
+    // Reserve slot via limiter
+    let limiter = state
+        .screen_share_limiter
+        .as_ref()
+        .ok_or(ScreenShareError::InternalError)?;
+    limiter.start(channel_id, max_screen_shares).await?;
 
-    // 6. Update Room & Broadcast
+    // Update room & broadcast
     let info = ScreenShareInfo::new(
         user.id,
         user.username.clone(),
@@ -243,13 +226,12 @@ pub async fn start(
         has_audio: req.has_audio,
         quality: granted_quality,
     };
-
     if let Err(e) = broadcast_to_channel(&state.redis, channel_id, &event).await {
         error!(
             channel_id = %channel_id,
             user_id = %user.id,
             error = %e,
-            "Failed to broadcast screen share started event - participants may have stale state"
+            "Failed to broadcast screen share started event"
         );
     }
 
@@ -272,16 +254,18 @@ pub async fn stop(
     user: AuthUser,
     Path(channel_id): Path<Uuid>,
 ) -> Result<(), ScreenShareError> {
-    // Only decrement if user actually had a screen share
     let had_screen_share = if let Some(room) = state.sfu.get_room(channel_id).await {
-        let screen_shares = room.screen_shares.read().await;
-        screen_shares.contains_key(&user.id)
+        room.screen_shares.read().await.contains_key(&user.id)
     } else {
         false
     };
 
     if had_screen_share {
-        stop_screen_share(&state.redis, channel_id).await;
+        if let Some(ref limiter) = state.screen_share_limiter {
+            limiter.stop(channel_id).await;
+        } else {
+            tracing::warn!("Screen share limiter unavailable during stop — counter not decremented");
+        }
     }
 
     if let Some(room) = state.sfu.get_room(channel_id).await {
@@ -292,13 +276,12 @@ pub async fn stop(
             user_id: user.id,
             reason: "user_stopped".to_string(),
         };
-
         if let Err(e) = broadcast_to_channel(&state.redis, channel_id, &event).await {
             error!(
                 channel_id = %channel_id,
                 user_id = %user.id,
                 error = %e,
-                "Failed to broadcast screen share stopped event - participants may have stale state"
+                "Failed to broadcast screen share stopped event"
             );
         }
     }

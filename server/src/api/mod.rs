@@ -40,7 +40,7 @@ use crate::moderation::filter_cache::FilterCache;
 use crate::ratelimit::{
     rate_limit_by_ip, rate_limit_by_user, with_category, RateLimitCategory, RateLimiter,
 };
-use crate::voice::SfuServer;
+use crate::voice::{ScreenShareLimiter, SfuServer};
 use crate::{
     admin, auth, chat, connectivity, crypto, discovery, governance, guild, moderation, pages,
     social, voice, webhooks, workspaces, ws,
@@ -61,6 +61,8 @@ pub struct AppState {
     pub sfu: Arc<SfuServer>,
     /// Rate limiter (optional, uses Redis)
     pub rate_limiter: Option<RateLimiter>,
+    /// Screen share limit manager (uses Redis Lua script)
+    pub screen_share_limiter: Option<ScreenShareLimiter>,
     /// Email service (optional, requires SMTP configuration)
     pub email: Option<Arc<EmailService>>,
     /// OIDC provider manager (optional, requires MFA encryption key)
@@ -85,6 +87,7 @@ pub struct AppStateConfig {
     pub s3: Option<S3Client>,
     pub sfu: SfuServer,
     pub rate_limiter: Option<RateLimiter>,
+    pub screen_share_limiter: Option<ScreenShareLimiter>,
     pub email: Option<EmailService>,
     pub oidc_manager: Option<OidcProviderManager>,
     pub http_client: reqwest::Client,
@@ -101,6 +104,7 @@ impl AppState {
             s3: cfg.s3,
             sfu: Arc::new(cfg.sfu),
             rate_limiter: cfg.rate_limiter,
+            screen_share_limiter: cfg.screen_share_limiter,
             email: cfg.email.map(Arc::new),
             oidc_manager: cfg.oidc_manager.map(Arc::new),
             filter_cache: Arc::new(FilterCache::new()),

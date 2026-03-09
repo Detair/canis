@@ -204,13 +204,13 @@ fn test_screen_share_info_fields() {
     use vc_server::voice::screen_share::ScreenShareInfo;
     use vc_server::voice::Quality;
 
-    let info = ScreenShareInfo {
-        user_id: Uuid::new_v4(),
-        username: "testuser".to_string(),
-        source_label: "Display 1".to_string(),
-        has_audio: true,
-        quality: Quality::High,
-    };
+    let info = ScreenShareInfo::new(
+        Uuid::new_v4(),
+        "testuser".to_string(),
+        "Display 1".to_string(),
+        true,
+        Quality::High,
+    );
 
     assert!(!info.username.is_empty());
     assert!(!info.source_label.is_empty());
@@ -227,13 +227,13 @@ async fn test_room_screen_share_add_and_remove() {
     let user_id = Uuid::new_v4();
 
     // Add screen share
-    let share_info = ScreenShareInfo {
+    let share_info = ScreenShareInfo::new(
         user_id,
-        username: "testuser".to_string(),
-        source_label: "Display 1".to_string(),
-        has_audio: false,
-        quality: Quality::Medium,
-    };
+        "testuser".to_string(),
+        "Display 1".to_string(),
+        false,
+        Quality::Medium,
+    );
     room.add_screen_share(share_info.clone()).await;
 
     // Verify it was added
@@ -263,13 +263,13 @@ async fn test_room_multiple_screen_shares() {
 
     // Add multiple screen shares
     for (i, quality) in qualities.iter().enumerate() {
-        let share_info = ScreenShareInfo {
-            user_id: Uuid::new_v4(),
-            username: format!("user{i}"),
-            source_label: format!("Display {i}"),
-            has_audio: false,
-            quality: *quality,
-        };
+        let share_info = ScreenShareInfo::new(
+            Uuid::new_v4(),
+            format!("user{i}"),
+            format!("Display {i}"),
+            false,
+            *quality,
+        );
         room.add_screen_share(share_info).await;
     }
 
@@ -287,23 +287,23 @@ async fn test_room_screen_share_duplicate_user_replaces() {
     let user_id = Uuid::new_v4();
 
     // Add first screen share
-    let share1 = ScreenShareInfo {
+    let share1 = ScreenShareInfo::new(
         user_id,
-        username: "testuser".to_string(),
-        source_label: "Display 1".to_string(),
-        has_audio: false,
-        quality: Quality::Medium,
-    };
+        "testuser".to_string(),
+        "Display 1".to_string(),
+        false,
+        Quality::Medium,
+    );
     room.add_screen_share(share1).await;
 
     // Add second screen share from same user (should replace)
-    let share2 = ScreenShareInfo {
+    let share2 = ScreenShareInfo::new(
         user_id,
-        username: "testuser".to_string(),
-        source_label: "Display 2".to_string(),
-        has_audio: true,
-        quality: Quality::High,
-    };
+        "testuser".to_string(),
+        "Display 2".to_string(),
+        true,
+        Quality::High,
+    );
     room.add_screen_share(share2).await;
 
     // Should still only have one entry
@@ -425,13 +425,13 @@ async fn test_screen_share_limit_per_channel() {
     let max_screen_shares = 5;
 
     for i in 0..max_screen_shares {
-        let share = ScreenShareInfo {
-            user_id: Uuid::new_v4(),
-            username: format!("user{i}"),
-            source_label: format!("Display {i}"),
-            has_audio: false,
-            quality: Quality::Medium,
-        };
+        let share = ScreenShareInfo::new(
+            Uuid::new_v4(),
+            format!("user{i}"),
+            format!("Display {i}"),
+            false,
+            Quality::Medium,
+        );
         room.add_screen_share(share).await;
     }
 

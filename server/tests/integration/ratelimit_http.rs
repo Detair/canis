@@ -47,6 +47,7 @@ async fn create_rate_limited_app(limits: RateLimits) -> (super::helpers::TestSer
         s3: None,
         sfu,
         rate_limiter: Some(limiter),
+        screen_share_limiter: None,
         email: None,
         oidc_manager: None,
         http_client: reqwest::Client::new(),

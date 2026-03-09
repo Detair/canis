@@ -162,7 +162,7 @@ mod tests {
         let sfu = Arc::new(sfu::SfuServer::new(config, None)?);
 
         // Create Redis client
-        let redis = create_test_redis().await;
+        let _redis = create_test_redis().await;
 
         // Create channel for server events
         let (tx, mut rx) = mpsc::channel::<ServerEvent>(10);
@@ -171,10 +171,10 @@ mod tests {
         ws_handler::handle_voice_event(
             &sfu,
             &pool,
-            &redis,
             user_id,
             ClientEvent::VoiceJoin { channel_id },
             &tx,
+            None,
         )
         .await?;
 
@@ -215,7 +215,7 @@ mod tests {
         let sfu = Arc::new(sfu::SfuServer::new(config, None)?);
 
         // Create Redis client
-        let redis = create_test_redis().await;
+        let _redis = create_test_redis().await;
 
         // Create channel for server events
         let (tx, _rx) = mpsc::channel::<ServerEvent>(10);
@@ -224,10 +224,10 @@ mod tests {
         ws_handler::handle_voice_event(
             &sfu,
             &pool,
-            &redis,
             user_id,
             ClientEvent::VoiceJoin { channel_id },
             &tx,
+            None,
         )
         .await?;
 
@@ -235,10 +235,10 @@ mod tests {
         let result = ws_handler::handle_voice_event(
             &sfu,
             &pool,
-            &redis,
             user_id,
             ClientEvent::VoiceJoin { channel_id },
             &tx,
+            None,
         )
         .await;
 
@@ -275,7 +275,7 @@ mod tests {
         let sfu = Arc::new(sfu::SfuServer::new(config, None)?);
 
         // Create Redis client
-        let redis = create_test_redis().await;
+        let _redis = create_test_redis().await;
 
         // Create channels for server events
         let (tx1, _rx1) = mpsc::channel::<ServerEvent>(10);
@@ -285,20 +285,20 @@ mod tests {
         ws_handler::handle_voice_event(
             &sfu,
             &pool,
-            &redis,
             user1_id,
             ClientEvent::VoiceJoin { channel_id },
             &tx1,
+            None,
         )
         .await?;
 
         ws_handler::handle_voice_event(
             &sfu,
             &pool,
-            &redis,
             user2_id,
             ClientEvent::VoiceJoin { channel_id },
             &tx2,
+            None,
         )
         .await?;
 
