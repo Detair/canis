@@ -182,9 +182,22 @@ impl ScreenShareLimiter {
         max_shares: u32,
         op: &str,
     ) -> Result<(bool, i64), ScreenShareError> {
+        self.run_script_with_extra(channel_id, max_shares, op, &[])
+            .await
+    }
+
+    /// Run the Lua script with optional extra ARGV arguments and retry on NOSCRIPT.
+    async fn run_script_with_extra(
+        &self,
+        channel_id: Uuid,
+        max_shares: u32,
+        op: &str,
+        extra_args: &[String],
+    ) -> Result<(bool, i64), ScreenShareError> {
         let key = format!("screenshare:limit:{channel_id}");
         let sha = self.script_sha.read().await.clone();
-        let args: Vec<String> = vec![max_shares.to_string(), op.to_string()];
+        let mut args: Vec<String> = vec![max_shares.to_string(), op.to_string()];
+        args.extend_from_slice(extra_args);
 
         match self
             .redis
@@ -270,6 +283,28 @@ impl ScreenShareLimiter {
                 channel_id = %channel_id,
                 error = ?e,
                 "Failed to decrement screen share counter"
+            );
+        }
+    }
+
+    /// Release N screen share slots at once (atomic batch decrement).
+    ///
+    /// Used when a user with multiple active screen shares leaves.
+    /// Clamps to zero if `count` exceeds the current counter value.
+    pub async fn stop_n(&self, channel_id: Uuid, count: usize) {
+        if count == 0 {
+            return;
+        }
+        // max_shares arg is unused by "stop_n" op, pass 0
+        if let Err(e) = self
+            .run_script_with_extra(channel_id, 0, "stop_n", &[count.to_string()])
+            .await
+        {
+            warn!(
+                channel_id = %channel_id,
+                count = count,
+                error = ?e,
+                "Failed to batch-decrement screen share counter"
             );
         }
     }

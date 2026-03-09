@@ -273,25 +273,27 @@ async fn handle_leave(
 
     // Remove all screen shares for this user
     let removed_shares = room.remove_user_screen_shares(user_id).await;
-    for share in &removed_shares {
+    if !removed_shares.is_empty() {
         if let Some(limiter) = screen_share_limiter {
-            limiter.stop(channel_id).await;
+            limiter.stop_n(channel_id, removed_shares.len()).await;
         } else {
             tracing::warn!(
                 "Screen share limiter unavailable during leave — counter not decremented"
             );
         }
 
-        room.broadcast_except(
-            user_id,
-            ServerEvent::ScreenShareStopped {
-                channel_id,
+        for share in &removed_shares {
+            room.broadcast_except(
                 user_id,
-                stream_id: share.stream_id,
-                reason: "disconnected".to_string(),
-            },
-        )
-        .await;
+                ServerEvent::ScreenShareStopped {
+                    channel_id,
+                    user_id,
+                    stream_id: share.stream_id,
+                    reason: "disconnected".to_string(),
+                },
+            )
+            .await;
+        }
     }
 
     // Check if webcam is active and stop it
