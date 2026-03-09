@@ -280,13 +280,13 @@ mod tests {
         );
         assert_eq!(
             router
-                .subscriber_count(user_id, TrackSource::ScreenVideo)
+                .subscriber_count(user_id, TrackSource::ScreenVideo(Uuid::nil()))
                 .await,
             0
         );
         assert_eq!(
             router
-                .subscriber_count(user_id, TrackSource::ScreenAudio)
+                .subscriber_count(user_id, TrackSource::ScreenAudio(Uuid::nil()))
                 .await,
             0
         );
@@ -307,7 +307,11 @@ mod tests {
             .remove_subscriber(source_id, TrackSource::Microphone, subscriber_id)
             .await;
         router
-            .remove_subscriber(source_id, TrackSource::ScreenVideo, subscriber_id)
+            .remove_subscriber(
+                source_id,
+                TrackSource::ScreenVideo(Uuid::nil()),
+                subscriber_id,
+            )
             .await;
     }
 
@@ -362,7 +366,11 @@ mod tests {
             .forward_rtp(source_id, TrackSource::Microphone, &rtp_packet)
             .await;
         router
-            .forward_rtp(source_id, TrackSource::ScreenVideo, &rtp_packet)
+            .forward_rtp(
+                source_id,
+                TrackSource::ScreenVideo(Uuid::nil()),
+                &rtp_packet,
+            )
             .await;
     }
 
@@ -409,7 +417,11 @@ mod tests {
                     router_clone.remove_source(source_id).await;
                 } else if i % 3 == 1 {
                     router_clone
-                        .remove_subscriber(source_id, TrackSource::ScreenVideo, subscriber_id)
+                        .remove_subscriber(
+                            source_id,
+                            TrackSource::ScreenVideo(Uuid::nil()),
+                            subscriber_id,
+                        )
                         .await;
                 } else {
                     router_clone.remove_subscriber_from_all(subscriber_id).await;

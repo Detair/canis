@@ -575,7 +575,11 @@ impl SfuServer {
                         RTPCodecType::Video => peer
                             .pop_pending_video_source()
                             .await
-                            .unwrap_or(TrackSource::ScreenVideo),
+                            // Fallback: if no pending source was queued, assume
+                            // it is a screen-video track with a nil stream_id.
+                            // This keeps backwards compatibility for the initial
+                            // mic+screen two-track setup.
+                            .unwrap_or(TrackSource::ScreenVideo(Uuid::nil())),
                         RTPCodecType::Unspecified => {
                             warn!("Unspecified track kind: {:?}", track.kind());
                             return;

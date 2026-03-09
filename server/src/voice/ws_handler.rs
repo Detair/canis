@@ -170,7 +170,7 @@ async fn handle_join(
                     .await
                 {
                     warn!("Failed to add outgoing track: {}", e);
-                } else if *source_type == TrackSource::ScreenVideo {
+                } else if matches!(source_type, TrackSource::ScreenVideo(_)) {
                     // Send PLI to request keyframe for late joiners
                     let pli = PictureLossIndication {
                         sender_ssrc: 0,
@@ -270,7 +270,9 @@ async fn handle_leave(
         if let Some(limiter) = screen_share_limiter {
             limiter.stop(channel_id).await;
         } else {
-            tracing::warn!("Screen share limiter unavailable during leave — counter not decremented");
+            tracing::warn!(
+                "Screen share limiter unavailable during leave — counter not decremented"
+            );
         }
 
         room.broadcast_except(
@@ -606,9 +608,8 @@ async fn handle_screen_share_start(
     let max_shares: u32 = max_screen_shares.try_into().unwrap_or(1);
 
     // Try to reserve a slot via limiter
-    let limiter = screen_share_limiter.ok_or_else(|| {
-        VoiceError::Signaling("Screen share limiter unavailable".to_string())
-    })?;
+    let limiter = screen_share_limiter
+        .ok_or_else(|| VoiceError::Signaling("Screen share limiter unavailable".to_string()))?;
     if let Err(e) = limiter.start(params.channel_id, max_shares).await {
         warn!(user_id = %params.user_id, channel_id = %params.channel_id, error = ?e, "Screen share limit check failed");
         return Err(VoiceError::Signaling(match e {
@@ -618,10 +619,16 @@ async fn handle_screen_share_start(
         }));
     }
 
+    // Generate a stream_id for this screen share session.
+    // TODO(multi-stream): In later tasks, this will come from the client event.
+    let stream_id = Uuid::new_v4();
+
     // Queue pending track sources so setup_track_handler can identify them
-    peer.push_pending_source(TrackSource::ScreenVideo).await;
+    peer.push_pending_source(TrackSource::ScreenVideo(stream_id))
+        .await;
     if params.has_audio {
-        peer.push_pending_source(TrackSource::ScreenAudio).await;
+        peer.push_pending_source(TrackSource::ScreenAudio(stream_id))
+            .await;
     }
 
     // Add recv transceivers for the incoming tracks
@@ -691,7 +698,7 @@ async fn handle_screen_share_stop(
         .ok_or(VoiceError::RoomNotFound(channel_id))?;
 
     // Remove screen share from room
-    let had_audio = if let Some(info) = room.remove_screen_share(user_id).await {
+    let _had_audio = if let Some(info) = room.remove_screen_share(user_id).await {
         info.has_audio
     } else {
         // User wasn't sharing, but that's okay - idempotent
@@ -706,33 +713,43 @@ async fn handle_screen_share_stop(
         tracing::warn!("Screen share limiter unavailable during stop — counter not decremented");
     }
 
+    // Collect screen share track sources from the peer's incoming tracks
+    let screen_sources: Vec<TrackSource> = if let Some(peer) = room.get_peer(user_id).await {
+        let incoming = peer.incoming_tracks.read().await;
+        incoming
+            .keys()
+            .filter(|s| s.is_screen_share())
+            .copied()
+            .collect()
+    } else {
+        Vec::new()
+    };
+
     // Clean up screen share tracks from the track router
-    room.track_router
-        .remove_source_track(user_id, TrackSource::ScreenVideo)
-        .await;
-    if had_audio {
+    for source in &screen_sources {
         room.track_router
-            .remove_source_track(user_id, TrackSource::ScreenAudio)
+            .remove_source_track(user_id, *source)
             .await;
     }
 
     // Remove incoming tracks from the peer
     if let Some(peer) = room.get_peer(user_id).await {
         let mut incoming = peer.incoming_tracks.write().await;
-        incoming.remove(&TrackSource::ScreenVideo);
-        incoming.remove(&TrackSource::ScreenAudio);
+        for source in &screen_sources {
+            incoming.remove(source);
+        }
     }
 
     // Remove outgoing tracks from all subscribers and renegotiate
     let other_peers = room.get_other_peers(user_id).await;
     for other_peer in &other_peers {
-        let removed_video = other_peer
-            .remove_outgoing_track(user_id, TrackSource::ScreenVideo)
-            .await;
-        let removed_audio = other_peer
-            .remove_outgoing_track(user_id, TrackSource::ScreenAudio)
-            .await;
-        if removed_video || removed_audio {
+        let mut any_removed = false;
+        for source in &screen_sources {
+            if other_peer.remove_outgoing_track(user_id, *source).await {
+                any_removed = true;
+            }
+        }
+        if any_removed {
             if let Err(e) = SfuServer::renegotiate(other_peer).await {
                 warn!(
                     subscriber = %other_peer.user_id,
