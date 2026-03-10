@@ -18,7 +18,7 @@ import {
   createSignal,
   onCleanup,
 } from "solid-js";
-import { Hash, Volume2 } from "lucide-solid";
+import { Hash, Volume2, Pin } from "lucide-solid";
 import AppShell from "@/components/layout/AppShell";
 import CommandPalette from "@/components/layout/CommandPalette";
 import MessageList from "@/components/messages/MessageList";
@@ -37,6 +37,8 @@ import {
   setShowGlobalSearch,
   clearSearch,
 } from "@/stores/search";
+import { loadChannelPins, pinCount, clearChannelPins } from "@/stores/channelPins";
+import PinDrawer from "@/components/channels/PinDrawer";
 
 const DiscoveryView = lazy(
   () => import("@/components/discovery/DiscoveryView"),
@@ -46,10 +48,22 @@ const Main: Component = () => {
   const channel = selectedChannel;
   const [showShortcuts, setShowShortcuts] = createSignal(false);
   const [channelSearchScope, setChannelSearchScope] = createSignal(false);
+  const [showPinDrawer, setShowPinDrawer] = createSignal(false);
 
   // Load guilds on mount
   onMount(() => {
     loadGuilds();
+  });
+
+  // Load pins when channel changes
+  createEffect(() => {
+    const ch = channel();
+    if (ch) {
+      loadChannelPins(ch.id);
+    } else {
+      clearChannelPins();
+    }
+    setShowPinDrawer(false);
   });
 
   // Combined global keyboard shortcut handler
@@ -201,6 +215,21 @@ const Main: Component = () => {
                           {channel()?.topic}
                         </div>
                       </Show>
+                      <div class="ml-auto flex items-center">
+                        <button
+                          onClick={() => setShowPinDrawer(!showPinDrawer())}
+                          class="p-1.5 rounded hover:bg-white/10 text-text-secondary hover:text-text-primary transition-colors relative"
+                          title="Pinned Messages"
+                          aria-label="Pinned Messages"
+                        >
+                          <Pin class="w-4 h-4" />
+                          <Show when={pinCount() > 0}>
+                            <span class="absolute -top-1 -right-1 bg-accent-primary text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center font-bold">
+                              {pinCount()}
+                            </span>
+                          </Show>
+                        </button>
+                      </div>
                     </header>
 
                     {/* Messages */}
@@ -222,6 +251,20 @@ const Main: Component = () => {
                     <ThreadSidebar
                       channelId={channel()!.id}
                       guildId={guildsState.activeGuildId ?? undefined}
+                    />
+                  </Show>
+
+                  {/* Pin Drawer */}
+                  <Show when={showPinDrawer()}>
+                    <PinDrawer
+                      channelId={channel()!.id}
+                      canUnpin={true}
+                      onClose={() => setShowPinDrawer(false)}
+                      onJumpToMessage={(messageId) => {
+                        // TODO: Implement scroll-to-message
+                        setShowPinDrawer(false);
+                        console.log("Jump to message:", messageId);
+                      }}
                     />
                   </Show>
                 </div>
