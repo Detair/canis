@@ -307,11 +307,17 @@ pub async fn unpin_message(
     .map_err(|_| ChannelPinsError::Forbidden)?;
 
     // Delete the pin
-    sqlx::query("DELETE FROM channel_pins WHERE channel_id = $1 AND message_id = $2")
-        .bind(channel_id)
-        .bind(message_id)
-        .execute(&state.db)
-        .await?;
+    let result =
+        sqlx::query("DELETE FROM channel_pins WHERE channel_id = $1 AND message_id = $2")
+            .bind(channel_id)
+            .bind(message_id)
+            .execute(&state.db)
+            .await?;
+
+    // Only broadcast if a pin was actually removed
+    if result.rows_affected() == 0 {
+        return Ok(StatusCode::NO_CONTENT);
+    }
 
     // Broadcast unpin event
     if let Err(e) = broadcast_to_channel(
