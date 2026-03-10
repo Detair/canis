@@ -854,6 +854,8 @@ export async function initWebSocket(): Promise<void> {
             edited_at: null,
             created_at: new Date().toISOString(),
             mention_type: null,
+            pinned: false,
+            message_type: "user",
           };
           await addMessage(syntheticMessage);
         } else {
@@ -1348,6 +1350,8 @@ async function handleServerEvent(event: ServerEvent): Promise<void> {
           edited_at: null,
           created_at: new Date().toISOString(),
           mention_type: null,
+          pinned: false,
+          message_type: "user",
         };
         await addMessage(syntheticMessage);
       } else {
