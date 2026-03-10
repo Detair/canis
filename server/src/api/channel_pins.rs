@@ -244,18 +244,43 @@ pub async fn pin_message(
     if result.rows_affected() > 0 {
         let pinned_at = Utc::now();
 
-        // Insert system message
-        sqlx::query(
+        // Insert system message and fetch it back for broadcasting
+        let sys_msg = sqlx::query_as::<_, db::Message>(
             r"
             INSERT INTO messages (channel_id, user_id, content, message_type)
             VALUES ($1, $2, $3, 'system')
+            RETURNING *
             ",
         )
         .bind(channel_id)
         .bind(auth_user.id)
         .bind("pinned a message to this channel.")
-        .execute(&state.db)
+        .fetch_one(&state.db)
         .await?;
+
+        // Broadcast system message as MessageNew
+        let sys_responses =
+            crate::chat::messages::build_message_responses(&state.db, auth_user.id, vec![sys_msg]).await
+                .unwrap_or_default();
+        if let Some(sys_response) = sys_responses.into_iter().next() {
+            let message_json = serde_json::to_value(&sys_response).unwrap_or_default();
+            if let Err(e) = broadcast_to_channel(
+                &state.redis,
+                channel_id,
+                &ServerEvent::MessageNew {
+                    channel_id,
+                    message: message_json,
+                },
+            )
+            .await
+            {
+                tracing::warn!(
+                    channel_id = %channel_id,
+                    error = %e,
+                    "Failed to broadcast system message for pin"
+                );
+            }
+        }
 
         // Broadcast pin event
         if let Err(e) = broadcast_to_channel(

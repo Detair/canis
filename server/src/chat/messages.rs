@@ -1246,7 +1246,14 @@ pub async fn update(
         mention_type: None, // Edits don't trigger new notifications
         reactions: None,
         thread_info: None,
-        pinned: false,
+        pinned: sqlx::query_scalar::<_, bool>(
+            "SELECT EXISTS(SELECT 1 FROM channel_pins WHERE channel_id = $1 AND message_id = $2)",
+        )
+        .bind(message.channel_id)
+        .bind(message.id)
+        .fetch_one(&state.db)
+        .await
+        .unwrap_or(false),
         message_type: message.message_type.clone(),
     };
 
