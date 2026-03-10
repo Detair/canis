@@ -46,7 +46,7 @@ import { currentUser } from "@/stores/auth";
 import { showUserContextMenu, triggerReport } from "@/lib/contextMenuBuilders";
 import { spoilerExtension } from "@/lib/markdown/spoilerExtension";
 import { openThread } from "@/stores/threads";
-import { pinMessageAction, unpinMessageAction, isMessagePinned } from "@/stores/channelPins";
+import { pinMessageAction, unpinMessageAction } from "@/stores/channelPins";
 import { removeMessage, updateMessage, editingMessageId, setEditingMessageId } from "@/stores/messages";
 import { showToast } from "@/components/ui/Toast";
 
