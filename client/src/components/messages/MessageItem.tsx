@@ -47,6 +47,10 @@ import { showUserContextMenu, triggerReport } from "@/lib/contextMenuBuilders";
 import { spoilerExtension } from "@/lib/markdown/spoilerExtension";
 import { openThread } from "@/stores/threads";
 import { pinMessageAction, unpinMessageAction } from "@/stores/channelPins";
+import { memberHasPermission } from "@/stores/permissions";
+import { isGuildOwner } from "@/stores/guilds";
+import { PermissionBits } from "@/lib/permissionConstants";
+import { authState } from "@/stores/auth";
 import { removeMessage, updateMessage, editingMessageId, setEditingMessageId } from "@/stores/messages";
 import { showToast } from "@/components/ui/Toast";
 
@@ -415,6 +419,15 @@ const MessageItem: Component<MessageItemProps> = (props) => {
 
   const isImage = (mimeType: string) => mimeType.startsWith("image/");
 
+  // Check if current user can pin/unpin in this guild
+  const canPin = createMemo(() => {
+    const guildId = props.guildId;
+    const userId = authState.user?.id;
+    if (!guildId || !userId) return false;
+    const isOwner = isGuildOwner(guildId, userId);
+    return isOwner || memberHasPermission(guildId, userId, isOwner, PermissionBits.PIN_MESSAGES);
+  });
+
   // Parse markdown and extract code blocks for separate rendering
   const contentBlocks = createMemo((): ContentBlock[] => {
     const content = props.message.content;
@@ -500,25 +513,27 @@ const MessageItem: Component<MessageItemProps> = (props) => {
       },
     ];
 
-    // Pin/Unpin
-    items.push(
-      { separator: true },
-      {
-        label: msg.pinned ? "Unpin Message" : "Pin Message",
-        icon: Pin,
-        action: async () => {
-          try {
-            if (msg.pinned) {
-              await unpinMessageAction(msg.channel_id, msg.id);
-            } else {
-              await pinMessageAction(msg.channel_id, msg.id);
+    // Pin/Unpin (only if user has PIN_MESSAGES permission)
+    if (canPin()) {
+      items.push(
+        { separator: true },
+        {
+          label: msg.pinned ? "Unpin Message" : "Pin Message",
+          icon: Pin,
+          action: async () => {
+            try {
+              if (msg.pinned) {
+                await unpinMessageAction(msg.channel_id, msg.id);
+              } else {
+                await pinMessageAction(msg.channel_id, msg.id);
+              }
+            } catch (e) {
+              showToast({ type: "error", title: "Failed to pin/unpin message" });
             }
-          } catch (e) {
-            console.error("Failed to pin/unpin message:", e);
-          }
+          },
         },
-      },
-    );
+      );
+    }
 
     // Only show "Reply in Thread" for top-level messages, not inside ThreadSidebar, and only when threads are enabled
     if (

@@ -1319,6 +1319,32 @@ pub async fn delete(
     let deleted = db::delete_message(&state.db, id, auth_user.id).await?;
 
     if deleted {
+        // Clean up channel pin if message was pinned
+        let pin_deleted = sqlx::query(
+            "DELETE FROM channel_pins WHERE channel_id = $1 AND message_id = $2",
+        )
+        .bind(channel_id)
+        .bind(id)
+        .execute(&state.db)
+        .await;
+
+        if let Ok(result) = pin_deleted {
+            if result.rows_affected() > 0 {
+                if let Err(e) = broadcast_to_channel(
+                    &state.redis,
+                    channel_id,
+                    &ServerEvent::ChannelPinRemoved {
+                        channel_id,
+                        message_id: id,
+                    },
+                )
+                .await
+                {
+                    warn!(channel_id = %channel_id, message_id = %id, error = %e, "Failed to broadcast channel_pin_removed on delete");
+                }
+            }
+        }
+
         if let Some(parent_id) = parent_id {
             // Thread reply deleted: decrement parent counters and broadcast ThreadReplyDelete
             if let Err(e) = db::decrement_thread_counters(&state.db, parent_id).await {

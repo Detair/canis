@@ -11,6 +11,7 @@ import { Pin, X, ExternalLink } from "lucide-solid";
 import Avatar from "@/components/ui/Avatar";
 import { channelPins, isPinsLoading, unpinMessageAction } from "@/stores/channelPins";
 import { formatTimestamp } from "@/lib/utils";
+import { showToast } from "@/components/ui/Toast";
 import type { ChannelPin } from "@/lib/types";
 
 interface PinDrawerProps {
@@ -22,7 +23,11 @@ interface PinDrawerProps {
 
 const PinDrawer: Component<PinDrawerProps> = (props) => {
   const handleUnpin = async (pin: ChannelPin) => {
-    await unpinMessageAction(props.channelId, pin.message.id);
+    try {
+      await unpinMessageAction(props.channelId, pin.message.id);
+    } catch (e) {
+      showToast({ type: "error", title: "Failed to unpin message" });
+    }
   };
 
   return (

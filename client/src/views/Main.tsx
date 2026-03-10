@@ -30,7 +30,10 @@ import HomeSidebar from "@/components/home/HomeSidebar";
 import SearchPanel from "@/components/search/SearchPanel";
 import KeyboardShortcutsDialog from "@/components/ui/KeyboardShortcutsDialog";
 import { selectedChannel } from "@/stores/channels";
-import { loadGuilds, guildsState, isDiscoveryActive } from "@/stores/guilds";
+import { loadGuilds, guildsState, isDiscoveryActive, isGuildOwner } from "@/stores/guilds";
+import { memberHasPermission } from "@/stores/permissions";
+import { PermissionBits } from "@/lib/permissionConstants";
+import { authState } from "@/stores/auth";
 import { threadsState } from "@/stores/threads";
 import {
   showGlobalSearch,
@@ -258,7 +261,13 @@ const Main: Component = () => {
                   <Show when={showPinDrawer()}>
                     <PinDrawer
                       channelId={channel()!.id}
-                      canUnpin={true}
+                      canUnpin={(() => {
+                        const guildId = guildsState.activeGuildId;
+                        const userId = authState.user?.id;
+                        if (!guildId || !userId) return false;
+                        const isOwner = isGuildOwner(guildId, userId);
+                        return isOwner || memberHasPermission(guildId, userId, isOwner, PermissionBits.PIN_MESSAGES);
+                      })()}
                       onClose={() => setShowPinDrawer(false)}
                       onJumpToMessage={(messageId) => {
                         // TODO: Implement scroll-to-message
