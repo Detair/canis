@@ -269,10 +269,9 @@ const Main: Component = () => {
                         return isOwner || memberHasPermission(guildId, userId, isOwner, PermissionBits.PIN_MESSAGES);
                       })()}
                       onClose={() => setShowPinDrawer(false)}
-                      onJumpToMessage={(messageId) => {
-                        // TODO: Implement scroll-to-message
+                      onJumpToMessage={(_messageId) => {
+                        // TODO: Implement scroll-to-message in a follow-up PR
                         setShowPinDrawer(false);
-                        console.log("Jump to message:", messageId);
                       }}
                     />
                   </Show>
