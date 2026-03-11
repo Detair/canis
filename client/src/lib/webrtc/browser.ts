@@ -28,13 +28,22 @@ const QUALITY_BITRATES: Record<ScreenShareQuality, number> = {
   premium: 6_000_000, // 1080p60
 };
 
+/** Max framerate for the highest simulcast layer, keyed by quality. */
+const QUALITY_FRAMERATES: Record<ScreenShareQuality, number> = {
+  low: 15,
+  medium: 30,
+  high: 30,
+  premium: 60,
+};
+
 /** Build 3-layer simulcast encodings (high / medium / low). */
 function simulcastEncodings(
   highBitrate: number,
+  highFramerate: number = 30,
 ): RTCRtpEncodingParameters[] {
   return [
-    { rid: "h", maxBitrate: highBitrate, scaleResolutionDownBy: 1.0, maxFramerate: 30 },
-    { rid: "m", maxBitrate: 800_000, scaleResolutionDownBy: 2.0, maxFramerate: 24 },
+    { rid: "h", maxBitrate: highBitrate, scaleResolutionDownBy: 1.0, maxFramerate: highFramerate },
+    { rid: "m", maxBitrate: 800_000, scaleResolutionDownBy: 2.0, maxFramerate: Math.min(24, highFramerate) },
     { rid: "l", maxBitrate: 200_000, scaleResolutionDownBy: 4.0, maxFramerate: 15 },
   ];
 }
@@ -768,11 +777,13 @@ export class BrowserVoiceAdapter implements VoiceAdapter {
       };
 
       // Add video track to peer connection with simulcast encodings
-      const qualityBitrate = QUALITY_BITRATES[options?.quality ?? "medium"];
+      const quality = options?.quality ?? "medium";
+      const qualityBitrate = QUALITY_BITRATES[quality];
+      const qualityFramerate = QUALITY_FRAMERATES[quality];
       const transceiver = this.peerConnection.addTransceiver(videoTrack, {
         direction: "sendonly",
         streams: [stream],
-        sendEncodings: simulcastEncodings(qualityBitrate),
+        sendEncodings: simulcastEncodings(qualityBitrate, qualityFramerate),
       });
       const videoSender = transceiver.sender;
 
