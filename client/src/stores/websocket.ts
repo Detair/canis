@@ -656,7 +656,7 @@ export async function initWebSocket(): Promise<void> {
         channel_id: string;
         source_user_id: string;
         track_source: string;
-        active_layer: string;
+        active_layer: "high" | "medium" | "low";
       }>("ws:voice_layer_changed", async (event) => {
         await handleVoiceLayerChanged(event.payload);
       }),
@@ -1931,7 +1931,11 @@ async function handleVoiceUserStatsEvent(event: {
   handleVoiceUserStats(event);
 }
 
-async function handleVoiceLayerChanged(event: any): Promise<void> {
+async function handleVoiceLayerChanged(event: {
+  source_user_id: string;
+  track_source: string;
+  active_layer: "high" | "medium" | "low";
+}): Promise<void> {
   const { handleLayerChanged } = await import("@/stores/simulcastLayers");
   handleLayerChanged(
     event.source_user_id,
