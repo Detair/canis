@@ -352,16 +352,21 @@ const QualityContextMenu: Component<{
   };
 
   onMount(() => {
-    // Delay to avoid the menu being immediately closed by the contextmenu event
+    // Delay to avoid the menu being immediately closed by the contextmenu event.
+    // Track cleanup state to prevent listener leak if component unmounts
+    // before the timeout fires.
+    let cleaned = false;
     setTimeout(() => {
+      if (cleaned) return;
       window.addEventListener("click", handleClickOutside);
       window.addEventListener("contextmenu", handleClickOutside);
     }, 0);
-  });
 
-  onCleanup(() => {
-    window.removeEventListener("click", handleClickOutside);
-    window.removeEventListener("contextmenu", handleClickOutside);
+    onCleanup(() => {
+      cleaned = true;
+      window.removeEventListener("click", handleClickOutside);
+      window.removeEventListener("contextmenu", handleClickOutside);
+    });
   });
 
   return (
