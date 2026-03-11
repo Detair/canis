@@ -59,9 +59,9 @@ const fn select_layer(pref: LayerPreference, remb: u64) -> Layer {
     } else {
         Layer::Low
     };
-    match pref {
-        LayerPreference::Auto => bandwidth_layer,
-        LayerPreference::Manual(ceiling) => layer_min(ceiling, bandwidth_layer),
+    match pref.layer() {
+        Some(ceiling) => layer_min(ceiling, bandwidth_layer),
+        None => bandwidth_layer,
     }
 }
 
@@ -670,7 +670,7 @@ mod simulcast_tests {
     #[test]
     fn test_select_layer_manual_ceiling() {
         assert_eq!(
-            select_layer(LayerPreference::Manual(Layer::Medium), 2_000_000),
+            select_layer(LayerPreference::Medium, 2_000_000),
             Layer::Medium
         );
     }
@@ -678,7 +678,7 @@ mod simulcast_tests {
     #[test]
     fn test_select_layer_manual_drops_below_ceiling() {
         assert_eq!(
-            select_layer(LayerPreference::Manual(Layer::High), 200_000),
+            select_layer(LayerPreference::High, 200_000),
             Layer::Low
         );
     }

@@ -276,14 +276,32 @@ impl Layer {
 }
 
 /// Viewer's layer preference for a specific track.
+///
+/// Flat enum matching the wire format (`"auto"`, `"high"`, `"medium"`, `"low"`).
+/// When not `Auto`, acts as a ceiling: the server may select a lower layer
+/// if bandwidth cannot sustain the requested one.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum LayerPreference {
     /// Server selects layer based on REMB bandwidth estimate.
     #[default]
     Auto,
-    /// Viewer requested a specific layer (used as ceiling).
-    Manual(Layer),
+    High,
+    Medium,
+    Low,
+}
+
+impl LayerPreference {
+    /// Convert to the equivalent [`Layer`], returning `None` for `Auto`.
+    #[must_use]
+    pub const fn layer(self) -> Option<Layer> {
+        match self {
+            Self::Auto => None,
+            Self::High => Some(Layer::High),
+            Self::Medium => Some(Layer::Medium),
+            Self::Low => Some(Layer::Low),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -475,5 +493,20 @@ mod layer_tests {
     #[test]
     fn test_layer_preference_default() {
         assert_eq!(LayerPreference::default(), LayerPreference::Auto);
+    }
+
+    #[test]
+    fn layer_preference_serde_round_trip() {
+        // Verify wire format matches what client sends
+        assert_eq!(serde_json::to_string(&LayerPreference::Auto).unwrap(), "\"auto\"");
+        assert_eq!(serde_json::to_string(&LayerPreference::High).unwrap(), "\"high\"");
+        assert_eq!(serde_json::to_string(&LayerPreference::Medium).unwrap(), "\"medium\"");
+        assert_eq!(serde_json::to_string(&LayerPreference::Low).unwrap(), "\"low\"");
+
+        // Verify deserialization from client-sent strings
+        assert_eq!(serde_json::from_str::<LayerPreference>("\"auto\"").unwrap(), LayerPreference::Auto);
+        assert_eq!(serde_json::from_str::<LayerPreference>("\"high\"").unwrap(), LayerPreference::High);
+        assert_eq!(serde_json::from_str::<LayerPreference>("\"medium\"").unwrap(), LayerPreference::Medium);
+        assert_eq!(serde_json::from_str::<LayerPreference>("\"low\"").unwrap(), LayerPreference::Low);
     }
 }
