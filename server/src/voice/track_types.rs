@@ -233,6 +233,59 @@ impl TrackInfo {
     }
 }
 
+/// Simulcast layer identifier, matching the RID sent by the client.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Layer {
+    High,
+    Medium,
+    Low,
+}
+
+impl Layer {
+    /// RID string used in RTP headers.
+    #[must_use]
+    pub const fn rid(self) -> &'static str {
+        match self {
+            Self::High => "h",
+            Self::Medium => "m",
+            Self::Low => "l",
+        }
+    }
+
+    /// Parse from RID string.
+    #[must_use]
+    pub fn from_rid(rid: &str) -> Option<Self> {
+        match rid {
+            "h" => Some(Self::High),
+            "m" => Some(Self::Medium),
+            "l" => Some(Self::Low),
+            _ => None,
+        }
+    }
+
+    /// Target bitrate for this layer (bps).
+    #[must_use]
+    pub const fn target_bitrate(self) -> u64 {
+        match self {
+            Self::High => 4_000_000,
+            Self::Medium => 800_000,
+            Self::Low => 200_000,
+        }
+    }
+}
+
+/// Viewer's layer preference for a specific track.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum LayerPreference {
+    /// Server selects layer based on REMB bandwidth estimate.
+    #[default]
+    Auto,
+    /// Viewer requested a specific layer (used as ceiling).
+    Manual(Layer),
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -397,5 +450,30 @@ mod tests {
 
         let deserialized: TrackInfo = serde_json::from_str(&json).unwrap();
         assert_eq!(deserialized, track);
+    }
+}
+
+#[cfg(test)]
+mod layer_tests {
+    use super::*;
+
+    #[test]
+    fn test_layer_rid_roundtrip() {
+        assert_eq!(Layer::from_rid("h"), Some(Layer::High));
+        assert_eq!(Layer::from_rid("m"), Some(Layer::Medium));
+        assert_eq!(Layer::from_rid("l"), Some(Layer::Low));
+        assert_eq!(Layer::from_rid("x"), None);
+    }
+
+    #[test]
+    fn test_layer_rid_string() {
+        assert_eq!(Layer::High.rid(), "h");
+        assert_eq!(Layer::Medium.rid(), "m");
+        assert_eq!(Layer::Low.rid(), "l");
+    }
+
+    #[test]
+    fn test_layer_preference_default() {
+        assert_eq!(LayerPreference::default(), LayerPreference::Auto);
     }
 }
