@@ -254,12 +254,12 @@ async fn test_pin_forbidden_without_permission() {
         "User without PIN_MESSAGES should get 403"
     );
 
-    // Owner also doesn't have PIN_MESSAGES permission (via @everyone role)
+    // Owner bypasses permission checks (GuildPermissions::all())
     let resp = pin_message(&app, channel_id, msg_id, &owner_token).await;
     assert_eq!(
         resp.status(),
-        403,
-        "Owner without PIN_MESSAGES should also get 403"
+        200,
+        "Owner should succeed regardless of @everyone role permissions"
     );
 }
 
