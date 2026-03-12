@@ -41,7 +41,7 @@ class MainActivity : ComponentActivity() {
         val startDestination = resolveStartDestination()
 
         setContent {
-            KaikuApp(startDestination = startDestination)
+            KaikuApp(startDestination = startDestination, authState = authState)
         }
     }
 
@@ -77,17 +77,26 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun KaikuApp(startDestination: String = "server_url") {
+fun KaikuApp(startDestination: String = "server_url", authState: AuthState? = null) {
     MaterialTheme {
         Surface(
             modifier = Modifier.fillMaxSize(),
             color = MaterialTheme.colorScheme.background,
         ) {
             val navController = rememberNavController()
-            KaikuNavGraph(
-                navController = navController,
-                startDestination = startDestination
-            )
+            if (authState != null) {
+                KaikuNavGraph(
+                    navController = navController,
+                    startDestination = startDestination,
+                    authState = authState
+                )
+            } else {
+                KaikuNavGraph(
+                    navController = navController,
+                    startDestination = startDestination,
+                    authState = AuthState()
+                )
+            }
         }
     }
 }

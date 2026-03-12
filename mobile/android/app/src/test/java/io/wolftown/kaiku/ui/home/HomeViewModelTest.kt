@@ -2,7 +2,9 @@ package io.wolftown.kaiku.ui.home
 
 import app.cash.turbine.test
 import io.mockk.*
+import io.wolftown.kaiku.data.local.TokenStorage
 import io.wolftown.kaiku.data.repository.GuildRepository
+import io.wolftown.kaiku.data.ws.KaikuWebSocket
 import io.wolftown.kaiku.domain.model.Channel
 import io.wolftown.kaiku.domain.model.Guild
 import kotlinx.coroutines.Dispatchers
@@ -18,6 +20,8 @@ import org.junit.Test
 class HomeViewModelTest {
 
     private lateinit var guildRepository: GuildRepository
+    private lateinit var webSocket: KaikuWebSocket
+    private lateinit var tokenStorage: TokenStorage
     private lateinit var viewModel: HomeViewModel
 
     private val testDispatcher = StandardTestDispatcher()
@@ -41,9 +45,12 @@ class HomeViewModelTest {
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
         guildRepository = mockk(relaxed = true)
+        webSocket = mockk(relaxed = true)
+        tokenStorage = mockk(relaxed = true)
         every { guildRepository.guilds } returns guildsFlow
         every { guildRepository.selectedGuildId } returns selectedGuildIdFlow
         every { guildRepository.channels } returns channelsFlow
+        every { tokenStorage.getServerUrl() } returns "https://example.com"
     }
 
     @After
@@ -61,7 +68,7 @@ class HomeViewModelTest {
             guildsFlow.value = sampleGuilds
         }
 
-        viewModel = HomeViewModel(guildRepository)
+        viewModel = HomeViewModel(guildRepository, webSocket, tokenStorage)
         advanceUntilIdle()
 
         coVerify { guildRepository.loadGuilds() }
@@ -84,7 +91,7 @@ class HomeViewModelTest {
             selectedGuildIdFlow.value = "guild-1"
         }
 
-        viewModel = HomeViewModel(guildRepository)
+        viewModel = HomeViewModel(guildRepository, webSocket, tokenStorage)
         advanceUntilIdle()
 
         viewModel.onGuildSelected("guild-1")
@@ -116,7 +123,7 @@ class HomeViewModelTest {
             selectedGuildIdFlow.value = "guild-1"
         }
 
-        viewModel = HomeViewModel(guildRepository)
+        viewModel = HomeViewModel(guildRepository, webSocket, tokenStorage)
         advanceUntilIdle()
 
         viewModel.onGuildSelected("guild-1")
@@ -139,7 +146,7 @@ class HomeViewModelTest {
             guildsFlow.value = sampleGuilds
         }
 
-        viewModel = HomeViewModel(guildRepository)
+        viewModel = HomeViewModel(guildRepository, webSocket, tokenStorage)
 
         viewModel.isLoading.test {
             // Initial loading state should be true (loading started in init)
@@ -164,7 +171,7 @@ class HomeViewModelTest {
     fun `error state on API failure`() = runTest {
         coEvery { guildRepository.loadGuilds() } throws RuntimeException("Network error")
 
-        viewModel = HomeViewModel(guildRepository)
+        viewModel = HomeViewModel(guildRepository, webSocket, tokenStorage)
         advanceUntilIdle()
 
         assertNotNull(viewModel.error.value)
@@ -186,7 +193,7 @@ class HomeViewModelTest {
             selectedGuildIdFlow.value = "guild-2"
         }
 
-        viewModel = HomeViewModel(guildRepository)
+        viewModel = HomeViewModel(guildRepository, webSocket, tokenStorage)
         advanceUntilIdle()
 
         assertNull(viewModel.selectedGuild.value)
@@ -207,7 +214,7 @@ class HomeViewModelTest {
             guildsFlow.value = sampleGuilds
         }
 
-        viewModel = HomeViewModel(guildRepository)
+        viewModel = HomeViewModel(guildRepository, webSocket, tokenStorage)
         advanceUntilIdle()
 
         viewModel.refresh()
@@ -233,7 +240,7 @@ class HomeViewModelTest {
             }
         }
 
-        viewModel = HomeViewModel(guildRepository)
+        viewModel = HomeViewModel(guildRepository, webSocket, tokenStorage)
         advanceUntilIdle()
 
         assertNotNull(viewModel.error.value)

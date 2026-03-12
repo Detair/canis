@@ -3,7 +3,9 @@ package io.wolftown.kaiku.ui.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import io.wolftown.kaiku.data.local.TokenStorage
 import io.wolftown.kaiku.data.repository.GuildRepository
+import io.wolftown.kaiku.data.ws.KaikuWebSocket
 import io.wolftown.kaiku.domain.model.Channel
 import io.wolftown.kaiku.domain.model.Guild
 import kotlinx.coroutines.flow.*
@@ -12,7 +14,9 @@ import javax.inject.Inject
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
-    private val guildRepository: GuildRepository
+    private val guildRepository: GuildRepository,
+    private val webSocket: KaikuWebSocket,
+    private val tokenStorage: TokenStorage
 ) : ViewModel() {
 
     val guilds: StateFlow<List<Guild>> = guildRepository.guilds
@@ -40,6 +44,7 @@ class HomeViewModel @Inject constructor(
     val navigateToChannel: SharedFlow<ChannelNavEvent> = _navigateToChannel.asSharedFlow()
 
     init {
+        connectWebSocket()
         loadGuilds()
     }
 
@@ -60,6 +65,11 @@ class HomeViewModel @Inject constructor(
 
     fun refresh() {
         loadGuilds()
+    }
+
+    private fun connectWebSocket() {
+        val serverUrl = tokenStorage.getServerUrl() ?: return
+        webSocket.connect(serverUrl)
     }
 
     private fun loadGuilds() {

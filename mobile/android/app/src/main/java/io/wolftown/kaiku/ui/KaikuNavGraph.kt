@@ -4,21 +4,28 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import io.wolftown.kaiku.data.local.AuthState
 import io.wolftown.kaiku.ui.auth.LoginScreen
 import io.wolftown.kaiku.ui.auth.RegisterScreen
 import io.wolftown.kaiku.ui.auth.ServerUrlScreen
+import io.wolftown.kaiku.ui.channel.TextChannelScreen
 import io.wolftown.kaiku.ui.home.HomeScreen
 
 @Composable
 fun KaikuNavGraph(
     navController: NavHostController,
-    startDestination: String
+    startDestination: String,
+    authState: AuthState
 ) {
+    val currentUserId by authState.currentUserId.collectAsState()
+
     NavHost(navController = navController, startDestination = startDestination) {
         composable("server_url") {
             ServerUrlScreen(
@@ -67,10 +74,13 @@ fun KaikuNavGraph(
             )
         }
 
-        composable("channel/{channelId}") {
-            // Placeholder for TextChannelScreen (Task 9)
-            val channelId = it.arguments?.getString("channelId") ?: ""
-            PlaceholderScreen(title = "Text Channel", subtitle = channelId)
+        composable("channel/{channelId}") { backStackEntry ->
+            val channelId = backStackEntry.arguments?.getString("channelId") ?: ""
+            TextChannelScreen(
+                channelName = channelId, // Will be replaced by actual name when channel data is available
+                currentUserId = currentUserId ?: "",
+                onNavigateBack = { navController.popBackStack() }
+            )
         }
 
         composable("voice/{channelId}") {
