@@ -16,6 +16,7 @@ import org.junit.Test
 class LoginViewModelTest {
 
     private lateinit var authRepository: AuthRepository
+    private lateinit var oidcHandler: OidcHandler
     private lateinit var viewModel: LoginViewModel
 
     private val testDispatcher = StandardTestDispatcher()
@@ -24,7 +25,8 @@ class LoginViewModelTest {
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
         authRepository = mockk(relaxed = true)
-        viewModel = LoginViewModel(authRepository)
+        oidcHandler = mockk(relaxed = true)
+        viewModel = LoginViewModel(authRepository, oidcHandler)
     }
 
     @After
