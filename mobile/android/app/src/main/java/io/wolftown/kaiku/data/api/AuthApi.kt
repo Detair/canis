@@ -28,6 +28,7 @@ interface AuthApi {
     suspend fun logout()
     suspend fun getMe(): User
     suspend fun getOidcProviders(): List<OidcProvider>
+    suspend fun exchangeOidcCode(code: String, state: String, redirectUri: String): AuthResponse
 }
 
 @Serializable
@@ -48,6 +49,13 @@ private data class RegisterRequest(
 @Serializable
 private data class RefreshTokenRequest(
     val refreshToken: String
+)
+
+@Serializable
+private data class OidcCallbackRequest(
+    val code: String,
+    val state: String,
+    val redirectUri: String
 )
 
 class AuthApiImpl @Inject constructor(
@@ -129,6 +137,33 @@ class AuthApiImpl @Inject constructor(
 
         if (!response.status.isSuccess()) {
             return emptyList()
+        }
+
+        return response.body()
+    }
+
+    override suspend fun exchangeOidcCode(
+        code: String,
+        state: String,
+        redirectUri: String
+    ): AuthResponse {
+        // The server's OIDC callback is GET /auth/oidc/callback?code=...&state=...
+        // The server handles the code exchange internally and returns/redirects with tokens.
+        // For the mobile flow, the server redirects to kaiku://auth/callback with tokens
+        // in query params, so this method is used as a fallback POST exchange if needed.
+        val response = httpClient.get("/auth/oidc/callback") {
+            url {
+                parameters.append("code", code)
+                parameters.append("state", state)
+            }
+        }
+
+        if (!response.status.isSuccess()) {
+            val errorBody = runCatching { response.body<ApiErrorResponse>() }.getOrNull()
+            throw ApiException(
+                response.status,
+                errorBody?.message ?: "OIDC code exchange failed"
+            )
         }
 
         return response.body()

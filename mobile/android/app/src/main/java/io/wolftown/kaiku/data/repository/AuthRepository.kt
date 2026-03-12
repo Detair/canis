@@ -99,6 +99,75 @@ class AuthRepository @Inject constructor(
         }
     }
 
+    /**
+     * Completes the OIDC login by storing the tokens received via deep link redirect.
+     *
+     * In the mobile OIDC flow, the server redirects to `kaiku://auth/callback` with
+     * tokens in query parameters (access_token, refresh_token, expires_in).
+     * This method saves those tokens and fetches the user profile.
+     */
+    suspend fun completeOidcLogin(
+        accessToken: String,
+        refreshToken: String,
+        expiresIn: Int
+    ): Result<User> {
+        return try {
+            tokenStorage.saveTokens(
+                accessToken = accessToken,
+                refreshToken = refreshToken,
+                expiresIn = expiresIn,
+                userId = "" // Will be populated after getMe
+            )
+
+            val user = authApi.getMe()
+
+            tokenStorage.saveTokens(
+                accessToken = accessToken,
+                refreshToken = refreshToken,
+                expiresIn = expiresIn,
+                userId = user.id
+            )
+
+            authState.setLoggedIn(user.id)
+            Result.success(user)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Exchanges an OIDC authorization code for tokens via the server's callback endpoint.
+     *
+     * This is a fallback path if the server does not redirect with tokens directly.
+     */
+    suspend fun exchangeOidcCode(code: String, state: String): Result<User> {
+        return try {
+            val redirectUri = "kaiku://auth/callback"
+            val authResponse = authApi.exchangeOidcCode(code, state, redirectUri)
+
+            tokenStorage.saveTokens(
+                accessToken = authResponse.accessToken,
+                refreshToken = authResponse.refreshToken ?: "",
+                expiresIn = authResponse.expiresIn,
+                userId = ""
+            )
+
+            val user = authApi.getMe()
+
+            tokenStorage.saveTokens(
+                accessToken = authResponse.accessToken,
+                refreshToken = authResponse.refreshToken ?: "",
+                expiresIn = authResponse.expiresIn,
+                userId = user.id
+            )
+
+            authState.setLoggedIn(user.id)
+            Result.success(user)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     fun isLoggedIn(): Boolean {
         return authState.isLoggedIn.value
     }

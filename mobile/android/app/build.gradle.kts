@@ -92,6 +92,9 @@ dependencies {
     implementation("io.coil-kt.coil3:coil-compose:3.1.0")
     implementation("io.coil-kt.coil3:coil-network-okhttp:3.1.0")
 
+    // Browser (Chrome Custom Tabs)
+    implementation("androidx.browser:browser:1.8.0")
+
     // Security
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
 
