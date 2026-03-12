@@ -6,11 +6,13 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Call
-import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -24,6 +26,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import io.wolftown.kaiku.data.voice.AudioRoute
 import io.wolftown.kaiku.data.ws.ScreenShareInfo
 import io.wolftown.kaiku.data.ws.VoiceParticipant
+import org.webrtc.VideoTrack
 
 /**
  * Full-screen voice channel view.
@@ -45,8 +48,34 @@ fun VoiceChannelScreen(
     val isMuted by viewModel.isMuted.collectAsState()
     val isConnected by viewModel.isConnected.collectAsState()
     val screenShares by viewModel.screenShares.collectAsState()
+    val remoteVideoTracks by viewModel.remoteVideoTracks.collectAsState()
+    val layerPreferences by viewModel.layerPreferences.collectAsState()
     val currentRoute by viewModel.currentRoute.collectAsState()
     val availableRoutes by viewModel.availableRoutes.collectAsState()
+
+    var fullscreenStreamId by remember { mutableStateOf<String?>(null) }
+
+    // Fullscreen mode: show only the screen share
+    if (fullscreenStreamId != null) {
+        val share = screenShares.find { it.streamId == fullscreenStreamId }
+        if (share != null) {
+            val videoTrack = findVideoTrackForStream(remoteVideoTracks, share.streamId)
+            val currentLayer = layerPreferences[share.streamId] ?: "auto"
+            ScreenShareView(
+                videoTrack = videoTrack,
+                screenShareInfo = share,
+                eglContext = viewModel.eglContext,
+                currentLayer = currentLayer,
+                onLayerChange = { viewModel.onSetLayerPreference(share.streamId, it) },
+                onToggleFullscreen = { fullscreenStreamId = null },
+                modifier = Modifier.fillMaxSize()
+            )
+            return
+        } else {
+            // Screen share ended while in fullscreen — exit fullscreen
+            fullscreenStreamId = null
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -84,9 +113,16 @@ fun VoiceChannelScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // Screen share area (placeholder for Task 12)
+            // Screen share area
             if (screenShares.isNotEmpty()) {
-                ScreenSharePlaceholder(screenShares = screenShares)
+                ScreenShareArea(
+                    screenShares = screenShares,
+                    remoteVideoTracks = remoteVideoTracks,
+                    layerPreferences = layerPreferences,
+                    eglContext = viewModel.eglContext,
+                    onLayerChange = viewModel::onSetLayerPreference,
+                    onToggleFullscreen = { streamId -> fullscreenStreamId = streamId }
+                )
             }
 
             // Connection status
@@ -199,46 +235,118 @@ private fun ParticipantCard(participant: VoiceParticipant) {
     }
 }
 
+/**
+ * Screen share area with support for multiple concurrent screen shares.
+ *
+ * Single share: renders directly. Multiple shares: uses [HorizontalPager]
+ * with page indicators. Takes ~60% of screen height when active.
+ */
 @Composable
-private fun ScreenSharePlaceholder(screenShares: List<ScreenShareInfo>) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(200.dp)
-            .padding(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
+private fun ScreenShareArea(
+    screenShares: List<ScreenShareInfo>,
+    remoteVideoTracks: Map<String, VideoTrack>,
+    layerPreferences: Map<String, String>,
+    eglContext: org.webrtc.EglBase.Context,
+    onLayerChange: (String, String) -> Unit,
+    onToggleFullscreen: (String) -> Unit
+) {
+    if (screenShares.size == 1) {
+        // Single screen share — render directly
+        val share = screenShares.first()
+        val videoTrack = findVideoTrackForStream(remoteVideoTracks, share.streamId)
+        val currentLayer = layerPreferences[share.streamId] ?: "auto"
+
+        ScreenShareView(
+            videoTrack = videoTrack,
+            screenShareInfo = share,
+            eglContext = eglContext,
+            currentLayer = currentLayer,
+            onLayerChange = { layer -> onLayerChange(share.streamId, layer) },
+            onToggleFullscreen = { onToggleFullscreen(share.streamId) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(0.6f)
+                .padding(horizontal = 8.dp, vertical = 4.dp)
         )
-    ) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
+    } else {
+        // Multiple screen shares — horizontal pager
+        val pagerState = rememberPagerState(pageCount = { screenShares.size })
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(0.6f)
         ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            ) { page ->
+                val share = screenShares[page]
+                val videoTrack = findVideoTrackForStream(remoteVideoTracks, share.streamId)
+                val currentLayer = layerPreferences[share.streamId] ?: "auto"
+
+                ScreenShareView(
+                    videoTrack = videoTrack,
+                    screenShareInfo = share,
+                    eglContext = eglContext,
+                    currentLayer = currentLayer,
+                    onLayerChange = { layer -> onLayerChange(share.streamId, layer) },
+                    onToggleFullscreen = { onToggleFullscreen(share.streamId) },
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+
+            // Page indicators
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+                horizontalArrangement = Arrangement.Center
             ) {
-                Icon(
-                    imageVector = Icons.Default.Share,
-                    contentDescription = "Screen share",
-                    modifier = Modifier.size(32.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "${screenShares.size} screen share(s) active",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                screenShares.firstOrNull()?.let { share ->
-                    Text(
-                        text = "${share.username} sharing: ${share.sourceLabel}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                repeat(screenShares.size) { index ->
+                    val color = if (pagerState.currentPage == index) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                    }
+                    Box(
+                        modifier = Modifier
+                            .padding(horizontal = 3.dp)
+                            .size(6.dp)
+                            .clip(CircleShape)
+                            .background(color)
                     )
                 }
             }
         }
     }
+}
+
+/**
+ * Finds the best-matching remote video track for a given screen share stream ID.
+ *
+ * The server labels video tracks with the stream ID in the track ID or mid.
+ * Falls back to the first available video track if no exact match is found
+ * and there is only one screen share.
+ */
+private fun findVideoTrackForStream(
+    remoteVideoTracks: Map<String, VideoTrack>,
+    streamId: String
+): VideoTrack? {
+    // Exact match by track ID containing the stream ID
+    remoteVideoTracks.entries.find { (trackId, _) ->
+        trackId.contains(streamId)
+    }?.let { return it.value }
+
+    // If there's only one video track and one possible match, use it
+    if (remoteVideoTracks.size == 1) {
+        return remoteVideoTracks.values.firstOrNull()
+    }
+
+    return null
 }
 
 @Composable

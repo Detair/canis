@@ -7,9 +7,12 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import io.wolftown.kaiku.data.repository.VoiceRepository
 import io.wolftown.kaiku.data.voice.AudioRoute
 import io.wolftown.kaiku.data.voice.AudioRouteManager
+import io.wolftown.kaiku.data.voice.WebRtcManager
 import io.wolftown.kaiku.data.ws.ScreenShareInfo
 import io.wolftown.kaiku.data.ws.VoiceParticipant
 import kotlinx.coroutines.flow.StateFlow
+import org.webrtc.EglBase
+import org.webrtc.VideoTrack
 import kotlinx.coroutines.launch
 import java.util.logging.Level
 import java.util.logging.Logger
@@ -25,6 +28,7 @@ import javax.inject.Inject
 class VoiceViewModel @Inject constructor(
     private val voiceRepository: VoiceRepository,
     private val audioRouteManager: AudioRouteManager,
+    private val webRtcManager: WebRtcManager,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -38,8 +42,13 @@ class VoiceViewModel @Inject constructor(
     val isMuted: StateFlow<Boolean> = voiceRepository.isMuted
     val isConnected: StateFlow<Boolean> = voiceRepository.isConnected
     val screenShares: StateFlow<List<ScreenShareInfo>> = voiceRepository.screenShares
+    val remoteVideoTracks: StateFlow<Map<String, VideoTrack>> = webRtcManager.remoteVideoTracks
+    val layerPreferences: StateFlow<Map<String, String>> = voiceRepository.layerPreferences
     val currentRoute: StateFlow<AudioRoute> = audioRouteManager.currentRoute
     val availableRoutes: StateFlow<Set<AudioRoute>> = audioRouteManager.availableRoutes
+
+    /** Shared EGL context for video rendering. */
+    val eglContext: EglBase.Context = webRtcManager.eglBase.eglBaseContext
 
     init {
         onJoin()
@@ -70,6 +79,11 @@ class VoiceViewModel @Inject constructor(
     /** Toggles the local microphone mute state. */
     fun onToggleMute() {
         voiceRepository.toggleMute()
+    }
+
+    /** Sets the preferred simulcast layer for a screen share stream. */
+    fun onSetLayerPreference(streamId: String, layer: String) {
+        voiceRepository.setLayerPreference(streamId, layer)
     }
 
     /** Switches the audio output route (speaker, earpiece, bluetooth, wired headset). */

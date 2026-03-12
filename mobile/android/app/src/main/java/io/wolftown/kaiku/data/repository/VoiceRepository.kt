@@ -2,6 +2,8 @@ package io.wolftown.kaiku.data.repository
 
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import io.wolftown.kaiku.data.voice.AudioRouteManager
 import io.wolftown.kaiku.data.voice.WebRtcManager
 import io.wolftown.kaiku.data.ws.ClientEvent
@@ -65,6 +67,10 @@ class VoiceRepository @Inject constructor(
     private val _screenShares = MutableStateFlow<List<ScreenShareInfo>>(emptyList())
     /** Active screen shares in the current voice channel. */
     val screenShares: StateFlow<List<ScreenShareInfo>> = _screenShares.asStateFlow()
+
+    private val _layerPreferences = MutableStateFlow<Map<String, String>>(emptyMap())
+    /** Current layer preference per stream (streamId -> "auto"|"high"|"medium"|"low"). */
+    val layerPreferences: StateFlow<Map<String, String>> = _layerPreferences.asStateFlow()
 
     /** WebSocket event collection job — cancelled when leaving a channel. */
     private var eventCollectionJob: Job? = null
@@ -166,6 +172,52 @@ class VoiceRepository @Inject constructor(
         }
     }
 
+    /**
+     * Sets the preferred simulcast layer for a screen share stream.
+     *
+     * @param streamId The screen share stream ID.
+     * @param layer One of "auto", "high", "medium", "low".
+     */
+    fun setLayerPreference(streamId: String, layer: String) {
+        val channelId = _currentChannelId.value ?: return
+
+        // Find the screen share to get the userId for the target
+        val share = _screenShares.value.find { it.streamId == streamId } ?: return
+
+        _layerPreferences.value = _layerPreferences.value.toMutableMap().apply {
+            put(streamId, layer)
+        }
+
+        webSocket.send(
+            ClientEvent.VoiceSetLayerPreference(
+                channelId = channelId,
+                targetUserId = share.userId,
+                trackSource = "screen_video:$streamId",
+                preferredLayer = layer
+            )
+        )
+        logger.info("Set layer preference for stream $streamId: $layer")
+    }
+
+    /**
+     * Returns the default layer based on the current network type.
+     *
+     * - WiFi: "auto" (server picks best layer based on bandwidth)
+     * - Cellular: "low" (conserve data)
+     */
+    private fun defaultLayerForNetwork(): String {
+        val connectivityManager =
+            context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+                ?: return "auto"
+        val network = connectivityManager.activeNetwork ?: return "low"
+        val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return "low"
+        return if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
+            "auto"
+        } else {
+            "low"
+        }
+    }
+
     // -- Internal -------------------------------------------------------------
 
     private fun cleanUp() {
@@ -188,6 +240,7 @@ class VoiceRepository @Inject constructor(
         _currentChannelId.value = null
         _participants.value = emptyList()
         _screenShares.value = emptyList()
+        _layerPreferences.value = emptyMap()
         _isConnected.value = false
         _isMuted.value = false
     }
@@ -274,6 +327,21 @@ class VoiceRepository @Inject constructor(
                     val current = _screenShares.value
                     if (current.none { it.streamId == event.streamId }) {
                         _screenShares.value = current + info
+
+                        // Auto-request stream with network-aware layer preference
+                        val defaultLayer = defaultLayerForNetwork()
+                        _layerPreferences.value = _layerPreferences.value.toMutableMap().apply {
+                            put(event.streamId, defaultLayer)
+                        }
+                        webSocket.send(
+                            ClientEvent.VoiceSetLayerPreference(
+                                channelId = channelId,
+                                targetUserId = event.userId,
+                                trackSource = "screen_video:${event.streamId}",
+                                preferredLayer = defaultLayer
+                            )
+                        )
+                        logger.info("Auto-requested screen share ${event.streamId} at layer $defaultLayer")
                     }
                 }
             }
@@ -282,6 +350,18 @@ class VoiceRepository @Inject constructor(
                 if (event.channelId == channelId) {
                     _screenShares.value = _screenShares.value.filter {
                         it.streamId != event.streamId
+                    }
+                    // Clean up layer preference for the stopped stream
+                    _layerPreferences.value = _layerPreferences.value.toMutableMap().apply {
+                        remove(event.streamId)
+                    }
+                    // Remove any video tracks associated with this stream
+                    // Track IDs from the server follow the pattern: screen_video:{stream_id}
+                    val videoTracks = webRtcManager.remoteVideoTracks.value
+                    videoTracks.keys.filter { trackId ->
+                        trackId.contains(event.streamId)
+                    }.forEach { trackId ->
+                        webRtcManager.removeVideoTrack(trackId)
                     }
                 }
             }

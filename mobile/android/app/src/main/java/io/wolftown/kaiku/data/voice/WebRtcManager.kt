@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import org.webrtc.AudioSource
 import org.webrtc.AudioTrack
 import org.webrtc.DataChannel
+import org.webrtc.EglBase
 import org.webrtc.IceCandidate
 import org.webrtc.MediaConstraints
 import org.webrtc.MediaStream
@@ -57,6 +58,9 @@ class WebRtcManager @Inject constructor(
     private var factory: PeerConnectionFactory? = null
     private var peerConnection: PeerConnection? = null
     private var audioSource: AudioSource? = null
+
+    /** Shared EGL context for video rendering (SurfaceViewRenderer). */
+    val eglBase: EglBase = EglBase.create()
 
     /** The local microphone audio track, null until [createPeerConnection] is called. */
     var localAudioTrack: AudioTrack? = null
@@ -175,6 +179,11 @@ class WebRtcManager @Inject constructor(
         closePeerConnection()
         factory?.dispose()
         factory = null
+        try {
+            eglBase.release()
+        } catch (_: Exception) {
+            // EglBase may already be released
+        }
         logger.info("WebRtcManager disposed")
     }
 
@@ -236,6 +245,23 @@ class WebRtcManager @Inject constructor(
         }
     }
 
+    // -- Video track management -----------------------------------------------
+
+    /**
+     * Removes a remote video track by its track ID.
+     *
+     * Called when a screen share stops — the track is removed from
+     * [remoteVideoTracks] so the UI can clean up the renderer.
+     */
+    fun removeVideoTrack(trackId: String) {
+        val updated = _remoteVideoTracks.value.toMutableMap()
+        val removed = updated.remove(trackId)
+        if (removed != null) {
+            _remoteVideoTracks.value = updated
+            logger.info("Remote video track removed: $trackId")
+        }
+    }
+
     // -- Audio control --------------------------------------------------------
 
     /**
@@ -272,18 +298,20 @@ class WebRtcManager @Inject constructor(
 
         override fun onTrack(transceiver: RtpTransceiver) {
             val track = transceiver.receiver.track() ?: return
+            // Build a track key from the mid (maps to stream_id in SDP)
+            val mid = transceiver.mid ?: track.id()
             when (track) {
                 is AudioTrack -> {
                     val updated = _remoteAudioTracks.value.toMutableMap()
                     updated[track.id()] = track
                     _remoteAudioTracks.value = updated
-                    logger.info("Remote audio track added: ${track.id()}")
+                    logger.info("Remote audio track added: ${track.id()} (mid=$mid)")
                 }
                 is VideoTrack -> {
                     val updated = _remoteVideoTracks.value.toMutableMap()
                     updated[track.id()] = track
                     _remoteVideoTracks.value = updated
-                    logger.info("Remote video track added: ${track.id()}")
+                    logger.info("Remote video track added: ${track.id()} (mid=$mid)")
                 }
             }
             onTrackAdded?.invoke(track)
