@@ -2636,12 +2636,15 @@ pub async fn qr_create(
 #[tracing::instrument(skip(state, body))]
 pub async fn qr_redeem(
     State(state): State<AppState>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
     headers: HeaderMap,
     jar: CookieJar,
     Json(body): Json<QrRedeemRequest>,
 ) -> AuthResult<(CookieJar, Json<AuthResponse>)> {
-    let token_uuid: Uuid = body.token.parse()
-        .map_err(|_| AuthError::InvalidCredentials)?;
+    let token_uuid: Uuid = body.token.parse().map_err(|_| {
+        crate::observability::metrics::record_auth_login_attempt(false);
+        AuthError::InvalidCredentials
+    })?;
     let redis_key = format!("qr_login:{token_uuid}");
 
     // Atomic get-and-delete (one-use)
@@ -2662,7 +2665,10 @@ pub async fn qr_redeem(
     // Verify user still exists (may have been deleted/banned during the token window)
     let _user = find_user_by_id(&state.db, user_id)
         .await?
-        .ok_or(AuthError::InvalidCredentials)?;
+        .ok_or_else(|| {
+            crate::observability::metrics::record_auth_login_attempt(false);
+            AuthError::InvalidCredentials
+        })?;
 
     // Issue tokens
     let tokens = generate_token_pair(
@@ -2676,14 +2682,15 @@ pub async fn qr_redeem(
     let token_hash = hash_token(&tokens.refresh_token);
     let expires_at = Utc::now() + Duration::seconds(state.config.jwt_refresh_expiry);
 
-    // Create session (no IP/UA/geo — mobile device info not available here)
+    // Create session with IP and user agent from the redeeming client
+    let user_agent = extract_user_agent(&headers);
     create_session(
         &state.db,
         user_id,
         &token_hash,
         expires_at,
-        None,
-        None,
+        Some(&addr.ip().to_string()),
+        user_agent.as_deref(),
         None,
         None,
     )
