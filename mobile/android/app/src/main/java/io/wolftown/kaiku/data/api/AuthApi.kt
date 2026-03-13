@@ -129,7 +129,10 @@ class AuthApiImpl @Inject constructor(
     }
 
     override suspend fun logout() {
-        httpClient.post("/auth/logout")
+        val response = httpClient.post("/auth/logout")
+        if (!response.status.isSuccess()) {
+            logger.log(Level.WARNING, "Logout request failed: ${response.status}")
+        }
     }
 
     override suspend fun getMe(): User {
@@ -147,8 +150,8 @@ class AuthApiImpl @Inject constructor(
         val response = httpClient.get("/auth/oidc/providers")
 
         if (!response.status.isSuccess()) {
-            logger.log(Level.WARNING, "Failed to load OIDC providers: ${response.status}")
-            return emptyList()
+            val errorBody = runCatching { response.body<ApiErrorResponse>() }.getOrNull()
+            throw ApiException(response.status, errorBody?.message ?: "Failed to load OIDC providers")
         }
 
         return response.body()

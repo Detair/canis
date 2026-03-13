@@ -6,6 +6,8 @@ import androidx.browser.customtabs.CustomTabsIntent
 import io.wolftown.kaiku.data.local.TokenStorage
 import io.wolftown.kaiku.data.repository.AuthRepository
 import io.wolftown.kaiku.domain.model.User
+import java.util.logging.Level
+import java.util.logging.Logger
 import javax.inject.Inject
 
 /**
@@ -28,6 +30,7 @@ class OidcHandler @Inject constructor(
         private const val SCHEME = "kaiku"
         private const val HOST = "auth"
         private const val PATH = "/callback"
+        private val logger = Logger.getLogger("OidcHandler")
     }
 
     /**
@@ -37,7 +40,11 @@ class OidcHandler @Inject constructor(
      * @param providerSlug The OIDC provider slug (e.g., "google", "github")
      */
     fun launchOidcLogin(context: Context, providerSlug: String) {
-        val serverUrl = tokenStorage.getServerUrl() ?: return
+        val serverUrl = tokenStorage.getServerUrl()
+        if (serverUrl == null) {
+            logger.log(Level.WARNING, "Cannot launch OIDC login: server URL not configured")
+            return
+        }
         val authUrl = "$serverUrl/auth/oidc/authorize/$providerSlug" +
             "?redirect_uri=${Uri.encode(REDIRECT_URI)}"
         val customTabIntent = CustomTabsIntent.Builder().build()
