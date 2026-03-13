@@ -34,7 +34,7 @@ class SerializationTest {
         assertEquals("testuser", user.username)
         assertEquals("Test User", user.displayName)
         assertEquals("https://cdn.example.com/avatar.png", user.avatarUrl)
-        assertEquals("online", user.status)
+        assertEquals(UserStatus.ONLINE, user.status)
         assertTrue(user.mfaEnabled)
         assertEquals("2025-01-15T10:30:00Z", user.createdAt)
     }
@@ -52,7 +52,7 @@ class SerializationTest {
         val user = KaikuJson.decodeFromString<User>(json)
 
         assertNull(user.avatarUrl)
-        assertEquals("offline", user.status)
+        assertEquals(UserStatus.OFFLINE, user.status)
         assertFalse(user.mfaEnabled)
         assertEquals("", user.createdAt)
     }
@@ -64,7 +64,7 @@ class SerializationTest {
             username = "roundtrip",
             displayName = "Roundtrip User",
             avatarUrl = "https://cdn.example.com/avatar.png",
-            status = "away",
+            status = UserStatus.IDLE,
             mfaEnabled = true,
             createdAt = "2025-01-15T10:30:00Z"
         )
@@ -176,7 +176,7 @@ class SerializationTest {
 
         assertEquals("chan-uuid-001", channel.id)
         assertEquals("general", channel.name)
-        assertEquals("text", channel.channelType)
+        assertEquals(ChannelType.TEXT, channel.channelType)
         assertEquals("cat-uuid-001", channel.categoryId)
         assertEquals("General discussion", channel.topic)
         assertNull(channel.userLimit)
@@ -198,7 +198,7 @@ class SerializationTest {
 
         val channel = KaikuJson.decodeFromString<Channel>(json)
 
-        assertEquals("voice", channel.channelType)
+        assertEquals(ChannelType.VOICE, channel.channelType)
         assertEquals(10, channel.userLimit)
     }
 
@@ -207,7 +207,7 @@ class SerializationTest {
         val channel = Channel(
             id = "chan-uuid-001",
             name = "roundtrip",
-            channelType = "text",
+            channelType = ChannelType.TEXT,
             categoryId = "cat-001",
             topic = "Topic",
             userLimit = 25,

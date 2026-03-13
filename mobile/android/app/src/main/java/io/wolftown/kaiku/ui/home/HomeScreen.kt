@@ -11,6 +11,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import io.wolftown.kaiku.domain.model.ChannelType
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -34,7 +35,7 @@ fun HomeScreen(
     LaunchedEffect(Unit) {
         viewModel.navigateToChannel.collect { event ->
             when (event.channelType) {
-                "voice" -> onNavigateToVoiceChannel(event.channelId)
+                ChannelType.VOICE -> onNavigateToVoiceChannel(event.channelId)
                 else -> onNavigateToTextChannel(event.channelId)
             }
         }

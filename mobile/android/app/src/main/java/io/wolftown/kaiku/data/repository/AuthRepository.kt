@@ -30,7 +30,7 @@ class AuthRepository @Inject constructor(
 
             tokenStorage.saveTokens(
                 accessToken = authResponse.accessToken,
-                refreshToken = authResponse.refreshToken ?: "",
+                refreshToken = authResponse.refreshToken,
                 expiresIn = authResponse.expiresIn,
                 userId = "" // Will be populated after getMe
             )
@@ -40,7 +40,7 @@ class AuthRepository @Inject constructor(
             // Re-save tokens with correct userId
             tokenStorage.saveTokens(
                 accessToken = authResponse.accessToken,
-                refreshToken = authResponse.refreshToken ?: "",
+                refreshToken = authResponse.refreshToken,
                 expiresIn = authResponse.expiresIn,
                 userId = user.id
             )
@@ -68,7 +68,7 @@ class AuthRepository @Inject constructor(
 
             tokenStorage.saveTokens(
                 accessToken = authResponse.accessToken,
-                refreshToken = authResponse.refreshToken ?: "",
+                refreshToken = authResponse.refreshToken,
                 expiresIn = authResponse.expiresIn,
                 userId = "" // Will be populated after getMe
             )
@@ -77,7 +77,7 @@ class AuthRepository @Inject constructor(
 
             tokenStorage.saveTokens(
                 accessToken = authResponse.accessToken,
-                refreshToken = authResponse.refreshToken ?: "",
+                refreshToken = authResponse.refreshToken,
                 expiresIn = authResponse.expiresIn,
                 userId = user.id
             )
@@ -124,7 +124,7 @@ class AuthRepository @Inject constructor(
      */
     suspend fun completeOidcLogin(
         accessToken: String,
-        refreshToken: String,
+        refreshToken: String?,
         expiresIn: Int
     ): Result<User> {
         return try {
@@ -166,7 +166,7 @@ class AuthRepository @Inject constructor(
 
             tokenStorage.saveTokens(
                 accessToken = authResponse.accessToken,
-                refreshToken = authResponse.refreshToken ?: "",
+                refreshToken = authResponse.refreshToken,
                 expiresIn = authResponse.expiresIn,
                 userId = ""
             )
@@ -175,7 +175,7 @@ class AuthRepository @Inject constructor(
 
             tokenStorage.saveTokens(
                 accessToken = authResponse.accessToken,
-                refreshToken = authResponse.refreshToken ?: "",
+                refreshToken = authResponse.refreshToken,
                 expiresIn = authResponse.expiresIn,
                 userId = user.id
             )
@@ -205,7 +205,7 @@ class AuthRepository @Inject constructor(
 
             tokenStorage.saveTokens(
                 accessToken = authResponse.accessToken,
-                refreshToken = authResponse.refreshToken ?: "",
+                refreshToken = authResponse.refreshToken,
                 expiresIn = authResponse.expiresIn,
                 userId = "" // Will be populated after getMe
             )
@@ -215,7 +215,7 @@ class AuthRepository @Inject constructor(
             // Re-save tokens with correct userId
             tokenStorage.saveTokens(
                 accessToken = authResponse.accessToken,
-                refreshToken = authResponse.refreshToken ?: "",
+                refreshToken = authResponse.refreshToken,
                 expiresIn = authResponse.expiresIn,
                 userId = user.id
             )

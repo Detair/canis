@@ -64,7 +64,7 @@ fun SettingsScreen(
             } else if (user != null) {
                 SettingsRow(label = "Username", value = user!!.username)
                 SettingsRow(label = "Display name", value = user!!.displayName)
-                SettingsRow(label = "Status", value = user!!.status)
+                SettingsRow(label = "Status", value = user!!.status.name.lowercase())
             }
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))

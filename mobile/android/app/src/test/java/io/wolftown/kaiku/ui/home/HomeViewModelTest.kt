@@ -6,6 +6,7 @@ import io.wolftown.kaiku.data.local.TokenStorage
 import io.wolftown.kaiku.data.repository.GuildRepository
 import io.wolftown.kaiku.data.ws.KaikuWebSocket
 import io.wolftown.kaiku.domain.model.Channel
+import io.wolftown.kaiku.domain.model.ChannelType
 import io.wolftown.kaiku.domain.model.Guild
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -36,9 +37,9 @@ class HomeViewModelTest {
     )
 
     private val sampleChannels = listOf(
-        Channel(id = "ch-1", name = "general", channelType = "text", position = 2),
-        Channel(id = "ch-2", name = "voice-lobby", channelType = "voice", position = 1),
-        Channel(id = "ch-3", name = "announcements", channelType = "text", categoryId = "cat-1", position = 0)
+        Channel(id = "ch-1", name = "general", channelType = ChannelType.TEXT, position = 2),
+        Channel(id = "ch-2", name = "voice-lobby", channelType = ChannelType.VOICE, position = 1),
+        Channel(id = "ch-3", name = "announcements", channelType = ChannelType.TEXT, categoryId = "cat-1", position = 0)
     )
 
     @Before
@@ -110,9 +111,9 @@ class HomeViewModelTest {
     @Test
     fun `channels are sorted by position`() = runTest {
         val unsortedChannels = listOf(
-            Channel(id = "ch-a", name = "zeta", channelType = "text", position = 3),
-            Channel(id = "ch-b", name = "alpha", channelType = "text", position = 1),
-            Channel(id = "ch-c", name = "beta", channelType = "text", position = 2)
+            Channel(id = "ch-a", name = "zeta", channelType = ChannelType.TEXT, position = 3),
+            Channel(id = "ch-b", name = "alpha", channelType = ChannelType.TEXT, position = 1),
+            Channel(id = "ch-c", name = "beta", channelType = ChannelType.TEXT, position = 2)
         )
 
         coEvery { guildRepository.loadGuilds() } just Runs

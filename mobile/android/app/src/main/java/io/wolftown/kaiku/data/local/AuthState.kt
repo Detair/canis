@@ -1,28 +1,39 @@
 package io.wolftown.kaiku.data.local
 
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
 import javax.inject.Singleton
+
+sealed class AuthSession {
+    data object LoggedOut : AuthSession()
+    data class LoggedIn(val userId: String) : AuthSession()
+}
 
 @Singleton
 class AuthState @Inject constructor() {
 
-    private val _isLoggedIn = MutableStateFlow(false)
-    val isLoggedIn: StateFlow<Boolean> = _isLoggedIn.asStateFlow()
+    private val _session = MutableStateFlow<AuthSession>(AuthSession.LoggedOut)
+    val session: StateFlow<AuthSession> = _session.asStateFlow()
 
-    private val _currentUserId = MutableStateFlow<String?>(null)
-    val currentUserId: StateFlow<String?> = _currentUserId.asStateFlow()
+    val isLoggedIn: StateFlow<Boolean> = _session.map { it is AuthSession.LoggedIn }
+        .stateIn(CoroutineScope(Dispatchers.Default), SharingStarted.Eagerly, false)
+
+    val currentUserId: StateFlow<String?> = _session.map { (it as? AuthSession.LoggedIn)?.userId }
+        .stateIn(CoroutineScope(Dispatchers.Default), SharingStarted.Eagerly, null)
 
     fun setLoggedIn(userId: String) {
-        _currentUserId.value = userId
-        _isLoggedIn.value = true
+        _session.value = AuthSession.LoggedIn(userId)
     }
 
     fun setLoggedOut() {
-        _isLoggedIn.value = false
-        _currentUserId.value = null
+        _session.value = AuthSession.LoggedOut
     }
 
     /**

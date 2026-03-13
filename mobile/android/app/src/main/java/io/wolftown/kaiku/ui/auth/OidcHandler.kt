@@ -85,7 +85,7 @@ class OidcHandler @Inject constructor(
                 ?: return Result.failure(IllegalArgumentException("Invalid expires_in value"))
             return authRepository.completeOidcLogin(
                 accessToken = accessToken,
-                refreshToken = refreshToken ?: "",
+                refreshToken = refreshToken,
                 expiresIn = expiresIn
             )
         }

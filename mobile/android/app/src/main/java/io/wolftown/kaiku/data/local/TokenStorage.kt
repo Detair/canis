@@ -19,14 +19,14 @@ class TokenStorage @Inject constructor(
 
     fun saveTokens(
         accessToken: String,
-        refreshToken: String,
+        refreshToken: String?,
         expiresIn: Int,
         userId: String
     ) {
         val expiresAt = System.currentTimeMillis() + expiresIn * 1000L
         val success = prefs.edit()
             .putString(KEY_ACCESS_TOKEN, accessToken)
-            .putString(KEY_REFRESH_TOKEN, refreshToken)
+            .putString(KEY_REFRESH_TOKEN, refreshToken ?: "")
             .putLong(KEY_EXPIRES_AT, expiresAt)
             .putString(KEY_USER_ID, userId)
             .commit()

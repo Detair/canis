@@ -14,6 +14,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import io.wolftown.kaiku.domain.model.Channel
+import io.wolftown.kaiku.domain.model.ChannelType
 
 /**
  * Displays channels grouped by category.
@@ -25,7 +26,7 @@ import io.wolftown.kaiku.domain.model.Channel
 @Composable
 fun ChannelList(
     channels: List<Channel>,
-    onChannelSelected: (channelId: String, channelType: String) -> Unit,
+    onChannelSelected: (channelId: String, channelType: ChannelType) -> Unit,
     modifier: Modifier = Modifier
 ) {
     // Group channels: null categoryId first, then by categoryId
@@ -91,7 +92,7 @@ private fun ChannelItem(
         verticalAlignment = Alignment.CenterVertically
     ) {
         val prefix = when (channel.channelType) {
-            "voice" -> "\uD83D\uDD0A "  // speaker emoji as icon fallback
+            ChannelType.VOICE -> "\uD83D\uDD0A "  // speaker emoji as icon fallback
             else -> "# "
         }
 
@@ -108,7 +109,7 @@ private fun ChannelItem(
             modifier = Modifier.weight(1f)
         )
 
-        if (channel.channelType == "voice" && channel.userLimit != null && channel.userLimit > 0) {
+        if (channel.channelType == ChannelType.VOICE && channel.userLimit != null && channel.userLimit > 0) {
             Text(
                 text = "/${channel.userLimit}",
                 style = MaterialTheme.typography.bodySmall,

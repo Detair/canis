@@ -7,6 +7,7 @@ import io.wolftown.kaiku.data.local.TokenStorage
 import io.wolftown.kaiku.data.repository.GuildRepository
 import io.wolftown.kaiku.data.ws.KaikuWebSocket
 import io.wolftown.kaiku.domain.model.Channel
+import io.wolftown.kaiku.domain.model.ChannelType
 import io.wolftown.kaiku.domain.model.Guild
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.*
@@ -62,7 +63,7 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    fun onChannelSelected(channelId: String, channelType: String) {
+    fun onChannelSelected(channelId: String, channelType: ChannelType) {
         _navigateToChannel.tryEmit(ChannelNavEvent(channelId, channelType))
     }
 
@@ -94,5 +95,5 @@ class HomeViewModel @Inject constructor(
 
 data class ChannelNavEvent(
     val channelId: String,
-    val channelType: String
+    val channelType: ChannelType
 )
