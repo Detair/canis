@@ -76,15 +76,15 @@ class QrLoginFlowTest {
             )
         }
 
-        // Server URL and final tokens must be saved AFTER getMe succeeds
+        // Server URL must be saved BEFORE getMe (KaikuHttpClient needs it for the base URL)
         verifyOrder {
+            tokenStorage.saveServerUrl(testServerUrl)
             tokenStorage.saveTokens(
                 accessToken = "qr-access-token-abc",
                 refreshToken = "qr-refresh-token-xyz",
                 expiresIn = 900,
                 userId = ""
             )
-            tokenStorage.saveServerUrl(testServerUrl)
             tokenStorage.saveTokens(
                 accessToken = "qr-access-token-abc",
                 refreshToken = "qr-refresh-token-xyz",
@@ -110,9 +110,10 @@ class QrLoginFlowTest {
         val result = authRepository.redeemQrToken(testServerUrl, testToken)
 
         assertTrue(result.isFailure)
-        // Server URL should NOT be saved (deferred to after getMe in Task 8)
-        verify(exactly = 0) { tokenStorage.saveServerUrl(any()) }
-        // Tokens should be cleared
+        // Server URL IS saved before getMe (KaikuHttpClient needs it for the base URL).
+        // This is acceptable — the redeem already succeeded at this point.
+        verify { tokenStorage.saveServerUrl(testServerUrl) }
+        // Tokens should be cleared on failure
         verify { tokenStorage.clear() }
         // Auth state should remain logged out
         assertFalse(authState.isLoggedIn.value)

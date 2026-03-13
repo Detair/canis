@@ -152,7 +152,8 @@ pub fn router(state: AppState) -> Router<AppState> {
             RateLimitCategory::AuthPasswordReset,
         )));
 
-    // QR login redeem route with rate limiting (public — mobile isn't authenticated yet)
+    // QR login redeem route with rate limiting (public — mobile isn't authenticated yet).
+    // Uses AuthLogin category: like /login, this exchanges a credential for a full session.
     let qr_redeem_route = Router::new()
         .route("/qr/redeem", post(handlers::qr_redeem))
         .layer(axum_middleware::from_fn_with_state(
@@ -160,7 +161,7 @@ pub fn router(state: AppState) -> Router<AppState> {
             rate_limit_by_ip,
         ))
         .layer(axum_middleware::from_fn(with_category(
-            RateLimitCategory::AuthOther,
+            RateLimitCategory::AuthLogin,
         )));
 
     // Merge all public routes

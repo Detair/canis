@@ -194,13 +194,16 @@ class AuthRepository @Inject constructor(
      * Redeems a QR login token scanned from the desktop client.
      *
      * Exchanges the token for auth credentials via an absolute URL, then
-     * saves the server URL only after the full flow succeeds (so a failed
-     * redeem or getMe does not overwrite the previously configured server).
+     * saves the server URL after the redeem succeeds (before getMe, which
+     * needs it to construct the request URL). A failed getMe leaves the
+     * server URL set, which is acceptable since the redeem already succeeded.
      */
     suspend fun redeemQrToken(serverUrl: String, token: String): Result<User> {
         return try {
             val authResponse = authApi.redeemQrToken(serverUrl, token)
 
+            // Save server URL before getMe — KaikuHttpClient needs it for the base URL
+            tokenStorage.saveServerUrl(serverUrl)
             tokenStorage.saveTokens(
                 accessToken = authResponse.accessToken,
                 refreshToken = authResponse.refreshToken,
@@ -210,8 +213,7 @@ class AuthRepository @Inject constructor(
 
             val user = authApi.getMe()
 
-            // Save server URL and re-save tokens with correct userId only after full success
-            tokenStorage.saveServerUrl(serverUrl)
+            // Re-save tokens with correct userId
             tokenStorage.saveTokens(
                 accessToken = authResponse.accessToken,
                 refreshToken = authResponse.refreshToken,
