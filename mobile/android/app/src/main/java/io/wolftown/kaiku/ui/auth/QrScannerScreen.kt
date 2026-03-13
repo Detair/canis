@@ -41,7 +41,8 @@ fun QrScannerScreen(
                 == PackageManager.PERMISSION_GRANTED
         )
     }
-    var hasScanned by remember { mutableStateOf(false) }
+    val hasScanned = remember { java.util.concurrent.atomic.AtomicBoolean(false) }
+    val logger = remember { java.util.logging.Logger.getLogger("QrScannerScreen") }
     var cameraError by remember { mutableStateOf<String?>(null) }
 
     // Create scanner and executor outside AndroidView for proper lifecycle cleanup
@@ -119,7 +120,7 @@ fun QrScannerScreen(
                             imageAnalysis.setAnalyzer(analysisExecutor) { imageProxy ->
                                 @androidx.camera.core.ExperimentalGetImage
                                 val mediaImage = imageProxy.image
-                                if (mediaImage != null && !hasScanned) {
+                                if (mediaImage != null && !hasScanned.get()) {
                                     val inputImage = InputImage.fromMediaImage(
                                         mediaImage,
                                         imageProxy.imageInfo.rotationDegrees
@@ -132,16 +133,14 @@ fun QrScannerScreen(
                                                 ) {
                                                     val raw = barcode.rawValue ?: continue
                                                     val parsed = parseKaikuQrUri(raw)
-                                                    if (parsed != null && !hasScanned) {
-                                                        hasScanned = true
+                                                    if (parsed != null && hasScanned.compareAndSet(false, true)) {
                                                         onQrScanned(parsed.first, parsed.second)
                                                     }
                                                 }
                                             }
                                         }
                                         .addOnFailureListener { e ->
-                                            // ML Kit processing failed — log silently, individual
-                                            // frames can fail without affecting overall scanning
+                                            logger.log(java.util.logging.Level.FINE, "Frame analysis failed", e)
                                         }
                                         .addOnCompleteListener {
                                             imageProxy.close()
@@ -200,7 +199,9 @@ fun QrScannerScreen(
 
 /**
  * Parses a `kaiku://qr/login?server=...&token=...` URI.
- * Returns (serverUrl, token) or null if the URI doesn't match.
+ * Returns (serverUrl, token) or null if the URI format doesn't match
+ * or the server URL fails HTTPS validation (HTTP allowed only for
+ * localhost and RFC 1918 private networks).
  */
 internal fun parseKaikuQrUri(raw: String): Pair<String, String>? {
     val uri = android.net.Uri.parse(raw)
@@ -208,10 +209,14 @@ internal fun parseKaikuQrUri(raw: String): Pair<String, String>? {
     val server = uri.getQueryParameter("server") ?: return null
     val token = uri.getQueryParameter("token") ?: return null
     // Enforce HTTPS for production; allow HTTP only for local development
-    if (!server.startsWith("https://") &&
-        !server.startsWith("http://localhost") &&
-        !server.startsWith("http://10.") &&
-        !server.startsWith("http://192.168.")
-    ) return null
+    if (!server.startsWith("https://")) {
+        val host = android.net.Uri.parse(server).host ?: return null
+        val isLocal = host == "localhost" ||
+            host.startsWith("127.") ||
+            host.startsWith("10.") ||
+            host.startsWith("192.168.") ||
+            Regex("^172\\.(1[6-9]|2[0-9]|3[0-1])\\.").containsMatchIn(host)
+        if (!isLocal) return null
+    }
     return Pair(server, token)
 }

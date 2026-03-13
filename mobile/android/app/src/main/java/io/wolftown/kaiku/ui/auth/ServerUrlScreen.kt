@@ -42,7 +42,7 @@ class ServerUrlViewModel @Inject constructor(
 
         if (!isValidUrl(url)) {
             _uiState.update {
-                it.copy(error = "URL must start with https:// or http://")
+                it.copy(error = "URL must use HTTPS (HTTP allowed only for local development)")
             }
             return
         }
@@ -54,7 +54,15 @@ class ServerUrlViewModel @Inject constructor(
     }
 
     private fun isValidUrl(url: String): Boolean {
-        return url.startsWith("https://") || url.startsWith("http://")
+        if (url.startsWith("https://")) return true
+        if (!url.startsWith("http://")) return false
+        // Allow HTTP only for local development addresses
+        val host = android.net.Uri.parse(url).host ?: return false
+        return host == "localhost" ||
+            host.startsWith("127.") ||
+            host.startsWith("10.") ||
+            host.startsWith("192.168.") ||
+            Regex("^172\\.(1[6-9]|2[0-9]|3[0-1])\\.").containsMatchIn(host)
     }
 }
 
