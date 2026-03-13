@@ -8,6 +8,7 @@ import io.wolftown.kaiku.data.repository.GuildRepository
 import io.wolftown.kaiku.data.ws.KaikuWebSocket
 import io.wolftown.kaiku.domain.model.Channel
 import io.wolftown.kaiku.domain.model.Guild
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -53,6 +54,8 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 guildRepository.loadChannels(guildId)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 _error.value = e.message ?: "Failed to load channels"
             }
@@ -78,6 +81,8 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 guildRepository.loadGuilds()
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 _error.value = e.message ?: "Failed to load guilds"
             } finally {
