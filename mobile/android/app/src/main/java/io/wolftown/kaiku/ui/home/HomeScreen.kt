@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -17,6 +18,7 @@ import kotlinx.coroutines.launch
 fun HomeScreen(
     onNavigateToTextChannel: (channelId: String) -> Unit,
     onNavigateToVoiceChannel: (channelId: String) -> Unit,
+    onNavigateToSettings: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val guilds by viewModel.guilds.collectAsState()
@@ -69,6 +71,9 @@ fun HomeScreen(
                     actions = {
                         IconButton(onClick = { viewModel.refresh() }) {
                             Icon(Icons.Default.Refresh, contentDescription = "Refresh")
+                        }
+                        IconButton(onClick = onNavigateToSettings) {
+                            Icon(Icons.Default.Settings, contentDescription = "Settings")
                         }
                     }
                 )

@@ -7,8 +7,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.rememberNavController
@@ -17,6 +17,7 @@ import io.wolftown.kaiku.data.local.AuthState
 import io.wolftown.kaiku.data.local.TokenStorage
 import io.wolftown.kaiku.ui.auth.LoginViewModel
 import io.wolftown.kaiku.ui.auth.OidcHandler
+import io.wolftown.kaiku.ui.shared.KaikuTheme
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -40,9 +41,14 @@ class MainActivity : ComponentActivity() {
         handleIntent(intent)
 
         val startDestination = resolveStartDestination()
+        val appVersion = packageManager.getPackageInfo(packageName, 0).versionName ?: ""
 
         setContent {
-            KaikuApp(startDestination = startDestination, authState = authState)
+            KaikuApp(
+                startDestination = startDestination,
+                authState = authState,
+                appVersion = appVersion
+            )
         }
     }
 
@@ -78,26 +84,23 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun KaikuApp(startDestination: String = "server_url", authState: AuthState? = null) {
-    MaterialTheme {
+fun KaikuApp(
+    startDestination: String = "server_url",
+    authState: AuthState? = null,
+    appVersion: String = ""
+) {
+    KaikuTheme(darkTheme = true) {
         Surface(
             modifier = Modifier.fillMaxSize(),
             color = MaterialTheme.colorScheme.background,
         ) {
             val navController = rememberNavController()
-            if (authState != null) {
-                KaikuNavGraph(
-                    navController = navController,
-                    startDestination = startDestination,
-                    authState = authState
-                )
-            } else {
-                KaikuNavGraph(
-                    navController = navController,
-                    startDestination = startDestination,
-                    authState = AuthState()
-                )
-            }
+            KaikuNavGraph(
+                navController = navController,
+                startDestination = startDestination,
+                authState = authState ?: AuthState(),
+                appVersion = appVersion
+            )
         }
     }
 }

@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -20,6 +21,7 @@ import io.wolftown.kaiku.ui.auth.RegisterScreen
 import io.wolftown.kaiku.ui.auth.ServerUrlScreen
 import io.wolftown.kaiku.ui.channel.TextChannelScreen
 import io.wolftown.kaiku.ui.home.HomeScreen
+import io.wolftown.kaiku.ui.settings.SettingsScreen
 import io.wolftown.kaiku.ui.voice.VoiceChannelScreen
 import io.wolftown.kaiku.ui.voice.VoiceOverlay
 import io.wolftown.kaiku.ui.voice.VoiceOverlayViewModel
@@ -28,11 +30,23 @@ import io.wolftown.kaiku.ui.voice.VoiceOverlayViewModel
 fun KaikuNavGraph(
     navController: NavHostController,
     startDestination: String,
-    authState: AuthState
+    authState: AuthState,
+    appVersion: String = ""
 ) {
     val currentUserId by authState.currentUserId.collectAsState()
+    val isLoggedIn by authState.isLoggedIn.collectAsState()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
+
+    // Auth guard: redirect to login when logged out from an authenticated screen
+    val authRoutes = setOf("server_url", "login", "register")
+    LaunchedEffect(isLoggedIn) {
+        if (!isLoggedIn && currentRoute != null && currentRoute !in authRoutes) {
+            navController.navigate("login") {
+                popUpTo(0) { inclusive = true }
+            }
+        }
+    }
 
     // Voice overlay state — shows on non-voice screens when connected
     val voiceOverlayViewModel: VoiceOverlayViewModel = hiltViewModel()
@@ -86,6 +100,9 @@ fun KaikuNavGraph(
                         },
                         onNavigateToVoiceChannel = { channelId ->
                             navController.navigate("voice/$channelId")
+                        },
+                        onNavigateToSettings = {
+                            navController.navigate("settings")
                         }
                     )
                 }
@@ -104,6 +121,18 @@ fun KaikuNavGraph(
                     VoiceChannelScreen(
                         channelName = channelId,
                         onNavigateBack = { navController.popBackStack() }
+                    )
+                }
+
+                composable("settings") {
+                    SettingsScreen(
+                        appVersion = appVersion,
+                        onNavigateBack = { navController.popBackStack() },
+                        onLogout = {
+                            navController.navigate("login") {
+                                popUpTo(0) { inclusive = true }
+                            }
+                        }
                     )
                 }
             }
