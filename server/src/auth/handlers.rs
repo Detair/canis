@@ -2640,7 +2640,9 @@ pub async fn qr_redeem(
     jar: CookieJar,
     Json(body): Json<QrRedeemRequest>,
 ) -> AuthResult<(CookieJar, Json<AuthResponse>)> {
-    let redis_key = format!("qr_login:{}", body.token);
+    let token_uuid: Uuid = body.token.parse()
+        .map_err(|_| AuthError::InvalidCredentials)?;
+    let redis_key = format!("qr_login:{token_uuid}");
 
     // Atomic get-and-delete (one-use)
     let user_id_str: Option<String> = state
@@ -2649,7 +2651,10 @@ pub async fn qr_redeem(
         .await
         .map_err(|e| AuthError::Internal(format!("Failed to read QR token: {e}")))?;
 
-    let user_id_str = user_id_str.ok_or(AuthError::InvalidCredentials)?;
+    let user_id_str = user_id_str.ok_or_else(|| {
+        crate::observability::metrics::record_auth_login_attempt(false);
+        AuthError::InvalidCredentials
+    })?;
     let user_id: Uuid = user_id_str
         .parse()
         .map_err(|_| AuthError::Internal("Invalid user ID in QR token".to_string()))?;
