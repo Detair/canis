@@ -1033,6 +1033,24 @@ export async function mfaBackupCodeCount(): Promise<MfaBackupCodeCountResponse> 
   );
 }
 
+// ============================================================================
+// QR Login Commands
+// ============================================================================
+
+export interface QrLoginCreateResponse {
+  token: string;
+  expires_in: number;
+}
+
+/** Create a QR login token for mobile scanning. */
+export async function qrLoginCreate(): Promise<QrLoginCreateResponse> {
+  if (isTauri) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return invoke("qr_login_create");
+  }
+  return httpRequest<QrLoginCreateResponse>("POST", "/auth/qr/create");
+}
+
 /**
  * Get auth credentials for fetch-based uploads.
  * In Tauri mode, retrieves from Rust backend state.

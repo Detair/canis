@@ -738,6 +738,41 @@ pub async fn mfa_generate_backup_codes(
         .map_err(|e| format!("Invalid backup codes response: {e}"))
 }
 
+// ============================================================================
+// QR Login Commands
+// ============================================================================
+
+/// QR login create response from server.
+#[derive(Debug, Deserialize, Serialize)]
+pub struct QrLoginCreateResponse {
+    pub token: String,
+    pub expires_in: u64,
+}
+
+/// Create a QR login token (authenticated user generates token for mobile scan).
+#[command]
+pub async fn qr_login_create(state: State<'_, AppState>) -> Result<QrLoginCreateResponse, String> {
+    let (server_url, token) = get_auth_context(&state).await?;
+
+    let response = state
+        .http
+        .post(format!("{server_url}/auth/qr/create"))
+        .header("Authorization", format!("Bearer {token}"))
+        .send()
+        .await
+        .map_err(|e| format!("QR login create request failed: {e}"))?;
+
+    if !response.status().is_success() {
+        let body = response.text().await.unwrap_or_default();
+        return Err(format!("QR login create failed: {body}"));
+    }
+
+    response
+        .json::<QrLoginCreateResponse>()
+        .await
+        .map_err(|e| format!("Invalid QR login create response: {e}"))
+}
+
 /// Get remaining MFA backup code count.
 #[command]
 pub async fn mfa_backup_code_count(
