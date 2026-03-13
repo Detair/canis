@@ -41,6 +41,8 @@ class KaikuHttpClient @Inject constructor(
     private val tokenStorage: TokenStorage,
     private val authState: AuthState
 ) {
+    private enum class RefreshResult { SUCCESS, AUTH_REJECTED, NETWORK_ERROR }
+
     internal companion object {
         private val logger = Logger.getLogger("KaikuHttpClient")
 
@@ -113,19 +115,21 @@ class KaikuHttpClient @Inject constructor(
             val tokenUsedInRequest =
                 request.headers[HttpHeaders.Authorization]?.removePrefix("Bearer ")
 
-            val refreshSucceeded = refreshMutex.withLock {
+            val refreshResult = refreshMutex.withLock {
                 // Double-check: another coroutine may have already refreshed
                 val currentToken = tokenStorage.getAccessToken()
                 if (currentToken != null && currentToken != tokenUsedInRequest) {
                     // Token was already refreshed by another coroutine
-                    true
+                    RefreshResult.SUCCESS
                 } else {
                     performRefresh(refreshToken)
                 }
             }
 
-            if (!refreshSucceeded) {
-                authState.setLoggedOut()
+            if (refreshResult != RefreshResult.SUCCESS) {
+                if (refreshResult == RefreshResult.AUTH_REJECTED) {
+                    authState.setLoggedOut()
+                }
                 return@intercept originalCall
             }
 
@@ -140,9 +144,12 @@ class KaikuHttpClient @Inject constructor(
 
     /**
      * Performs the token refresh request.
-     * Returns true if refresh succeeded and tokens were saved, false otherwise.
+     *
+     * Returns [RefreshResult.SUCCESS] when tokens were saved,
+     * [RefreshResult.AUTH_REJECTED] on 401/403 (invalid refresh token), or
+     * [RefreshResult.NETWORK_ERROR] for transient failures that should not log the user out.
      */
-    private suspend fun Sender.performRefresh(refreshToken: String): Boolean {
+    private suspend fun Sender.performRefresh(refreshToken: String): RefreshResult {
         return try {
             val body = KaikuJson.encodeToString(RefreshRequest(refreshToken))
             val refreshRequest = HttpRequestBuilder().apply {
@@ -157,17 +164,17 @@ class KaikuHttpClient @Inject constructor(
             val status = refreshCall.response.status
 
             if (status == HttpStatusCode.Unauthorized || status == HttpStatusCode.Forbidden) {
-                return false
+                return RefreshResult.AUTH_REJECTED
             }
 
             if (!status.isSuccess()) {
-                return false
+                return RefreshResult.NETWORK_ERROR
             }
 
             val authResponse = refreshCall.response.body<AuthResponse>()
 
             // Use existing userId since the refresh response does not include it
-            val userId = tokenStorage.getUserId() ?: return false
+            val userId = tokenStorage.getUserId() ?: return RefreshResult.NETWORK_ERROR
 
             tokenStorage.saveTokens(
                 accessToken = authResponse.accessToken,
@@ -175,12 +182,12 @@ class KaikuHttpClient @Inject constructor(
                 expiresIn = authResponse.expiresIn,
                 userId = userId
             )
-            true
+            RefreshResult.SUCCESS
         } catch (e: kotlin.coroutines.cancellation.CancellationException) {
             throw e
         } catch (e: Exception) {
             logger.log(Level.WARNING, "Token refresh failed", e)
-            false
+            RefreshResult.NETWORK_ERROR
         }
     }
 }
