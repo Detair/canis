@@ -41,8 +41,8 @@ class VoiceCallService : Service() {
         const val ACTION_DISCONNECT = "io.wolftown.kaiku.DISCONNECT"
 
         /** Callback for notification actions. Set by VoiceRepository when starting the service. */
-        var onMuteToggle: (() -> Unit)? = null
-        var onDisconnect: (() -> Unit)? = null
+        @Volatile var onMuteToggle: (() -> Unit)? = null
+        @Volatile var onDisconnect: (() -> Unit)? = null
 
         /**
          * Starts the foreground voice call service.
@@ -73,13 +73,15 @@ class VoiceCallService : Service() {
         // Handle notification action intents
         when (intent?.getStringExtra(EXTRA_ACTION)) {
             ACTION_MUTE_TOGGLE -> {
-                logger.info("Mute toggle from notification")
-                onMuteToggle?.invoke()
+                val handler = onMuteToggle
+                if (handler != null) handler.invoke()
+                else logger.warning("Mute toggle callback is null — voice session may have ended")
                 return START_NOT_STICKY
             }
             ACTION_DISCONNECT -> {
-                logger.info("Disconnect from notification")
-                onDisconnect?.invoke()
+                val handler = onDisconnect
+                if (handler != null) handler.invoke()
+                else logger.warning("Disconnect callback is null — voice session may have ended")
                 return START_NOT_STICKY
             }
         }

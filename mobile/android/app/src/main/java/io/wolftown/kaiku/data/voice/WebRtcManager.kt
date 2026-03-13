@@ -4,6 +4,8 @@ import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.wolftown.kaiku.data.api.IceServer
 import io.wolftown.kaiku.data.api.VoiceApi
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -55,6 +57,7 @@ class WebRtcManager @Inject constructor(
 
     // -- State ----------------------------------------------------------------
 
+    private val initMutex = Mutex()
     private var factory: PeerConnectionFactory? = null
     private var peerConnection: PeerConnection? = null
     private var audioSource: AudioSource? = null
@@ -100,7 +103,7 @@ class WebRtcManager @Inject constructor(
      * Must be called once before [createPeerConnection]. Safe to call multiple
      * times — subsequent calls are no-ops if the factory already exists.
      */
-    suspend fun initialize() {
+    suspend fun initialize() = initMutex.withLock {
         if (factory != null) return
 
         PeerConnectionFactory.initialize(
