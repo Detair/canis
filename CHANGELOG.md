@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Volume mute toggle now remembers pre-mute level and restores it on unmute
 
 ### Added
+- QR code login — generate a QR code on desktop to instantly sign in on the Android app, no manual URL entry or credentials needed
 - Android app (Milestone 1) — native Jetpack Compose client with login/register (JWT + OIDC), guild navigation, text messaging with reactions, voice chat via WebRTC SFU, and screen share viewing with simulcast layer selection (#363)
 - Simulcast video — 3-layer adaptive quality (high/medium/low) for screen shares and webcam, with manual viewer override via right-click context menu, quality badge overlay on video tiles, and REMB bandwidth monitoring (automatic layer switching in a follow-up)
 - Channel message pinning — pin up to 50 messages per channel with PIN_MESSAGES permission, pin/unpin from message context menu, pin indicator on messages, pin drawer sidebar, pin count badge in channel header, and system messages for pin/unpin actions (#359)
