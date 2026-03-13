@@ -189,14 +189,15 @@ class AuthRepository @Inject constructor(
     /**
      * Redeems a QR login token scanned from the desktop client.
      *
-     * This flow saves the server URL first (since it comes from the QR code),
-     * then exchanges the token for auth credentials via an absolute URL.
+     * Exchanges the token for auth credentials via an absolute URL, then
+     * saves the server URL only on success (so a failed redeem does not
+     * overwrite the previously configured server).
      */
     suspend fun redeemQrToken(serverUrl: String, token: String): Result<User> {
         return try {
-            tokenStorage.saveServerUrl(serverUrl)
-
             val authResponse = authApi.redeemQrToken(serverUrl, token)
+
+            tokenStorage.saveServerUrl(serverUrl)
 
             tokenStorage.saveTokens(
                 accessToken = authResponse.accessToken,

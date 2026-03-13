@@ -42,6 +42,18 @@ fun QrScannerScreen(
         )
     }
     var hasScanned by remember { mutableStateOf(false) }
+    var cameraError by remember { mutableStateOf<String?>(null) }
+
+    // Create scanner and executor outside AndroidView for proper lifecycle cleanup
+    val barcodeScanner = remember { BarcodeScanning.getClient() }
+    val analysisExecutor = remember { Executors.newSingleThreadExecutor() }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            barcodeScanner.close()
+            analysisExecutor.shutdown()
+        }
+    }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -72,7 +84,22 @@ fun QrScannerScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            if (hasCameraPermission) {
+            if (cameraError != null) {
+                Column(
+                    modifier = Modifier.align(Alignment.Center),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = cameraError!!,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Button(onClick = onNavigateBack) {
+                        Text("Go back")
+                    }
+                }
+            } else if (hasCameraPermission) {
                 AndroidView(
                     factory = { ctx ->
                         val previewView = PreviewView(ctx)
@@ -84,9 +111,6 @@ fun QrScannerScreen(
                             val preview = Preview.Builder().build().also {
                                 it.surfaceProvider = previewView.surfaceProvider
                             }
-
-                            val barcodeScanner = BarcodeScanning.getClient()
-                            val analysisExecutor = Executors.newSingleThreadExecutor()
 
                             val imageAnalysis = ImageAnalysis.Builder()
                                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
@@ -115,6 +139,10 @@ fun QrScannerScreen(
                                                 }
                                             }
                                         }
+                                        .addOnFailureListener { e ->
+                                            // ML Kit processing failed — log silently, individual
+                                            // frames can fail without affecting overall scanning
+                                        }
                                         .addOnCompleteListener {
                                             imageProxy.close()
                                         }
@@ -132,7 +160,7 @@ fun QrScannerScreen(
                                     imageAnalysis
                                 )
                             } catch (e: Exception) {
-                                // Camera bind failed
+                                cameraError = "Could not start camera"
                             }
                         }, ContextCompat.getMainExecutor(ctx))
 
@@ -179,5 +207,11 @@ internal fun parseKaikuQrUri(raw: String): Pair<String, String>? {
     if (uri.scheme != "kaiku" || uri.host != "qr" || uri.path != "/login") return null
     val server = uri.getQueryParameter("server") ?: return null
     val token = uri.getQueryParameter("token") ?: return null
+    // Enforce HTTPS for production; allow HTTP only for local development
+    if (!server.startsWith("https://") &&
+        !server.startsWith("http://localhost") &&
+        !server.startsWith("http://10.") &&
+        !server.startsWith("http://192.168.")
+    ) return null
     return Pair(server, token)
 }

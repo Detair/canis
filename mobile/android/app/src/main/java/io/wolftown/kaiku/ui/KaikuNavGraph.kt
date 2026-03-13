@@ -149,7 +149,7 @@ fun KaikuNavGraph(
                     QrScannerScreen(
                         onQrScanned = { serverUrl, token ->
                             navController.navigate(
-                                "qr_redeem/${Uri.encode(serverUrl)}/$token"
+                                "qr_redeem/${Uri.encode(serverUrl)}/${Uri.encode(token)}"
                             )
                         },
                         onNavigateBack = { navController.popBackStack() }
@@ -160,7 +160,9 @@ fun KaikuNavGraph(
                     val serverUrl = Uri.decode(
                         backStackEntry.arguments?.getString("serverUrl") ?: ""
                     )
-                    val token = backStackEntry.arguments?.getString("token") ?: ""
+                    val token = Uri.decode(
+                        backStackEntry.arguments?.getString("token") ?: ""
+                    )
                     QrRedeemScreen(
                         serverUrl = serverUrl,
                         token = token,
