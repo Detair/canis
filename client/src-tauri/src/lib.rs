@@ -91,6 +91,7 @@ pub fn run() {
             commands::auth::mfa_disable,
             commands::auth::mfa_generate_backup_codes,
             commands::auth::mfa_backup_code_count,
+            commands::auth::qr_login_create,
             // Chat commands
             commands::chat::get_channels,
             commands::chat::get_messages,
