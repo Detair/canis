@@ -4,7 +4,7 @@ This roadmap outlines the development path from the current prototype to a produ
 
 **Current Phase:** Phase 6 (Competitive Differentiators & Mastery) - In Progress
 
-**Last Updated:** 2026-03-11
+**Last Updated:** 2026-03-12
 
 ## Quick Status Overview
 
@@ -16,9 +16,9 @@ This roadmap outlines the development path from the current prototype to a produ
 | **Foundation** | **Phase 3** | ✅ Complete | 100% | Guild system, Friends, DMs, Home View, Rate Limiting, Permission System + UI, Information Pages, DM Voice Calls |
 | **Foundation** | **Phase 4** | ✅ Complete | 100% | E2EE DM Messaging, User Connectivity Monitor, Rich Presence, First User Setup, Context Menus, Emoji Picker Polish, Unread Aggregator, Content Spoilers, Forgot Password, SSO/OIDC, User Blocking & Reports |
 | **Expansion** | **Phase 5** | ✅ Complete | 100% (17/17) | E2E suite, CI hardening, bot platform, search upgrades, threads, multi-stream partial, slash command reliability, production-scale polish, content filters, webhooks, bulk read management, guild discovery & onboarding, guild resource limits, progressive image loading, data governance |
-| **Expansion** | **Phase 6** | 🔄 In Progress | 85% (17/20) | Personal workspaces, digital library, focus engine, custom status, session management, QA polish (edit messages, emoji composer, session expiry, shortcuts, formatting, friends empty state), multi-stream screen sharing, guild bans, channel search & guild discovery prompt, PTT/PTM hotkeys, channel pins. Remaining: mobile, live session toolkits, simulcast |
+| **Expansion** | **Phase 6** | 🔄 In Progress | 95% (18/19) | Personal workspaces, digital library, focus engine, custom status, session management, QA polish (edit messages, emoji composer, session expiry, shortcuts, formatting, friends empty state), multi-stream screen sharing, guild bans, channel search & guild discovery prompt, PTT/PTM hotkeys, channel pins, simulcast. Remaining: mobile |
 | **Scale and Trust** | **Phase 7** | 📋 Planned | 0% | Billing, accessibility, identity trust, observability |
-| **Scale and Trust** | **Phase 8** | 📋 Planned | 0% | Performance budgets, chaos drills, upgrade safety, FinOps, isolation testing |
+| **Scale and Trust** | **Phase 8** | 📋 Planned | 0% | Performance budgets, chaos drills, upgrade safety, FinOps, isolation testing, live session toolkits |
 | **Scale and Trust** | **Phase 10** | 📋 Planned | 0% | SaaS scaling architecture |
 
 **Production Ready Features:**
@@ -59,7 +59,7 @@ This section is the canonical high-level roadmap view. Detailed implementation c
 - ✅ Growth and onboarding (guild discovery, first-time experience, activation/retention UX).
 - ✅ Voice/media maturity (multi-stream, advanced media processing, progressive image loading).
 - Mobile strategy execution (Android-first path and shared Rust core evolution).
-- Personal workspaces, live session toolkits, focus engine, digital library.
+- Personal workspaces, focus engine, digital library.
 
 ### Scale and Trust (Planned)
 - SRE foundations (SLOs, observability standards, alerting, incident playbooks) ([Design](../plans/2026-02-15-sre-foundations-design.md), [OTel Reference](../plans/2026-02-15-opentelemetry-grafana-reference-design.md), [Implementation](../plans/2026-02-15-operational-safety-implementation-plan.md)).
@@ -416,7 +416,7 @@ This section is the canonical high-level roadmap view. Detailed implementation c
   - ✅ SFU renegotiation for dynamic track add/remove mid-session.
   - ✅ Track source identification via pending source queue.
   - [ ] Tauri native webcam capture (Rust-side `start_webcam`/`stop_webcam` commands).
-  - [ ] Implement Simulcast (quality tiers) for bandwidth management.
+  - ✅ Implement Simulcast (quality tiers) for bandwidth management.
 - [ ] **[Voice] Evaluate str0m as WebRTC Alternative** ([Design](../plans/2026-02-15-phase-5-str0m-evaluation-design.md), [Implementation](../plans/2026-02-15-phase-5-str0m-evaluation-implementation.md)) `Priority: Low`
   - Current stack: webrtc-rs 0.11 (full-stack, owns I/O). Working, but project is stagnating.
   - Alternative: [str0m](https://github.com/algesten/str0m) — Sans-IO WebRTC library (pure Rust).
@@ -574,11 +574,6 @@ This section is the canonical high-level roadmap view. Detailed implementation c
 - [x] **[UX] Personal Workspaces (Favorites v2)** ([Design](../plans/2026-02-15-phase-6-mobile-workspaces-design.md), [Implementation](../plans/2026-02-15-phase-6-mobile-workspaces-implementation.md)) — (#250)
   - 9 REST endpoints, 7 WebSocket events, cross-guild channel aggregation with drag-and-drop reordering.
   - Configurable limits (`MAX_WORKSPACES_PER_USER`, `MAX_ENTRIES_PER_WORKSPACE`), atomic CTE for concurrency safety, 17 integration tests.
-- [ ] **[Voice] Live Session Toolkits** ([Design](../plans/2026-02-15-phase-6-sovereign-livekit-design.md), [Implementation](../plans/2026-02-15-phase-6-sovereign-livekit-implementation.md))
-  - **Context:** Turn voice channels into productive spaces.
-  - **Strategy:** 
-    - **Gaming/Raid Kit:** Multi-timer overlays and restricted side-notes for raid leads/shot-callers.
-    - **Work/Task Kit:** Shared markdown notepad and collaborative "Action Item" tracking that auto-posts summaries to the channel post-session.
 - [x] **[UX] Context-Aware Focus Engine** ([Design](../plans/2026-02-15-phase-6-focus-library-design.md), [Implementation](../plans/2026-02-15-phase-6-focus-library-implementation.md))
   - **Context:** Prevent platform fatigue with intelligent notification routing.
   - **Strategy:** Use Tauri's desktop APIs to detect active foreground apps (e.g., IDEs, DAWs). Implement **VIP/Emergency Overrides** that allow specific users or channels to bypass DND during focused work sessions.
@@ -692,6 +687,11 @@ This section is the canonical high-level roadmap view. Detailed implementation c
 - [ ] **[Infra] Self-Hosted STUN/TURN Server**
   - **Context:** The server currently defaults to Google's public STUN server (`stun.l.google.com`), which defeats the purpose of self-hosting — voice NAT traversal traffic passes through a third-party infrastructure.
   - **Strategy:** Bundle a `coturn` container in the default deployment stack (docker-compose and production infra). Make `STUN_SERVER` and `TURN_SERVER` required config with no third-party fallback. Document operator setup for TURN credentials and RTP port forwarding.
+- [ ] **[Voice] Live Session Toolkits** ([Design](../plans/2026-02-15-phase-6-sovereign-livekit-design.md), [Implementation](../plans/2026-02-15-phase-6-sovereign-livekit-implementation.md))
+  - **Context:** Turn voice channels into productive spaces.
+  - **Strategy:**
+    - **Gaming/Raid Kit:** Multi-timer overlays and restricted side-notes for raid leads/shot-callers.
+    - **Work/Task Kit:** Shared markdown notepad and collaborative "Action Item" tracking that auto-posts summaries to the channel post-session.
 
 ---
 
