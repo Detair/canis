@@ -18,7 +18,7 @@ import {
   RefreshCw,
 } from "lucide-solid";
 import flokiHappy from "@/assets/emotes/floki_emote_1.png";
-import MessageItem from "./MessageItem";
+import MessageItem, { MessageImageLightbox } from "./MessageItem";
 import {
   messagesState,
   setMessagesState,
@@ -510,6 +510,9 @@ const MessageList: Component<MessageListProps> = (props) => {
           </span>
         </button>
       </Show>
+
+      {/* Image lightbox (rendered via Portal) */}
+      <MessageImageLightbox />
     </div>
   );
 };

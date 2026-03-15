@@ -28,6 +28,7 @@ import { formatTimestamp } from "@/lib/utils";
 import Avatar from "@/components/ui/Avatar";
 import CodeBlock from "@/components/ui/CodeBlock";
 import BlurhashPlaceholder from "@/components/ui/BlurhashPlaceholder";
+import ImageLightbox from "@/components/ui/ImageLightbox";
 import ReactionBar from "./ReactionBar";
 import ThreadIndicator from "./ThreadIndicator";
 import MessageActions, { QUICK_EMOJIS } from "./MessageActions";
@@ -200,6 +201,9 @@ async function fetchSignedUrl(
   return `/api/messages/attachments/${attachmentId}/download${qs ? `?${qs}` : ""}`;
 }
 
+
+// ---- Module-level lightbox state ----
+const [lightboxSrc, setLightboxSrc] = createSignal<string | null>(null);
 
 // ---- Module-level spoiler reveal state ----
 // Persists revealed spoilers across component remounts (e.g. virtual scroll).
@@ -828,20 +832,8 @@ const MessageItem: Component<MessageItemProps> = (props) => {
                               );
                             }}
                             onClick={async () => {
-                              try {
-                                const url = await fetchSignedUrl(
-                                  attachment.id,
-                                );
-                                window.open(url, "_blank");
-                              } catch (err) {
-                                console.error("Failed to get signed URL:", err);
-                                showToast({
-                                  type: "error",
-                                  title: "Download Failed",
-                                  message: "Could not get download link.",
-                                  duration: 8000,
-                                });
-                              }
+                              const url = await fetchSignedUrl(attachment.id);
+                              setLightboxSrc(url);
                             }}
                             style={{ cursor: "pointer" }}
                           />
@@ -911,6 +903,18 @@ function formatFileSize(bytes: number): string {
   if (bytes < 1024 * 1024 * 1024)
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+}
+
+/** Renders the global image lightbox overlay. Mount once in MessageList. */
+export function MessageImageLightbox() {
+  return (
+    <Show when={lightboxSrc()}>
+      <ImageLightbox
+        src={lightboxSrc()!}
+        onClose={() => setLightboxSrc(null)}
+      />
+    </Show>
+  );
 }
 
 export default MessageItem;
