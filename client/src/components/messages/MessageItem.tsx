@@ -32,7 +32,6 @@ import ReactionBar from "./ReactionBar";
 import ThreadIndicator from "./ThreadIndicator";
 import MessageActions, { QUICK_EMOJIS } from "./MessageActions";
 import {
-  getSignedUrl,
   addReaction,
   removeReaction,
   deleteMessage,
@@ -186,51 +185,16 @@ interface TextBlock {
 
 type ContentBlock = CodeBlockData | TextBlock;
 
-// ---- Module-level signed URL cache ----
-// Caches presigned S3 URLs to avoid redundant API calls.
-// Key: `${attachmentId}:${variant ?? "original"}`
-const signedUrlCache = new Map<
-  string,
-  { url: string; expiresAt: number }
->();
-
 async function fetchSignedUrl(
   attachmentId: string,
   variant?: string,
 ): Promise<string> {
-  const cacheKey = `${attachmentId}:${variant ?? "original"}`;
-  const cached = signedUrlCache.get(cacheKey);
-  if (cached && cached.expiresAt > Date.now()) {
-    return cached.url;
-  }
-
-  const result = await getSignedUrl(attachmentId, variant);
-
-  // Evict expired entries when cache grows too large
-  if (signedUrlCache.size > 500) {
-    const now = Date.now();
-    for (const [key, entry] of signedUrlCache) {
-      if (entry.expiresAt <= now) signedUrlCache.delete(key);
-    }
-    // Hard cap: if still over limit, evict entries closest to expiry
-    if (signedUrlCache.size > 500) {
-      const sorted = [...signedUrlCache.entries()].sort(
-        (a, b) => a[1].expiresAt - b[1].expiresAt,
-      );
-      for (let i = 0; i < sorted.length - 500; i++) {
-        signedUrlCache.delete(sorted[i][0]);
-      }
-    }
-  }
-
-  // Cache with safety margin (at most 300s, at most half the TTL) to avoid negative expiry
-  const safetyMargin = Math.min(300, Math.floor(result.expires_in / 2));
-  signedUrlCache.set(cacheKey, {
-    url: result.url,
-    expiresAt: Date.now() + (result.expires_in - safetyMargin) * 1000,
-  });
-  return result.url;
+  // Use the direct download endpoint which streams from S3 via the server.
+  // This avoids presigned URL issues when S3 is on an internal network.
+  const variantParam = variant ? `?variant=${encodeURIComponent(variant)}` : "";
+  return `/api/messages/attachments/${attachmentId}${variantParam}`;
 }
+
 
 // ---- Module-level spoiler reveal state ----
 // Persists revealed spoilers across component remounts (e.g. virtual scroll).
