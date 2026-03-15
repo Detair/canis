@@ -420,6 +420,7 @@ async fn test_screen_share_check_requires_auth() {
     let channel_id = Uuid::now_v7();
 
     let body = serde_json::json!({
+        "stream_id": Uuid::new_v4(),
         "quality": "medium",
         "has_audio": false,
         "source_label": "Display 1"
@@ -449,6 +450,7 @@ async fn test_screen_share_check_requires_permission() {
 
     let token = generate_access_token(&app.config, user_id);
     let body = serde_json::json!({
+        "stream_id": Uuid::new_v4(),
         "quality": "medium",
         "has_audio": false,
         "source_label": "Display 1"
@@ -485,6 +487,7 @@ async fn test_screen_share_check_allowed() {
 
     let token = generate_access_token(&app.config, user_id);
     let body = serde_json::json!({
+        "stream_id": Uuid::new_v4(),
         "quality": "medium",
         "has_audio": false,
         "source_label": "Display 1"
@@ -521,6 +524,7 @@ async fn test_screen_share_start_requires_room_membership() {
 
     let token = generate_access_token(&app.config, user_id);
     let body = serde_json::json!({
+        "stream_id": Uuid::new_v4(),
         "quality": "medium",
         "has_audio": false,
         "source_label": "Display 1"
@@ -552,11 +556,15 @@ async fn test_screen_share_stop_noop() {
 
     let token = generate_access_token(&app.config, user_id);
 
+    let stop_body = serde_json::json!({
+        "stream_id": Uuid::new_v4()
+    });
     let req = Request::builder()
         .method(Method::POST)
         .uri(format!("/api/channels/{channel_id}/screenshare/stop"))
+        .header("content-type", "application/json")
         .header("authorization", format!("Bearer {token}"))
-        .body(Body::empty())
+        .body(Body::from(serde_json::to_vec(&stop_body).unwrap()))
         .unwrap();
 
     let resp = app.oneshot(req).await;
@@ -577,6 +585,7 @@ async fn test_screen_share_check_invalid_source_label() {
 
     let token = generate_access_token(&app.config, user_id);
     let body = serde_json::json!({
+        "stream_id": Uuid::new_v4(),
         "quality": "medium",
         "has_audio": false,
         "source_label": "<script>alert(1)</script>"
