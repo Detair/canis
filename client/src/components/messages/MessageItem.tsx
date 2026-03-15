@@ -36,6 +36,7 @@ import {
   removeReaction,
   deleteMessage,
   editMessage,
+  getAccessToken,
 } from "@/lib/tauri";
 import {
   showContextMenu,
@@ -189,10 +190,14 @@ async function fetchSignedUrl(
   attachmentId: string,
   variant?: string,
 ): Promise<string> {
-  // Use the direct download endpoint which streams from S3 via the server.
-  // This avoids presigned URL issues when S3 is on an internal network.
-  const variantParam = variant ? `?variant=${encodeURIComponent(variant)}` : "";
-  return `/api/messages/attachments/${attachmentId}${variantParam}`;
+  // Use the download endpoint with ?token= for <img src> auth.
+  // Browser img tags can't send Authorization headers, so we pass JWT as query param.
+  const token = getAccessToken() || "";
+  const params = new URLSearchParams();
+  if (variant) params.set("variant", variant);
+  if (token) params.set("token", token);
+  const qs = params.toString();
+  return `/api/messages/attachments/${attachmentId}/download${qs ? `?${qs}` : ""}`;
 }
 
 
