@@ -129,6 +129,34 @@ textarea.bg-transparent {
   color: inherit;
 }
 
+/* Inline code (single backticks) — Slack-style */
+code {
+  font-family: "JetBrains Mono", "Fira Code", "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.85em;
+  background-color: var(--color-surface-layer2);
+  border: 1px solid var(--color-border-default);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
+/* Fenced code blocks (triple backticks) — rendered by marked as <pre><code> */
+pre {
+  background-color: var(--color-surface-layer2);
+  border: 1px solid var(--color-border-default);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin: 8px 0;
+  overflow-x: auto;
+}
+
+pre code {
+  background-color: transparent;
+  border: none;
+  padding: 0;
+  font-size: 0.85em;
+  line-height: 1.5;
+}
+
 /* Message highlight (search result scroll-to) */
 .message-highlight {
   animation: highlight-fade 2s ease-out forwards;

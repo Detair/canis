@@ -436,7 +436,7 @@ const MessageItem: Component<MessageItemProps> = (props) => {
       const blocks: ContentBlock[] = [];
 
       // Split content by fenced code blocks
-      const codeBlockRegex = /```(\w+)?\n([\s\S]*?)```/g;
+      const codeBlockRegex = /```(\w+)?\s*\n?([\s\S]*?)```/g;
       let lastIndex = 0;
       let match;
 
