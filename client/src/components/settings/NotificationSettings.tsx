@@ -103,7 +103,7 @@ const NotificationSettings: Component = () => {
                 onClick={() => handleSoundSelect(sound.id)}
                 class="w-full text-left p-4 rounded-xl border-2 transition-all duration-200"
                 classList={{
-                  "border-accent-primary bg-accent-primary/10":
+                  "border-accent-primary bg-surface-highlight":
                     soundSettings().selectedSound === sound.id,
                   "border-white/10 hover:border-accent-primary/50 hover:bg-white/5":
                     soundSettings().selectedSound !== sound.id,

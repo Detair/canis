@@ -362,7 +362,7 @@ const OnboardingWizard: Component = () => {
                       onClick={() => setTheme(t.id)}
                       class="text-left p-3 rounded-xl border-2 transition-all"
                       classList={{
-                        "border-accent-primary bg-accent-primary/10":
+                        "border-accent-primary bg-surface-highlight":
                           theme() === t.id,
                         "border-white/10 hover:border-accent-primary/50":
                           theme() !== t.id,

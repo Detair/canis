@@ -168,7 +168,7 @@ const SettingsModal: Component<SettingsModalProps> = (props) => {
                       onClick={() => setActiveTab(tab.id)}
                       class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors mb-1"
                       classList={{
-                        "bg-accent-primary/25 text-text-primary":
+                        "bg-surface-highlight text-text-primary":
                           activeTab() === tab.id,
                         "text-text-secondary hover:text-text-primary hover:bg-white/5":
                           activeTab() !== tab.id,
