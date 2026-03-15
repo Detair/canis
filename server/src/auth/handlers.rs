@@ -1316,24 +1316,8 @@ pub async fn upload_avatar(
         .await
         .map_err(|e| AuthError::Internal(format!("S3 upload failed: {e}")))?;
 
-    // Construct public URL for the uploaded file
-    let bucket = &state.config.s3_bucket;
-    let url = if let Some(public_url) = &state.config.s3_public_url {
-        // Use configured public URL (e.g., https://kaiku.pmind.de/s3)
-        format!("{public_url}/{bucket}/{key}")
-    } else if let Some(ep) = state
-        .config
-        .s3_endpoint
-        .as_deref()
-        .filter(|s| s.contains("localhost") || s.contains("127.0.0.1"))
-    {
-        // For local dev: endpoint/bucket/key
-        format!("{ep}/{bucket}/{key}")
-    } else if let Some(ep) = &state.config.s3_endpoint {
-        format!("{ep}/{bucket}/{key}")
-    } else {
-        format!("/{bucket}/{key}")
-    };
+    // Store redirect URL — /api/files/ endpoint generates presigned URLs on-the-fly
+    let url = crate::api::files::file_url(&key);
 
     // Update user in DB
     let user = update_user_avatar(&state.db, auth_user.id, Some(&url))

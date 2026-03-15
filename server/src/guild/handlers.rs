@@ -1562,28 +1562,14 @@ pub async fn upload_guild_banner(
         .unwrap_or_else(|| "banner.png".to_string())
         .replace(|c: char| !c.is_alphanumeric() && c != '.', "_");
 
-    let key = format!("guilds/{}/banner-{}_{}", guild_id, timestamp, safe_filename);
+    let key = format!("guilds/{guild_id}/banner-{timestamp}_{safe_filename}");
 
     s3.upload(&key, data.to_vec(), &mime)
         .await
         .map_err(|e| GuildError::Internal(format!("S3 upload failed: {e}")))?;
 
-    // Construct public URL
-    let bucket = &state.config.s3_bucket;
-    let url = if let Some(public_url) = &state.config.s3_public_url {
-        format!("{public_url}/{bucket}/{key}")
-    } else if let Some(ep) = state
-        .config
-        .s3_endpoint
-        .as_deref()
-        .filter(|s| s.contains("localhost") || s.contains("127.0.0.1"))
-    {
-        format!("{ep}/{bucket}/{key}")
-    } else if let Some(ep) = &state.config.s3_endpoint {
-        format!("{ep}/{bucket}/{key}")
-    } else {
-        format!("/{bucket}/{key}")
-    };
+    // Store redirect URL — /api/files/ endpoint generates presigned URLs on-the-fly
+    let url = crate::api::files::file_url(&key);
 
     // Update guild
     let updated_guild = sqlx::query_as::<_, Guild>(
