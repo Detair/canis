@@ -69,7 +69,7 @@ const LibraryViewRoute: Component = () => {
   };
 
   return (
-    <div class="h-screen bg-zinc-900 flex flex-col">
+    <div class="flex-1 flex flex-col bg-surface-layer1 overflow-auto">
       <Show
         when={!pagesState.isLoading}
         fallback={

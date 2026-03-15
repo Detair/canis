@@ -11,6 +11,8 @@
 import {
   Component,
   Show,
+  Switch,
+  Match,
   lazy,
   Suspense,
   onMount,
@@ -18,6 +20,7 @@ import {
   createSignal,
   onCleanup,
 } from "solid-js";
+import { useLocation } from "@solidjs/router";
 import { Hash, Volume2, Pin } from "lucide-solid";
 import AppShell from "@/components/layout/AppShell";
 import CommandPalette from "@/components/layout/CommandPalette";
@@ -46,10 +49,29 @@ import PinDrawer from "@/components/channels/PinDrawer";
 const DiscoveryView = lazy(
   () => import("@/components/discovery/DiscoveryView"),
 );
+const LibraryViewRoute = lazy(
+  () => import("@/views/LibraryViewRoute"),
+);
+const PageViewRoute = lazy(
+  () => import("@/views/PageViewRoute"),
+);
 
 const Main: Component = () => {
+  const location = useLocation();
   const channel = selectedChannel;
   const [showShortcuts, setShowShortcuts] = createSignal(false);
+
+  // Detect library and page routes within the guild context
+  const isLibraryRoute = () => {
+    const guildId = guildsState.activeGuildId;
+    return guildId && location.pathname === `/guilds/${guildId}/library`;
+  };
+  const pageSlug = () => {
+    const guildId = guildsState.activeGuildId;
+    if (!guildId) return null;
+    const match = location.pathname.match(`/guilds/${guildId}/pages/(.+)`);
+    return match ? match[1] : null;
+  };
   const [channelSearchScope, setChannelSearchScope] = createSignal(false);
   const [showPinDrawer, setShowPinDrawer] = createSignal(false);
 
@@ -179,109 +201,123 @@ const Main: Component = () => {
 
         {/* Main Content Area */}
         <Show when={!isDiscoveryActive()}>
-          <Show
-            when={guildsState.activeGuildId === null}
-            fallback={
-              <Show
-                when={channel()}
-                fallback={
-                  <div class="flex-1 flex items-center justify-center bg-surface-layer1">
-                    <div class="text-center text-text-secondary">
-                      <Hash class="w-12 h-12 mx-auto mb-4 opacity-30" />
-                      <p class="text-lg font-medium">
-                        Select a channel to start chatting
-                      </p>
-                      <p class="text-sm mt-2 opacity-60">
-                        Or press Ctrl+K to search
-                      </p>
-                    </div>
-                  </div>
-                }
-              >
-                <div class="flex flex-1 min-w-0">
-                  <div class="flex-1 flex flex-col min-w-0">
-                    {/* Channel Header */}
-                    <header class="h-12 px-4 flex items-center border-b border-white/5 bg-surface-layer1 shadow-sm">
-                      <Show
-                        when={channel()?.channel_type === "voice"}
-                        fallback={
-                          <Hash class="w-5 h-5 text-text-secondary mr-2" />
-                        }
-                      >
-                        <Volume2 class="w-5 h-5 text-text-secondary mr-2" />
-                      </Show>
-                      <span class="font-semibold text-text-primary">
-                        {channel()?.name}
-                      </span>
-                      <Show when={channel()?.topic}>
-                        <div class="ml-4 pl-4 border-l border-white/10 text-text-secondary text-sm truncate">
-                          {channel()?.topic}
-                        </div>
-                      </Show>
-                      <div class="ml-auto flex items-center">
-                        <button
-                          onClick={() => setShowPinDrawer(!showPinDrawer())}
-                          class="p-1.5 rounded hover:bg-white/10 text-text-secondary hover:text-text-primary transition-colors relative"
-                          title="Pinned Messages"
-                          aria-label="Pinned Messages"
-                        >
-                          <Pin class="w-4 h-4" />
-                          <Show when={pinCount() > 0}>
-                            <span class="absolute -top-1 -right-1 bg-accent-primary text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center font-bold">
-                              {pinCount()}
-                            </span>
-                          </Show>
-                        </button>
+          <Switch>
+            {/* Home View - No guild selected */}
+            <Match when={guildsState.activeGuildId === null}>
+              <HomeView />
+            </Match>
+
+            {/* Guild Library */}
+            <Match when={isLibraryRoute()}>
+              <Suspense fallback={<div class="flex-1 bg-surface-layer1" />}>
+                <LibraryViewRoute />
+              </Suspense>
+            </Match>
+
+            {/* Guild Page */}
+            <Match when={pageSlug()}>
+              <Suspense fallback={<div class="flex-1 bg-surface-layer1" />}>
+                <PageViewRoute />
+              </Suspense>
+            </Match>
+
+            {/* Channel Chat */}
+            <Match when={channel()}>
+              <div class="flex flex-1 min-w-0">
+                <div class="flex-1 flex flex-col min-w-0">
+                  {/* Channel Header */}
+                  <header class="h-12 px-4 flex items-center border-b border-white/5 bg-surface-layer1 shadow-sm">
+                    <Show
+                      when={channel()?.channel_type === "voice"}
+                      fallback={
+                        <Hash class="w-5 h-5 text-text-secondary mr-2" />
+                      }
+                    >
+                      <Volume2 class="w-5 h-5 text-text-secondary mr-2" />
+                    </Show>
+                    <span class="font-semibold text-text-primary">
+                      {channel()?.name}
+                    </span>
+                    <Show when={channel()?.topic}>
+                      <div class="ml-4 pl-4 border-l border-white/10 text-text-secondary text-sm truncate">
+                        {channel()?.topic}
                       </div>
-                    </header>
+                    </Show>
+                    <div class="ml-auto flex items-center">
+                      <button
+                        onClick={() => setShowPinDrawer(!showPinDrawer())}
+                        class="p-1.5 rounded hover:bg-white/10 text-text-secondary hover:text-text-primary transition-colors relative"
+                        title="Pinned Messages"
+                        aria-label="Pinned Messages"
+                      >
+                        <Pin class="w-4 h-4" />
+                        <Show when={pinCount() > 0}>
+                          <span class="absolute -top-1 -right-1 bg-accent-primary text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center font-bold">
+                            {pinCount()}
+                          </span>
+                        </Show>
+                      </button>
+                    </div>
+                  </header>
 
-                    {/* Messages */}
-                    <MessageList channelId={channel()!.id} />
+                  {/* Messages */}
+                  <MessageList channelId={channel()!.id} />
 
-                    {/* Typing Indicator */}
-                    <TypingIndicator channelId={channel()!.id} />
+                  {/* Typing Indicator */}
+                  <TypingIndicator channelId={channel()!.id} />
 
-                    {/* Message Input */}
-                    <MessageInput
-                      channelId={channel()!.id}
-                      channelName={channel()!.name}
-                      guildId={guildsState.activeGuildId ?? undefined}
-                    />
-                  </div>
-
-                  {/* Thread Sidebar */}
-                  <Show when={threadsState.activeThreadId}>
-                    <ThreadSidebar
-                      channelId={channel()!.id}
-                      guildId={guildsState.activeGuildId ?? undefined}
-                    />
-                  </Show>
-
-                  {/* Pin Drawer */}
-                  <Show when={showPinDrawer()}>
-                    <PinDrawer
-                      channelId={channel()!.id}
-                      canUnpin={(() => {
-                        const guildId = guildsState.activeGuildId;
-                        const userId = authState.user?.id;
-                        if (!guildId || !userId) return false;
-                        const isOwner = isGuildOwner(guildId, userId);
-                        return isOwner || memberHasPermission(guildId, userId, isOwner, PermissionBits.PIN_MESSAGES);
-                      })()}
-                      onClose={() => setShowPinDrawer(false)}
-                      onJumpToMessage={(_messageId) => {
-                        // Scroll-to-message works for search results; pin drawer dismisses on jump
-                        setShowPinDrawer(false);
-                      }}
-                    />
-                  </Show>
+                  {/* Message Input */}
+                  <MessageInput
+                    channelId={channel()!.id}
+                    channelName={channel()!.name}
+                    guildId={guildsState.activeGuildId ?? undefined}
+                  />
                 </div>
-              </Show>
-            }
-          >
-            {/* Home View - DMs and Friends */}
-            <HomeView />
-          </Show>
+
+                {/* Thread Sidebar */}
+                <Show when={threadsState.activeThreadId}>
+                  <ThreadSidebar
+                    channelId={channel()!.id}
+                    guildId={guildsState.activeGuildId ?? undefined}
+                  />
+                </Show>
+
+                {/* Pin Drawer */}
+                <Show when={showPinDrawer()}>
+                  <PinDrawer
+                    channelId={channel()!.id}
+                    canUnpin={(() => {
+                      const guildId = guildsState.activeGuildId;
+                      const userId = authState.user?.id;
+                      if (!guildId || !userId) return false;
+                      const isOwner = isGuildOwner(guildId, userId);
+                      return isOwner || memberHasPermission(guildId, userId, isOwner, PermissionBits.PIN_MESSAGES);
+                    })()}
+                    onClose={() => setShowPinDrawer(false)}
+                    onJumpToMessage={(_messageId) => {
+                      // Scroll-to-message works for search results; pin drawer dismisses on jump
+                      setShowPinDrawer(false);
+                    }}
+                  />
+                </Show>
+              </div>
+            </Match>
+
+            {/* No channel selected fallback */}
+            <Match when={guildsState.activeGuildId !== null}>
+              <div class="flex-1 flex items-center justify-center bg-surface-layer1">
+                <div class="text-center text-text-secondary">
+                  <Hash class="w-12 h-12 mx-auto mb-4 opacity-30" />
+                  <p class="text-lg font-medium">
+                    Select a channel to start chatting
+                  </p>
+                  <p class="text-sm mt-2 opacity-60">
+                    Or press Ctrl+K to search
+                  </p>
+                </div>
+              </div>
+            </Match>
+          </Switch>
         </Show>
       </AppShell>
     </>
