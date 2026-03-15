@@ -17,15 +17,13 @@ use uuid::Uuid;
 use validator::Validate;
 
 use super::backup_codes::{find_matching_backup_code, generate_backup_codes, BACKUP_CODE_COUNT};
-use super::cookies;
 use super::error::{AuthError, AuthResult};
-use super::geoip;
 use super::jwt::{generate_token_pair, validate_refresh_token};
 use super::mfa_crypto::{decrypt_mfa_secret, encrypt_mfa_secret};
 use super::middleware::AuthUser;
 use super::oidc::{append_collision_suffix, generate_username_from_claims, OidcFlowState};
 use super::password::{hash_password, verify_password};
-use super::ua_parser;
+use super::{cookies, geoip, ua_parser};
 use crate::api::AppState;
 use crate::db::{
     self, count_all_mfa_backup_codes, count_unused_mfa_backup_codes, create_password_reset_token,
@@ -326,7 +324,8 @@ static USERNAME_REGEX: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::
 // Re-use the public hash_token function from parent module
 use super::hash_token;
 
-/// Extract the current session's token hash from cookie (browser) or `X-Refresh-Token` header (Tauri).
+/// Extract the current session's token hash from cookie (browser) or `X-Refresh-Token` header
+/// (Tauri).
 ///
 /// Browser clients send the refresh token via an `HttpOnly` cookie.
 /// Tauri clients cannot use cookies for same-origin requests to the API, so they

@@ -406,12 +406,12 @@ fn test_screen_share_stop_request_deserialization() {
 use axum::body::Body;
 use axum::http::{Method, Request, StatusCode};
 use http_body_util::BodyExt;
+use vc_server::permissions::GuildPermissions;
 
 use super::helpers::{
     create_guild_with_default_role, create_test_user, create_voice_channel, generate_access_token,
     TestApp,
 };
-use vc_server::permissions::GuildPermissions;
 
 /// Screen share check endpoint requires authentication.
 #[tokio::test]

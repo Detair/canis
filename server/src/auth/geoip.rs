@@ -3,8 +3,9 @@
 //! Resolves IP addresses to approximate geographic locations via a configurable
 //! HTTP API. Used to enrich session metadata — never blocks authentication.
 
-use serde::Deserialize;
 use std::net::IpAddr;
+
+use serde::Deserialize;
 
 /// Approximate geographic location resolved from an IP address.
 #[derive(Debug, Clone, Deserialize)]

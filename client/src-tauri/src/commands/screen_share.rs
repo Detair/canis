@@ -2,8 +2,9 @@
 //!
 //! Tauri commands for native screen capture and sharing via WebRTC.
 
-use serde::{Deserialize, Serialize};
 use std::sync::mpsc as std_mpsc;
+
+use serde::{Deserialize, Serialize};
 use tauri::{command, State};
 use tokio::sync::{mpsc, watch};
 use tracing::{error, info, warn};
