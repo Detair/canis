@@ -79,6 +79,11 @@ pub struct Config {
     /// S3 presigned URL expiry in seconds (default: 3600 = 1 hour)
     pub s3_presign_expiry: i64,
 
+    /// Public S3 base URL for client-facing file URLs (e.g., avatar images).
+    /// When set, file URLs use this instead of the internal S3 endpoint.
+    /// Example: "https://kaiku.pmind.de/s3"
+    pub s3_public_url: Option<String>,
+
     /// S3 access key ID (optional, falls back to `AWS_ACCESS_KEY_ID` env var)
     pub s3_access_key: Option<String>,
 
@@ -269,6 +274,7 @@ impl Config {
                 .unwrap_or(604800),
             s3_endpoint: env::var("S3_ENDPOINT").ok(),
             s3_bucket: env::var("S3_BUCKET").unwrap_or_else(|_| "voicechat".into()),
+            s3_public_url: env::var("S3_PUBLIC_URL").ok(),
             s3_presign_expiry: env::var("S3_PRESIGN_EXPIRY")
                 .ok()
                 .and_then(|v| v.parse().ok())
@@ -474,6 +480,7 @@ impl Config {
             jwt_refresh_expiry: 604800,
             s3_endpoint: None,
             s3_bucket: "test-bucket".into(),
+            s3_public_url: None,
             s3_presign_expiry: 3600,
             s3_access_key: None,
             s3_secret_key: None,

@@ -1316,25 +1316,22 @@ pub async fn upload_avatar(
         .await
         .map_err(|e| AuthError::Internal(format!("S3 upload failed: {e}")))?;
 
-    // Construct public URL (assuming bucket is public or proxied)
+    // Construct public URL for the uploaded file
     let bucket = &state.config.s3_bucket;
-    let endpoint = &state.config.s3_endpoint;
-
-    // Handle localhost vs cloud endpoint formatting
-    let url = if let Some(ep) = endpoint
+    let url = if let Some(public_url) = &state.config.s3_public_url {
+        // Use configured public URL (e.g., https://kaiku.pmind.de/s3)
+        format!("{public_url}/{bucket}/{key}")
+    } else if let Some(ep) = state
+        .config
+        .s3_endpoint
         .as_deref()
         .filter(|s| s.contains("localhost") || s.contains("127.0.0.1"))
     {
-        // For RustFS/Local: endpoint/bucket/key
+        // For local dev: endpoint/bucket/key
         format!("{ep}/{bucket}/{key}")
-    } else if let Some(ep) = endpoint {
-        // Custom endpoint (R2, etc): endpoint/bucket/key or bucket.endpoint/key
-        // We'll stick to path style for safety if custom endpoint is used
+    } else if let Some(ep) = &state.config.s3_endpoint {
         format!("{ep}/{bucket}/{key}")
     } else {
-        // AWS S3 standard: https://bucket.s3.region.amazonaws.com/key
-        // We assume standard path style for simplicity if no endpoint logic matches
-        // or just construct a relative path if proxied
         format!("/{bucket}/{key}")
     };
 
