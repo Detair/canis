@@ -14,6 +14,18 @@ pub fn file_url(s3_key: &str) -> String {
     format!("/api/files/{s3_key}")
 }
 
+/// Transform an optional S3 key to an API file URL.
+/// Returns None if input is None, or if it already starts with /api/ or http.
+pub fn maybe_file_url(s3_key: Option<String>) -> Option<String> {
+    s3_key.map(|key| {
+        if key.starts_with("/api/") || key.starts_with("http") {
+            key
+        } else {
+            file_url(&key)
+        }
+    })
+}
+
 /// Infer MIME type from file extension.
 fn content_type_from_key(key: &str) -> &'static str {
     match key.rsplit('.').next().unwrap_or("") {

@@ -108,7 +108,7 @@ impl From<db::User> for AuthorProfile {
             id: user.id,
             username: user.username,
             display_name: user.display_name,
-            avatar_url: user.avatar_url,
+            avatar_url: crate::api::files::maybe_file_url(user.avatar_url),
             status: format!("{:?}", user.status).to_lowercase(),
         }
     }
@@ -1557,7 +1557,7 @@ async fn build_thread_info(pool: &sqlx::PgPool, parent_id: Uuid) -> ThreadInfoRe
             participants
                 .iter()
                 .find(|u| u.id == *uid)
-                .and_then(|u| u.avatar_url.clone())
+                .and_then(|u| crate::api::files::maybe_file_url(u.avatar_url.clone()))
         })
         .collect();
 
@@ -1668,7 +1668,7 @@ async fn build_batch_thread_infos(
 
         let participant_avatars: Vec<Option<String>> = participant_ids
             .iter()
-            .map(|uid| user_map.get(uid).and_then(|u| u.avatar_url.clone()))
+            .map(|uid| user_map.get(uid).and_then(|u| crate::api::files::maybe_file_url(u.avatar_url.clone())))
             .collect();
 
         // Determine unread status
