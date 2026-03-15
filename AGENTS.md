@@ -99,6 +99,7 @@ Dependency graph (acyclic): server/client → vc-common, vc-crypto. Shared crate
 - **Always wrap complex shell commands in `bash -c "..."`** — The system default shell is `fish`. Complex or multi-line commands using standard `sh`/`bash` syntax will fail or hang in `fish`. Always wrap them to bypass fish's syntax quirks.
 - **Never run multi-line scripts via `python -c` or `bash -c`** — Instead, write the script to a temporary file (e.g. `/tmp/script.py` or `/tmp/script.sh`) using the `write_to_file` tool, and then execute the file.
 - **No interactive commands** — You are running in a headless environment. Commands that pause for user input (e.g., `bun run` asking to install a package) or attempt to launch GUI windows (e.g., `PIL.Image.show()`) will hang indefinitely. Always use non-interactive flags (like `--yes` or `--bun`) and save visual outputs to disk instead of trying to preview them.
+- **Always enforce timeouts** — To prevent defunct processes from hanging in the background, wrap potentially blocking scripts or build commands with the `timeout` utility (e.g., `timeout 30s bun run lint` or `bash -c "timeout 60s python3 script.py"`).
 
 ## COMMANDS
 
