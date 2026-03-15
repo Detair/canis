@@ -4643,3 +4643,43 @@ export async function adminObsLinks(): Promise<ObsLinksResponse> {
     "/api/admin/observability/links",
   );
 }
+
+export async function uploadGuildBanner(
+  guildId: string,
+  file: File,
+): Promise<Guild> {
+  if (file.size > 5 * 1024 * 1024) {
+    throw new Error(
+      `File too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Maximum size is 5.0MB`,
+    );
+  }
+
+  const { token, baseUrl } = await getUploadAuth();
+
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  const formData = new FormData();
+  formData.append("banner", file);
+
+  const response = await fetch(`${baseUrl}/api/guilds/${guildId}/banner`, {
+    method: "POST",
+    headers,
+    body: formData,
+  });
+
+  if (!response.ok) {
+    let errorMessage = `Banner upload failed (HTTP ${response.status})`;
+    try {
+      const errorBody = await response.json();
+      errorMessage = errorBody.message || errorBody.error || errorMessage;
+    } catch {
+      errorMessage = response.statusText || errorMessage;
+    }
+    throw new Error(errorMessage);
+  }
+
+  return response.json();
+}

@@ -286,7 +286,7 @@ const SafetyTab: Component<SafetyTabProps> = (props) => {
           onClick={() => setActiveSection("categories")}
           class="px-3 py-1.5 text-sm rounded-md transition-colors"
           classList={{
-            "bg-accent-primary/20 text-accent-primary font-medium":
+            "bg-accent-primary/20 text-white font-semibold":
               activeSection() === "categories",
             "text-text-secondary hover:text-text-primary":
               activeSection() !== "categories",
@@ -298,7 +298,7 @@ const SafetyTab: Component<SafetyTabProps> = (props) => {
           onClick={() => setActiveSection("patterns")}
           class="px-3 py-1.5 text-sm rounded-md transition-colors"
           classList={{
-            "bg-accent-primary/20 text-accent-primary font-medium":
+            "bg-accent-primary/20 text-white font-semibold":
               activeSection() === "patterns",
             "text-text-secondary hover:text-text-primary":
               activeSection() !== "patterns",
@@ -310,7 +310,7 @@ const SafetyTab: Component<SafetyTabProps> = (props) => {
           onClick={() => setActiveSection("test")}
           class="px-3 py-1.5 text-sm rounded-md transition-colors"
           classList={{
-            "bg-accent-primary/20 text-accent-primary font-medium":
+            "bg-accent-primary/20 text-white font-semibold":
               activeSection() === "test",
             "text-text-secondary hover:text-text-primary":
               activeSection() !== "test",
@@ -325,7 +325,7 @@ const SafetyTab: Component<SafetyTabProps> = (props) => {
           }}
           class="px-3 py-1.5 text-sm rounded-md transition-colors"
           classList={{
-            "bg-accent-primary/20 text-accent-primary font-medium":
+            "bg-accent-primary/20 text-white font-semibold":
               activeSection() === "log",
             "text-text-secondary hover:text-text-primary":
               activeSection() !== "log",

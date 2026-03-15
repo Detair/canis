@@ -369,15 +369,17 @@ const FriendItem: Component<FriendItemProps> = (props) => {
         <Show when={props.tab === "pending"}>
           <button
             onClick={() => props.onAccept(props.friend.friendship_id)}
-            class="px-3 py-1.5 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
+            class="p-1.5 bg-white/5 rounded-lg hover:bg-status-success/20 transition-colors flex items-center justify-center w-9 h-9"
+            title="Accept Request"
           >
-            Accept
+            <div style={{ "background-image": "var(--icon-accept)" }} class="w-5 h-5 bg-contain bg-center bg-no-repeat opacity-80 hover:opacity-100" />
           </button>
           <button
             onClick={() => props.onReject(props.friend.friendship_id)}
-            class="px-3 py-1.5 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors"
+            class="p-1.5 bg-white/5 rounded-lg hover:bg-status-error/20 transition-colors flex items-center justify-center w-9 h-9"
+            title="Decline Request"
           >
-            Reject
+            <div style={{ "background-image": "var(--icon-decline)" }} class="w-5 h-5 bg-contain bg-center bg-no-repeat opacity-80 hover:opacity-100" />
           </button>
         </Show>
         <Show when={props.tab === "all" || props.tab === "online"}>

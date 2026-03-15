@@ -12,13 +12,7 @@ import {
   createEffect,
   onCleanup,
 } from "solid-js";
-import {
-  Phone,
-  PhoneOff,
-  PhoneIncoming,
-  PhoneOutgoing,
-  Users,
-} from "lucide-solid";
+import { Users } from "lucide-solid";
 import { callState, joinCall, declineCall, endCall } from "@/stores/call";
 import {
   joinDMCall,
@@ -165,7 +159,7 @@ const CallBanner: Component<CallBannerProps> = (props) => {
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-3">
                 <div class="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center animate-pulse">
-                  <PhoneIncoming class="w-5 h-5 text-green-400" />
+                  <div style={{ "background-image": "var(--icon-pickup)" }} class="w-5 h-5 bg-contain bg-center bg-no-repeat" />
                 </div>
                 <div>
                   <p class="text-text-primary font-medium">
@@ -180,19 +174,19 @@ const CallBanner: Component<CallBannerProps> = (props) => {
                   type="button"
                   onClick={handleDecline}
                   disabled={isLoading()}
-                  class="px-4 py-2 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors flex items-center gap-2 disabled:opacity-50"
+                  class="p-2 rounded-lg bg-red-500/20 hover:bg-red-500/30 transition-colors flex items-center justify-center w-10 h-10 disabled:opacity-50"
+                  title="Decline"
                 >
-                  <PhoneOff class="w-4 h-4" />
-                  <span>Decline</span>
+                  <div style={{ "background-image": "var(--icon-leave)" }} class="w-5 h-5 bg-contain bg-center bg-no-repeat opacity-90" />
                 </button>
                 <button
                   type="button"
                   onClick={handleAccept}
                   disabled={isLoading()}
-                  class="px-4 py-2 rounded-lg bg-green-500/20 text-green-400 hover:bg-green-500/30 transition-colors flex items-center gap-2 disabled:opacity-50"
+                  class="p-2 rounded-lg bg-green-500/20 hover:bg-green-500/30 transition-colors flex items-center justify-center w-10 h-10 disabled:opacity-50"
+                  title="Accept"
                 >
-                  <Phone class="w-4 h-4" />
-                  <span>Accept</span>
+                  <div style={{ "background-image": "var(--icon-pickup)" }} class="w-5 h-5 bg-contain bg-center bg-no-repeat opacity-90" />
                 </button>
               </div>
             </div>
@@ -203,7 +197,7 @@ const CallBanner: Component<CallBannerProps> = (props) => {
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-3">
                 <div class="w-10 h-10 rounded-full bg-accent-primary/20 flex items-center justify-center">
-                  <PhoneOutgoing class="w-5 h-5 text-accent-primary animate-pulse" />
+                  <div style={{ "background-image": "var(--icon-pickup)" }} class="w-5 h-5 bg-contain bg-center bg-no-repeat animate-pulse" />
                 </div>
                 <div>
                   <p class="text-text-primary font-medium">Calling...</p>
@@ -214,10 +208,10 @@ const CallBanner: Component<CallBannerProps> = (props) => {
                 type="button"
                 onClick={handleCancel}
                 disabled={isLoading()}
-                class="px-4 py-2 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors flex items-center gap-2 disabled:opacity-50"
+                class="p-2 rounded-lg bg-red-500/20 hover:bg-red-500/30 transition-colors flex items-center justify-center w-10 h-10 disabled:opacity-50"
+                title="Cancel"
               >
-                <PhoneOff class="w-4 h-4" />
-                <span>Cancel</span>
+                <div style={{ "background-image": "var(--icon-leave)" }} class="w-5 h-5 bg-contain bg-center bg-no-repeat opacity-90" />
               </button>
             </div>
           </Show>
@@ -226,7 +220,7 @@ const CallBanner: Component<CallBannerProps> = (props) => {
           <Show when={call().status === "connecting"}>
             <div class="flex items-center gap-3">
               <div class="w-10 h-10 rounded-full bg-accent-primary/20 flex items-center justify-center">
-                <Phone class="w-5 h-5 text-accent-primary animate-pulse" />
+                <div style={{ "background-image": "var(--icon-pickup)" }} class="w-5 h-5 bg-contain bg-center bg-no-repeat animate-pulse" />
               </div>
               <div>
                 <p class="text-text-primary font-medium">Connecting...</p>
@@ -242,7 +236,7 @@ const CallBanner: Component<CallBannerProps> = (props) => {
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-3">
                 <div class="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center">
-                  <Phone class="w-5 h-5 text-green-400" />
+                  <div style={{ "background-image": "var(--icon-pickup)" }} class="w-5 h-5 bg-contain bg-center bg-no-repeat" />
                 </div>
                 <div>
                   <p class="text-text-primary font-medium">In call</p>
@@ -269,10 +263,10 @@ const CallBanner: Component<CallBannerProps> = (props) => {
                 type="button"
                 onClick={handleLeave}
                 disabled={isLoading()}
-                class="px-4 py-2 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors flex items-center gap-2 disabled:opacity-50"
+                class="p-2 rounded-lg bg-red-500/20 hover:bg-red-500/30 transition-colors flex items-center justify-center w-10 h-10 disabled:opacity-50"
+                title="Leave"
               >
-                <PhoneOff class="w-4 h-4" />
-                <span>Leave</span>
+                <div style={{ "background-image": "var(--icon-leave)" }} class="w-5 h-5 bg-contain bg-center bg-no-repeat opacity-90" />
               </button>
             </div>
           </Show>
@@ -281,7 +275,7 @@ const CallBanner: Component<CallBannerProps> = (props) => {
           <Show when={call().status === "reconnecting"}>
             <div class="flex items-center gap-3">
               <div class="w-10 h-10 rounded-full bg-yellow-500/20 flex items-center justify-center">
-                <Phone class="w-5 h-5 text-yellow-400 animate-pulse" />
+                <div style={{ "background-image": "var(--icon-pickup)" }} class="w-5 h-5 bg-contain bg-center bg-no-repeat animate-pulse" />
               </div>
               <div>
                 <p class="text-text-primary font-medium">Reconnecting...</p>
@@ -297,7 +291,7 @@ const CallBanner: Component<CallBannerProps> = (props) => {
           <Show when={call().status === "ended"}>
             <div class="flex items-center gap-3">
               <div class="w-10 h-10 rounded-full bg-surface-layer1 flex items-center justify-center">
-                <PhoneOff class="w-5 h-5 text-text-secondary" />
+                <div style={{ "background-image": "var(--icon-leave)" }} class="w-5 h-5 bg-contain bg-center bg-no-repeat opacity-50" />
               </div>
               <div>
                 <p class="text-text-primary font-medium">

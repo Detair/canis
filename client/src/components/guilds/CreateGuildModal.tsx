@@ -8,6 +8,7 @@
 import { Component, createSignal, createMemo, Show, For } from "solid-js";
 import { X } from "lucide-solid";
 import { createGuild } from "@/stores/guilds";
+import * as tauri from "@/lib/tauri";
 import { Portal } from "solid-js/web";
 
 interface CreateGuildModalProps {
@@ -31,6 +32,8 @@ const CreateGuildModal: Component<CreateGuildModalProps> = (props) => {
   const [tagInput, setTagInput] = createSignal("");
   const [tagError, setTagError] = createSignal<string | null>(null);
   const [bannerUrl, setBannerUrl] = createSignal("");
+  const [bannerFile, setBannerFile] = createSignal<File | null>(null);
+  const [bannerPreviewUrl, setBannerPreviewUrl] = createSignal("");
   const [bannerLoadError, setBannerLoadError] = createSignal(false);
 
   // Shared state
@@ -125,7 +128,7 @@ const CreateGuildModal: Component<CreateGuildModalProps> = (props) => {
 
     // Validate banner URL if provided
     const banner = trimmedBannerUrl();
-    if (banner && !isValidBannerUrl()) {
+    if (banner && !isValidBannerUrl() && !bannerFile()) {
       setError("Banner URL must use HTTPS.");
       return;
     }
@@ -138,15 +141,30 @@ const CreateGuildModal: Component<CreateGuildModalProps> = (props) => {
         ? {
             discoverable: true as const,
             tags: tags().length > 0 ? tags() : undefined,
-            banner_url: banner || undefined,
+            banner_url: !bannerFile() && banner ? banner : undefined,
           }
         : undefined;
 
-      await createGuild(
+      const newGuild = await createGuild(
         name().trim(),
         description().trim() || undefined,
         discoveryParams,
       );
+
+      if (discoverable() && bannerFile()) {
+        try {
+          await tauri.uploadGuildBanner(newGuild.id, bannerFile()!);
+        } catch (uploadErr) {
+          setError(
+            `Server created, but banner upload failed: ${
+              uploadErr instanceof Error ? uploadErr.message : "Unknown error"
+            }. You can try again in settings.`,
+          );
+          setIsCreating(false);
+          return;
+        }
+      }
+
       props.onClose();
     } catch (err) {
       setError(
@@ -389,18 +407,54 @@ const CreateGuildModal: Component<CreateGuildModalProps> = (props) => {
                       URL to a banner image displayed on your server's
                       discovery card.
                     </div>
-                    <input
-                      type="url"
-                      placeholder="https://example.com/banner.png"
-                      value={bannerUrl()}
-                      onInput={(e) => {
-                        setBannerUrl(e.currentTarget.value);
-                        setBannerLoadError(false);
-                      }}
-                      disabled={isCreating()}
-                      class="w-full px-3 py-1.5 text-sm rounded-lg bg-surface-layer1 border border-white/5 text-text-primary placeholder-text-secondary focus:outline-none focus:border-accent-primary/50"
-                    />
-                    <Show when={isValidBannerUrl()}>
+                    <div class="flex flex-col gap-3">
+                      <div class="flex items-center gap-2">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => {
+                            const file = e.currentTarget.files?.[0];
+                            if (file) {
+                              setBannerFile(file);
+                              setBannerPreviewUrl(URL.createObjectURL(file));
+                              setBannerUrl("");
+                              setBannerLoadError(false);
+                            }
+                          }}
+                          disabled={isCreating()}
+                          class="text-sm text-text-secondary file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-surface-layer1 file:text-text-primary hover:file:bg-surface-layer1/80 transition-colors"
+                        />
+                        <Show when={bannerFile()}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setBannerFile(null);
+                              setBannerPreviewUrl("");
+                            }}
+                            class="text-xs text-text-secondary hover:text-text-primary transition-colors"
+                          >
+                            Clear File
+                          </button>
+                        </Show>
+                      </div>
+                      <div class="flex items-center gap-2">
+                        <span class="text-xs text-text-secondary">OR</span>
+                      </div>
+                      <input
+                        type="url"
+                        placeholder="https://example.com/banner.png"
+                        value={bannerUrl()}
+                        onInput={(e) => {
+                          setBannerUrl(e.currentTarget.value);
+                          setBannerFile(null);
+                          setBannerPreviewUrl("");
+                          setBannerLoadError(false);
+                        }}
+                        disabled={isCreating() || !!bannerFile()}
+                        class="w-full px-3 py-1.5 text-sm rounded-lg bg-surface-layer1 border border-white/5 text-text-primary placeholder-text-secondary focus:outline-none focus:border-accent-primary/50 disabled:opacity-50"
+                      />
+                    </div>
+                    <Show when={isValidBannerUrl() || bannerPreviewUrl()}>
                       <div class="mt-3 h-20 rounded-lg overflow-hidden border border-white/5">
                         <Show
                           when={!bannerLoadError()}
@@ -411,7 +465,7 @@ const CreateGuildModal: Component<CreateGuildModalProps> = (props) => {
                           }
                         >
                           <img
-                            src={trimmedBannerUrl()}
+                            src={bannerPreviewUrl() || trimmedBannerUrl()}
                             alt="Banner preview"
                             class="w-full h-full object-cover"
                             onError={() => setBannerLoadError(true)}
@@ -431,7 +485,7 @@ const CreateGuildModal: Component<CreateGuildModalProps> = (props) => {
                       {/* Banner area */}
                       <div class="h-16 relative">
                         <Show
-                          when={isValidBannerUrl() && !bannerLoadError()}
+                          when={(isValidBannerUrl() || bannerPreviewUrl()) && !bannerLoadError()}
                           fallback={
                             <div
                               class="w-full h-full"
@@ -444,7 +498,7 @@ const CreateGuildModal: Component<CreateGuildModalProps> = (props) => {
                           }
                         >
                           <img
-                            src={trimmedBannerUrl()}
+                            src={bannerPreviewUrl() || trimmedBannerUrl()}
                             alt=""
                             class="w-full h-full object-cover"
                           />
