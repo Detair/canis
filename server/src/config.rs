@@ -132,9 +132,9 @@ pub struct Config {
     /// WebRTC TURN credential (optional)
     pub turn_credential: Option<String>,
 
-    /// Public IP for WebRTC NAT traversal (optional, auto-detected if unset).
+    /// Public IP for WebRTC NAT traversal.
     /// Required when the SFU runs behind NAT/Docker so ICE candidates
-    /// advertise the public IP instead of the container-internal IP.
+    /// advertise the reachable IP instead of the container-internal IP.
     pub public_ip: Option<String>,
 
     /// MFA secret encryption key (32-byte hex string)

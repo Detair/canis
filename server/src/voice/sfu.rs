@@ -421,9 +421,9 @@ impl SfuServer {
         registry = register_default_interceptors(registry, &mut media_engine)
             .map_err(|e| VoiceError::WebRtc(e.to_string()))?;
 
-        // Configure SettingEngine for NAT traversal
+        // Configure SettingEngine for NAT traversal behind Docker/VPS
         let mut setting_engine = SettingEngine::default();
-        if let Some(public_ip) = &config.public_ip {
+        if let Some(ref public_ip) = config.public_ip {
             setting_engine.set_nat_1to1_ips(
                 vec![public_ip.clone()],
                 webrtc::ice_transport::ice_candidate_type::RTCIceCandidateType::Host,
