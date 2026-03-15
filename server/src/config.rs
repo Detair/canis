@@ -310,9 +310,9 @@ impl Config {
                 .unwrap_or(256 * 1024), // 256KB
             stun_server: env::var("STUN_SERVER")
                 .unwrap_or_else(|_| "stun:stun.l.google.com:19302".into()),
-            turn_server: env::var("TURN_SERVER").ok(),
-            turn_username: env::var("TURN_USERNAME").ok(),
-            turn_credential: env::var("TURN_CREDENTIAL").ok(),
+            turn_server: env::var("TURN_SERVER").ok().filter(|s| !s.is_empty()),
+            turn_username: env::var("TURN_USERNAME").ok().filter(|s| !s.is_empty()),
+            turn_credential: env::var("TURN_CREDENTIAL").ok().filter(|s| !s.is_empty()),
             public_ip: env::var("PUBLIC_IP").ok(),
             mfa_encryption_key: env::var("MFA_ENCRYPTION_KEY").ok(),
             require_e2ee_setup: env::var("REQUIRE_E2EE_SETUP")
