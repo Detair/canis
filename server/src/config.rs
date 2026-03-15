@@ -81,7 +81,7 @@ pub struct Config {
 
     /// Public S3 base URL for client-facing file URLs (e.g., avatar images).
     /// When set, file URLs use this instead of the internal S3 endpoint.
-    /// Example: "https://kaiku.pmind.de/s3"
+    /// Example: `https://kaiku.pmind.de/s3`
     pub s3_public_url: Option<String>,
 
     /// S3 access key ID (optional, falls back to `AWS_ACCESS_KEY_ID` env var)

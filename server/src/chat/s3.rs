@@ -24,6 +24,8 @@ use crate::config::Config;
 #[derive(Clone)]
 pub struct S3Client {
     client: Client,
+    /// Client configured with the public endpoint for generating browser-accessible presigned URLs.
+    presign_client: Client,
     bucket: String,
     presign_expiry: Duration,
 }
@@ -100,6 +102,41 @@ impl S3Client {
         let s3_config = s3_config_builder.build();
         let client = Client::from_conf(s3_config);
 
+        // Build presign client with public endpoint for browser-accessible presigned URLs.
+        // When S3_PUBLIC_URL is set, presigned URLs point to the public proxy.
+        // When unset (dev mode), presigning uses the same internal client.
+        let presign_client = if let Some(public_url) = &config.s3_public_url {
+            let mut presign_builder = aws_sdk_s3::Config::builder()
+                .region(Region::new(
+                    std::env::var("AWS_REGION").unwrap_or_else(|_| "us-east-1".to_string()),
+                ))
+                .stalled_stream_protection(StalledStreamProtectionConfig::disabled())
+                .identity_cache(IdentityCache::no_cache())
+                .sleep_impl(Arc::new(TokioSleep::new()))
+                .behavior_version_latest()
+                .endpoint_url(public_url)
+                .force_path_style(true);
+
+            let pk = config
+                .s3_access_key
+                .clone()
+                .or_else(|| std::env::var("AWS_ACCESS_KEY_ID").ok());
+            let sk = config
+                .s3_secret_key
+                .clone()
+                .or_else(|| std::env::var("AWS_SECRET_ACCESS_KEY").ok());
+            if let (Some(ak), Some(sk)) = (pk, sk) {
+                let creds = Credentials::new(ak, sk, None, None, "environment");
+                presign_builder =
+                    presign_builder.credentials_provider(SharedCredentialsProvider::new(creds));
+            }
+
+            info!(public_url = %public_url, "Presign client initialized with public endpoint");
+            Client::from_conf(presign_builder.build())
+        } else {
+            client.clone()
+        };
+
         info!(
             bucket = %config.s3_bucket,
             endpoint = ?config.s3_endpoint,
@@ -108,6 +145,7 @@ impl S3Client {
 
         Ok(Self {
             client,
+            presign_client,
             bucket: config.s3_bucket.clone(),
             // Safety: s3_presign_expiry is clamped to >= 1 at parse time in Config::from_env
             presign_expiry: Duration::from_secs(u64::try_from(config.s3_presign_expiry).map_err(
@@ -212,7 +250,7 @@ impl S3Client {
             .map_err(|e| S3Error::Presign(e.to_string()))?;
 
         let presign_future = self
-            .client
+            .presign_client
             .get_object()
             .bucket(&self.bucket)
             .key(key)

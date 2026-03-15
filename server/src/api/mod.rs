@@ -6,6 +6,7 @@ pub mod bots;
 pub mod channel_pins;
 pub mod commands;
 pub mod favorites;
+pub mod files;
 pub mod global_search;
 pub mod pins;
 pub mod preferences;
@@ -384,6 +385,8 @@ pub fn create_router(state: AppState) -> Router {
         .nest("/auth", auth::router(state.clone()))
         // Protected chat and voice routes
         .merge(protected_routes)
+        // Public file redirect (presigned S3 URLs)
+        .route("/api/files/{*key}", get(files::redirect))
         // Public message routes (download handles its own auth via query param)
         .nest("/api/messages", chat::messages_public_router())
         // WebSocket
