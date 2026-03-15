@@ -1,0 +1,15 @@
+# Gitleaks configuration — allowlist for known false positives
+#
+# These are test fixtures with fake JWT tokens and API keys,
+# not real secrets.
+
+[allowlist]
+
+paths = [
+    # Android test fixtures with fake JWT tokens and bearer tokens
+    '''mobile/android/app/src/test/.*\.kt''',
+    # Client test fixtures
+    '''client/src/.*__tests__/.*\.ts''',
+    # Server test fixtures
+    '''server/tests/.*\.rs''',
+]
