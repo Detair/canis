@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Layout areas (ServerRail, Sidebar, Main Stage) now separated by solid border lines for clearer visual structure
 
 ### Fixed
+- Guild Settings modal updated to be fully responsive (`w-[90vw] md:w-[800px]`), and Safety tab active sections text contrast improved for readability
 - Improved contrast and visibility of admin elevation badges, formatting toolbar icons, server rail icons, settings modal backdrop, and user panel across all 4 themes
 - Friend request accept/decline buttons enlarged with stronger backgrounds for better visibility
 - Search panel overlay no longer bleeds outside sidebar bounds
@@ -31,6 +32,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Volume mute toggle now remembers pre-mute level and restores it on unmute
 
 ### Added
+- Guild banner image upload support in the Create New Guild dialog with drag-and-drop and local image preview
+- Transparent backgrounds for all application icons via an automated NumPy processing script
+- Headless Agent Rules added to AGENTS.md to ensure reliable non-interactive shell command execution
 - Monitoring stack — Grafana, Prometheus, Tempo, and Loki available via `docker compose --profile monitoring up -d`, with auto-provisioned datasources and Kaiku Overview dashboard (localhost-only, access via VPN)
 - Database backup script — daily pg_dump with 7-day retention (`infra/scripts/backup.sh`), configurable via environment variables
 - OpenTelemetry telemetry — server traces, metrics (RED via spanmetrics), and structured logs exported to the monitoring stack when `OBSERVABILITY_ENABLED=true`

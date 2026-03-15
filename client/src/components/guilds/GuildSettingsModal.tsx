@@ -119,7 +119,7 @@ const GuildSettingsModal: Component<GuildSettingsModalProps> = (props) => {
         tabIndex={-1}
       >
         <div
-          class="border border-white/10 rounded-2xl w-[600px] max-h-[80vh] flex flex-col shadow-2xl"
+          class="border border-white/10 rounded-2xl w-[90vw] md:w-[800px] max-w-4xl max-h-[85vh] flex flex-col shadow-2xl"
           style="background-color: var(--color-surface-base)"
         >
           {/* Header */}

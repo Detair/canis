@@ -132,6 +132,11 @@ pub struct Config {
     /// WebRTC TURN credential (optional)
     pub turn_credential: Option<String>,
 
+    /// Public IP for WebRTC NAT traversal (optional, auto-detected if unset).
+    /// Required when the SFU runs behind NAT/Docker so ICE candidates
+    /// advertise the public IP instead of the container-internal IP.
+    pub public_ip: Option<String>,
+
     /// MFA secret encryption key (32-byte hex string)
     pub mfa_encryption_key: Option<String>,
 
@@ -308,6 +313,7 @@ impl Config {
             turn_server: env::var("TURN_SERVER").ok(),
             turn_username: env::var("TURN_USERNAME").ok(),
             turn_credential: env::var("TURN_CREDENTIAL").ok(),
+            public_ip: env::var("PUBLIC_IP").ok(),
             mfa_encryption_key: env::var("MFA_ENCRYPTION_KEY").ok(),
             require_e2ee_setup: env::var("REQUIRE_E2EE_SETUP")
                 .ok()
@@ -495,6 +501,7 @@ impl Config {
             turn_server: None,
             turn_username: None,
             turn_credential: None,
+            public_ip: None,
             mfa_encryption_key: Some(TEST_MFA_ENCRYPTION_KEY.into()),
             require_e2ee_setup: false,
             block_check_fail_open: false,

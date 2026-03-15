@@ -1,0 +1,56 @@
+    Checking vc-server v0.1.0 (/home/detair/GIT/detair/kaiku/server)
+error: variables can be used directly in the `format!` string
+   --> server/tests/integration/media_processing.rs:417:5
+    |
+417 | /     assert!(
+418 | |         error["message"]
+419 | |             .as_str()
+420 | |             .unwrap_or_default()
+...   |
+423 | |         error
+424 | |     );
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#uninlined_format_args
+    = note: `-D clippy::uninlined-format-args` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::uninlined_format_args)]`
+
+error: an inclusive range would be more readable
+   --> server/tests/integration/workspaces.rs:928:22
+    |
+928 | ...d = (0..(app.config.max_entries_per_workspace as usize + 1))
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: use: `0..=(app.config.max_entries_per_workspace as usize)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#range_plus_one
+    = note: `-D clippy::range-plus-one` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::range_plus_one)]`
+
+error: an inclusive range would be more readable
+   --> server/tests/integration/workspaces.rs:959:22
+    |
+959 |     let oversized = (0..(app.config.max_workspaces_per_user as usize + 1))
+    |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: use: `0..=(app.config.max_workspaces_per_user as usize)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#range_plus_one
+
+error: could not compile `vc-server` (test "integration") due to 3 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: unchecked subtraction of a `Duration`
+   --> server/src/voice/track.rs:743:22
+    |
+743 |         let recent = Instant::now() - Duration::from_secs(1);
+    |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `Instant::now().checked_sub(Duration::from_secs(1)).unwrap()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#unchecked_time_subtraction
+    = note: `-D clippy::unchecked-time-subtraction` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::unchecked_time_subtraction)]`
+
+error: unchecked subtraction of a `Duration`
+   --> server/src/voice/track.rs:749:19
+    |
+749 |         let old = Instant::now() - Duration::from_secs(4);
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `Instant::now().checked_sub(Duration::from_secs(4)).unwrap()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#unchecked_time_subtraction
+
+error: could not compile `vc-server` (lib test) due to 2 previous errors

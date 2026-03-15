@@ -7,7 +7,7 @@
  */
 
 import { Component, Show, For } from "solid-js";
-import { UserPlus, Check, X } from "lucide-solid";
+import { UserPlus } from "lucide-solid";
 import {
   friendsState,
   acceptFriendRequest,
@@ -81,17 +81,17 @@ const PendingModule: Component = () => {
                 <div class="flex items-center gap-1 flex-shrink-0">
                   <button
                     onClick={() => handleAccept(request)}
-                    class="p-2 rounded-full bg-status-success/25 text-status-success hover:bg-status-success/40 transition-colors"
+                    class="p-1 rounded-full bg-white/5 hover:bg-status-success/20 transition-colors flex items-center justify-center w-8 h-8"
                     title="Accept"
                   >
-                    <Check class="w-4 h-4" />
+                    <div style={{ "background-image": "var(--icon-accept)" }} class="w-5 h-5 bg-contain bg-center bg-no-repeat opacity-80 hover:opacity-100" />
                   </button>
                   <button
                     onClick={() => handleDecline(request)}
-                    class="p-2 rounded-full bg-status-error/25 text-status-error hover:bg-status-error/40 transition-colors"
+                    class="p-1 rounded-full bg-white/5 hover:bg-status-error/20 transition-colors flex items-center justify-center w-8 h-8"
                     title="Decline"
                   >
-                    <X class="w-4 h-4" />
+                    <div style={{ "background-image": "var(--icon-decline)" }} class="w-5 h-5 bg-contain bg-center bg-no-repeat opacity-80 hover:opacity-100" />
                   </button>
                 </div>
               </div>

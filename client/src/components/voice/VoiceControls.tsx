@@ -1,5 +1,5 @@
 import { Component, createSignal, Show, onMount, onCleanup } from "solid-js";
-import { Mic, MicOff, Headphones, VolumeX, Settings } from "lucide-solid";
+import { Mic, Headphones, Settings } from "lucide-solid";
 import { voiceState, toggleMute, toggleDeafen, isPttActive } from "@/stores/voice";
 import MicrophoneTest from "./MicrophoneTest";
 import ScreenShareButton from "./ScreenShareButton";
@@ -66,7 +66,7 @@ const VoiceControls: Component = () => {
           disabled={voiceState.state !== "connected" || isPttActive()}
         >
           {voiceState.muted ? (
-            <MicOff class="w-5 h-5" />
+            <div style={{ "background-image": "var(--icon-mute)" }} class="w-6 h-6 bg-contain bg-center bg-no-repeat" />
           ) : (
             <Mic class="w-5 h-5" />
           )}
@@ -85,7 +85,7 @@ const VoiceControls: Component = () => {
           disabled={voiceState.state !== "connected"}
         >
           {voiceState.deafened ? (
-            <VolumeX class="w-5 h-5" />
+            <div style={{ "background-image": "var(--icon-deafen)" }} class="w-6 h-6 bg-contain bg-center bg-no-repeat" />
           ) : (
             <Headphones class="w-5 h-5" />
           )}

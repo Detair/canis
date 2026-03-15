@@ -61,6 +61,16 @@
   --color-error-bg: rgba(191, 97, 106, 0.15);
   --color-error-border: rgba(191, 97, 106, 0.4);
   --color-error-text: #f0a0a8;
+
+  /* UI Icons */
+  --icon-accept: url('../assets/icons/accept_request_icon.png');
+  --icon-decline: url('../assets/icons/decline_request_icon.png');
+  --icon-pickup: url('../assets/icons/pickup_call_icon.png');
+  --icon-leave: url('../assets/icons/end_call_icon.png');
+  --icon-mute: url('../assets/icons/mute_icon.png');
+  --icon-deafen: url('../assets/icons/deafen_icon.png');
+
+  color-scheme: dark;
 }
 
 /* Solarized Dark - Precision colors for machines and people */
@@ -85,6 +95,8 @@
   --color-error-bg: rgba(220, 50, 47, 0.15);
   --color-error-border: rgba(220, 50, 47, 0.4);
   --color-error-text: #fdf6e3;
+
+  color-scheme: dark;
 }
 
 /* Solarized Light - Warm light theme */
@@ -109,6 +121,8 @@
   --color-error-bg: rgba(220, 50, 47, 0.12);
   --color-error-border: rgba(220, 50, 47, 0.35);
   --color-error-text: #a01a18;
+
+  color-scheme: light;
 }
 
 /* Pixel Cozy — Warm 8-bit RPG aesthetic
@@ -151,6 +165,8 @@
   --color-error-bg: rgba(192, 96, 80, 0.15);
   --color-error-border: rgba(192, 96, 80, 0.4);
   --color-error-text: #e8a090;
+
+  color-scheme: dark;
 }
 
 /* Default theme fallback (same as focused-hybrid) */
@@ -175,4 +191,14 @@
   --color-error-bg: rgba(191, 97, 106, 0.15);
   --color-error-border: rgba(191, 97, 106, 0.4);
   --color-error-text: #f0a0a8;
+
+  /* UI Icons */
+  --icon-accept: url('../assets/icons/accept_request_icon.png');
+  --icon-decline: url('../assets/icons/decline_request_icon.png');
+  --icon-pickup: url('../assets/icons/pickup_call_icon.png');
+  --icon-leave: url('../assets/icons/end_call_icon.png');
+  --icon-mute: url('../assets/icons/mute_icon.png');
+  --icon-deafen: url('../assets/icons/deafen_icon.png');
+
+  color-scheme: dark;
 }

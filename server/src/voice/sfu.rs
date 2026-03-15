@@ -10,7 +10,9 @@ use tracing::{debug, info, warn};
 use uuid::Uuid;
 use webrtc::api::interceptor_registry::register_default_interceptors;
 use webrtc::api::media_engine::MediaEngine;
+use webrtc::api::setting_engine::SettingEngine;
 use webrtc::api::{APIBuilder, API};
+use webrtc::ice::network_type::NetworkType;
 use webrtc::ice_transport::ice_server::RTCIceServer;
 use webrtc::interceptor::registry::Registry;
 use webrtc::peer_connection::configuration::RTCConfiguration;
@@ -419,10 +421,22 @@ impl SfuServer {
         registry = register_default_interceptors(registry, &mut media_engine)
             .map_err(|e| VoiceError::WebRtc(e.to_string()))?;
 
+        // Configure SettingEngine for NAT traversal
+        let mut setting_engine = SettingEngine::default();
+        if let Some(public_ip) = &config.public_ip {
+            setting_engine.set_nat_1to1_ips(
+                vec![public_ip.clone()],
+                webrtc::ice_transport::ice_candidate_type::RTCIceCandidateType::Host,
+            );
+            setting_engine.set_network_types(vec![NetworkType::Udp4, NetworkType::Udp6]);
+            info!(public_ip = %public_ip, "SFU NAT 1:1 IP configured");
+        }
+
         // Build WebRTC API
         let api = APIBuilder::new()
             .with_media_engine(media_engine)
             .with_interceptor_registry(registry)
+            .with_setting_engine(setting_engine)
             .build();
 
         info!("SFU server initialized");
