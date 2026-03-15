@@ -1,6 +1,6 @@
 //! Guild Management Handlers
 
-use axum::extract::{Path, State};
+use axum::extract::{Multipart, Path, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::Json;
@@ -8,6 +8,9 @@ use serde::{Deserialize, Serialize};
 use sqlx::QueryBuilder;
 use uuid::Uuid;
 use validator::Validate;
+use chrono::Utc;
+
+use crate::util::format_file_size;
 
 use super::limits;
 use super::types::{
@@ -78,6 +81,7 @@ pub enum GuildError {
     Validation(String),
     LimitExceeded(String),
     Database(sqlx::Error),
+    Internal(String),
 }
 
 impl IntoResponse for GuildError {
@@ -105,6 +109,11 @@ impl IntoResponse for GuildError {
                     "Database error".to_string(),
                 )
             }
+            Self::Internal(msg) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "INTERNAL_ERROR",
+                msg.clone(),
+            ),
         };
         (
             status,
@@ -1436,4 +1445,154 @@ pub async fn get_guild_usage(
             limit: page_limit.unwrap_or(state.config.max_pages_per_guild),
         },
     }))
+}
+
+/// Upload guild banner
+#[utoipa::path(
+    post,
+    path = "/api/guilds/{id}/banner",
+    tag = "guilds",
+    params(("id" = Uuid, Path, description = "Guild ID")),
+    request_body(content = String, content_type = "multipart/form-data"),
+    responses(
+        (status = 200, body = Guild),
+        (status = 400, description = "Bad request (invalid file)"),
+        (status = 403, description = "Forbidden (requires MANAGE_GUILD)"),
+        (status = 413, description = "Payload too large")
+    ),
+    security(("bearer_auth" = []))
+)]
+#[tracing::instrument(skip(state, multipart))]
+pub async fn upload_guild_banner(
+    State(state): State<AppState>,
+    auth: AuthUser,
+    Path(guild_id): Path<Uuid>,
+    mut multipart: Multipart,
+) -> Result<Json<Guild>, GuildError> {
+    // Check permission
+    let _ctx = require_guild_permission(
+        &state.db,
+        guild_id,
+        auth.id,
+        GuildPermissions::MANAGE_GUILD,
+    )
+    .await
+    .map_err(|e| match e {
+        PermissionError::NotGuildMember => GuildError::Forbidden,
+        other => GuildError::Permission(other),
+    })?;
+
+    // Check if S3 is configured
+    let s3 = state
+        .s3
+        .as_ref()
+        .ok_or_else(|| GuildError::Internal("File storage not configured".to_string()))?;
+
+    // Get the file from multipart
+    let mut file_data = None;
+    let mut filename = None;
+    let mut content_type = None;
+
+    while let Some(field) = multipart
+        .next_field()
+        .await
+        .map_err(|e| GuildError::Internal(format!("Multipart error: {e}")))?
+    {
+        if field.name() == Some("banner") {
+            filename = field.file_name().map(ToString::to_string);
+            content_type = field.content_type().map(ToString::to_string);
+
+            let data = field
+                .bytes()
+                .await
+                .map_err(|e| GuildError::Internal(format!("Upload error: {e}")))?;
+
+            file_data = Some(data);
+            break;
+        }
+    }
+
+    let data = file_data.ok_or(GuildError::Validation("No banner file provided".to_string()))?;
+
+    // Validate file size (using 5MB limit for banners)
+    let max_size = 5 * 1024 * 1024;
+    if data.len() > max_size {
+        return Err(GuildError::Validation(format!(
+            "Banner file too large ({}). Maximum size is {}",
+            format_file_size(data.len()),
+            format_file_size(max_size)
+        )));
+    }
+
+    // Validate mime type
+    let mime = content_type.unwrap_or_else(|| "application/octet-stream".to_string());
+    if !mime.starts_with("image/") {
+        return Err(GuildError::Validation("File must be an image".to_string()));
+    }
+
+    if mime.contains("svg") {
+        return Err(GuildError::Validation(
+            "SVG files are not allowed for banners".to_string(),
+        ));
+    }
+
+    // Validate actual content format
+    let detected_format = image::guess_format(&data).map_err(|_| {
+        GuildError::Validation(
+            "Unable to detect image format. File may be corrupted or not a valid image."
+                .to_string(),
+        )
+    })?;
+
+    match detected_format {
+        image::ImageFormat::Png
+        | image::ImageFormat::Jpeg
+        | image::ImageFormat::Gif
+        | image::ImageFormat::WebP => {}
+        _ => {
+            return Err(GuildError::Validation(format!(
+                "Unsupported image format: {detected_format:?}. Only PNG, JPEG, GIF, and WebP are allowed."
+            )));
+        }
+    }
+
+    // Generate S3 key: guilds/{guild_id}/banner-{timestamp}_{filename}
+    let timestamp = Utc::now().timestamp();
+    let safe_filename = filename
+        .unwrap_or_else(|| "banner.png".to_string())
+        .replace(|c: char| !c.is_alphanumeric() && c != '.', "_");
+
+    let key = format!("guilds/{}/banner-{}_{}", guild_id, timestamp, safe_filename);
+
+    s3.upload(&key, data.to_vec(), &mime)
+        .await
+        .map_err(|e| GuildError::Internal(format!("S3 upload failed: {e}")))?;
+
+    // Construct public URL
+    let bucket = &state.config.s3_bucket;
+    let url = if let Some(public_url) = &state.config.s3_public_url {
+        format!("{public_url}/{bucket}/{key}")
+    } else if let Some(ep) = state
+        .config
+        .s3_endpoint
+        .as_deref()
+        .filter(|s| s.contains("localhost") || s.contains("127.0.0.1"))
+    {
+        format!("{ep}/{bucket}/{key}")
+    } else if let Some(ep) = &state.config.s3_endpoint {
+        format!("{ep}/{bucket}/{key}")
+    } else {
+        format!("/{bucket}/{key}")
+    };
+
+    // Update guild
+    let updated_guild = sqlx::query_as::<_, Guild>(
+        "UPDATE guilds SET banner_url = $1 WHERE id = $2 RETURNING id, name, owner_id, icon_url, description, threads_enabled, discoverable, tags, banner_url, plan, created_at"
+    )
+    .bind(&url)
+    .bind(guild_id)
+    .fetch_one(&state.db)
+    .await?;
+
+    Ok(Json(updated_guild))
 }
