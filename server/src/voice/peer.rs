@@ -13,8 +13,8 @@ use webrtc::ice_transport::ice_connection_state::RTCIceConnectionState;
 use webrtc::peer_connection::configuration::RTCConfiguration;
 use webrtc::peer_connection::RTCPeerConnection;
 use webrtc::rtp_transceiver::rtp_codec::RTPCodecType;
-use webrtc::rtp_transceiver::rtp_transceiver_direction::RTCRtpTransceiverDirection;
 use webrtc::rtp_transceiver::rtp_sender::RTCRtpSender;
+use webrtc::rtp_transceiver::rtp_transceiver_direction::RTCRtpTransceiverDirection;
 use webrtc::rtp_transceiver::RTCRtpTransceiverInit;
 use webrtc::track::track_local::track_local_static_rtp::TrackLocalStaticRTP;
 use webrtc::track::track_local::TrackLocal;
@@ -118,7 +118,7 @@ impl Peer {
         let sender = self
             .peer_connection
             .add_track(
-                track.clone() as Arc<dyn webrtc::track::track_local::TrackLocal + Send + Sync>,
+                track.clone() as Arc<dyn webrtc::track::track_local::TrackLocal + Send + Sync>
             )
             .await?;
 

@@ -4,6 +4,7 @@
 //! Runs on a background thread and sends frames via `mpsc::Sender`.
 
 use std::sync::mpsc;
+
 use tokio::sync::watch;
 use tracing::{debug, error, info, warn};
 
