@@ -16,10 +16,10 @@ services:
   # Kaiku Server
   # ==========================================================================
   server:
+    image: ghcr.io/detair/kaiku/server:latest
     build:
       context: ../..
       dockerfile: infra/docker/Dockerfile
-    image: voicechat/server:latest
     container_name: canis-server
     restart: unless-stopped
     depends_on:
