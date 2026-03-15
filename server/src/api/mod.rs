@@ -386,7 +386,7 @@ pub fn create_router(state: AppState) -> Router {
         // Protected chat and voice routes
         .merge(protected_routes)
         // Public file redirect (presigned S3 URLs)
-        .route("/api/files/{*key}", get(files::redirect))
+        .route("/api/files/{*key}", get(files::serve))
         // Public message routes (download handles its own auth via query param)
         .nest("/api/messages", chat::messages_public_router())
         // WebSocket
