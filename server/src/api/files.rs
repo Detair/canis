@@ -1,8 +1,7 @@
-//! File redirect endpoint — generates presigned S3 URLs on-the-fly.
+//! File serving endpoint — streams files from S3 with caching headers.
 //!
-//! `GET /api/files/{key...}` → 302 redirect to a fresh presigned S3 URL.
+//! `GET /api/files/{key...}` → serves file bytes from S3.
 //! No auth required (URLs are shared in messages, profiles).
-//! Browser caches the redirect for ~1 hour via `Cache-Control`.
 
 use axum::extract::{Path, State};
 use axum::http::{header, HeaderMap, StatusCode};
@@ -11,14 +10,23 @@ use axum::response::IntoResponse;
 use super::AppState;
 
 /// Convert an S3 key to an API file URL.
-///
-/// Returns `/api/files/{key}` — the redirect endpoint that generates presigned URLs.
 pub fn file_url(s3_key: &str) -> String {
     format!("/api/files/{s3_key}")
 }
 
-/// Redirect to a presigned S3 URL for the given file key.
-pub async fn redirect(
+/// Infer MIME type from file extension.
+fn content_type_from_key(key: &str) -> &'static str {
+    match key.rsplit('.').next().unwrap_or("") {
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        "gif" => "image/gif",
+        "webp" => "image/webp",
+        _ => "application/octet-stream",
+    }
+}
+
+/// Serve a file from S3 storage.
+pub async fn serve(
     State(state): State<AppState>,
     Path(key): Path<String>,
 ) -> impl IntoResponse {
@@ -30,18 +38,29 @@ pub async fn redirect(
         }
     };
 
-    match s3.presign_get(&key).await {
-        Ok(presigned_url) => {
+    match s3.get_object_stream(&key).await {
+        Ok(stream) => {
+            let bytes = match stream.collect().await {
+                Ok(data) => data.into_bytes(),
+                Err(e) => {
+                    tracing::warn!(key = %key, error = %e, "Failed to read file from S3");
+                    return (StatusCode::INTERNAL_SERVER_ERROR, "Failed to read file")
+                        .into_response();
+                }
+            };
+
+            let content_type = content_type_from_key(&key);
             let mut headers = HeaderMap::new();
-            headers.insert(header::LOCATION, presigned_url.parse().unwrap());
+            headers.insert(header::CONTENT_TYPE, content_type.parse().unwrap());
             headers.insert(
                 header::CACHE_CONTROL,
-                "public, max-age=3500".parse().unwrap(),
+                "public, max-age=86400".parse().unwrap(),
             );
-            (StatusCode::FOUND, headers, "").into_response()
+
+            (StatusCode::OK, headers, bytes).into_response()
         }
         Err(e) => {
-            tracing::warn!(key = %key, error = %e, "Failed to generate presigned URL for file redirect");
+            tracing::warn!(key = %key, error = %e, "Failed to serve file from S3");
             (StatusCode::NOT_FOUND, "File not found").into_response()
         }
     }
