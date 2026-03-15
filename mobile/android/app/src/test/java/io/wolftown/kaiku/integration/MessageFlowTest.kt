@@ -15,8 +15,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.encodeToJsonElement
+import kotlinx.serialization.json.jsonObject
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
@@ -109,7 +109,7 @@ class MessageFlowTest {
             content = "Hello from WebSocket!",
             createdAt = "2026-03-12T10:02:00Z"
         )
-        val messageJson: JsonElement = json.encodeToJsonElement(newMessage)
+        val messageJson = json.encodeToJsonElement(newMessage).jsonObject
         eventsFlow.emit(ServerEvent.MessageNew(channelId = "ch-1", message = messageJson))
         advanceUntilIdle()
 
@@ -128,7 +128,7 @@ class MessageFlowTest {
 
         // Re-emit an existing message
         val existingMessage = initialMessages[0]
-        val messageJson: JsonElement = json.encodeToJsonElement(existingMessage)
+        val messageJson = json.encodeToJsonElement(existingMessage).jsonObject
         eventsFlow.emit(ServerEvent.MessageNew(channelId = "ch-1", message = messageJson))
         advanceUntilIdle()
 
