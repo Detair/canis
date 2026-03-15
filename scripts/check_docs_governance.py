@@ -11,7 +11,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 ROADMAP_PATH = ROOT / "docs/project/roadmap.md"
 CHANGELOG_PATH = ROOT / "CHANGELOG.md"
-PLAN_LIFECYCLE_PATH = ROOT / "docs/plans/PLAN_LIFECYCLE.md"
+PLAN_LIFECYCLE_PATH = ROOT / "docs/developer-guide/plans/PLAN_LIFECYCLE.md"
 RELEASE_TEMPLATE_PATH = ROOT / "docs/project/RELEASE_NOTES_TEMPLATE.md"
 
 LIFECYCLE_STATUSES = {"Active", "Superseded", "Archived"}
@@ -167,7 +167,7 @@ def validate_plan_lifecycle(errors: list[str]) -> None:
                 f"(allowed: {', '.join(sorted(LIFECYCLE_STATUSES))})"
             )
 
-        plan_path = ROOT / "docs/plans" / plan_rel
+        plan_path = ROOT / "docs/developer-guide/plans" / plan_rel
         if not plan_path.exists():
             errors.append(
                 f"Lifecycle entry references missing file: docs/plans/{plan_rel}"
@@ -190,7 +190,7 @@ def validate_plan_lifecycle(errors: list[str]) -> None:
                 )
                 continue
 
-            superseded_path = ROOT / "docs/plans" / superseded_rel
+            superseded_path = ROOT / "docs/developer-guide/plans" / superseded_rel
             if not superseded_path.exists():
                 errors.append(
                     f"Superseded target does not exist: docs/plans/{superseded_rel}"
@@ -199,7 +199,7 @@ def validate_plan_lifecycle(errors: list[str]) -> None:
             if superseded_rel not in plan_text:
                 errors.append(
                     f"Superseded source missing explicit target reference '{superseded_rel}': "
-                    f"docs/plans/{plan_rel}"
+                    f"docs/developer-guide/plans/{plan_rel}"
                 )
 
         if status == "Active" and "**Lifecycle:** Active" not in plan_text:
@@ -224,21 +224,21 @@ def validate_release_template(errors: list[str]) -> None:
 
 def check_observability_plan_linkage(errors: list[str]) -> None:
     """Verify observability plan linkage: plan file, ops docs, and roadmap reference."""
-    plan_path = ROOT / "docs/plans/2026-02-27-phase-7-observability-telemetry-task-plan.md"
+    plan_path = ROOT / "docs/developer-guide/plans/2026-02-27-phase-7-observability-telemetry-task-plan.md"
     contract_path = ROOT / "docs/ops/observability-contract.md"
     runbook_path = ROOT / "docs/ops/observability-runbook.md"
 
     if not plan_path.exists():
         errors.append(
             "Missing observability implementation plan: "
-            "docs/plans/2026-02-27-phase-7-observability-telemetry-task-plan.md"
+            "docs/developer-guide/plans/2026-02-27-phase-7-observability-telemetry-task-plan.md"
         )
     else:
         plan_text = plan_path.read_text(encoding="utf-8")
         if "**Status:**" not in plan_text:
             errors.append(
                 "Observability plan missing lifecycle metadata '**Status:**': "
-                "docs/plans/2026-02-27-phase-7-observability-telemetry-task-plan.md"
+                "docs/developer-guide/plans/2026-02-27-phase-7-observability-telemetry-task-plan.md"
             )
 
     if not contract_path.exists():

@@ -16,6 +16,8 @@ ignore = [
     "RUSTSEC-2025-0008",
     # rsa crate Marvin Attack - no safe upgrade available, used by openidconnect
     "RUSTSEC-2023-0071",
+    # time crate DoS via stack exhaustion in RFC 2822 parsing - low risk, no user input reaches this path
+    "RUSTSEC-2026-0009",
 ]
 
 # =============================================================================
